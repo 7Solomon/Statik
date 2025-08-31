@@ -1,19 +1,21 @@
-from custome_class_definitions import DistributedLoad, PointLoad, ProblemDefinition
+from custome_class_definitions import Bearing, DistributedLoad, Joint, PointLoad, ProblemDefinition
 import numpy as np
+from typing import List 
 
 def check_static_determinacy(problem: ProblemDefinition) -> int:
     """
     f = a + 3 * (c - n) - r
     """
     # total number of support reaction components
-    a = sum(len(node.bearings) for node in problem.nodes)
+    a = sum(len([_ for _ in node.reactions if isinstance(_, Bearing)]) for node in problem.nodes)
     # number of connections
     c = len(problem.connections)
     # number of nodes
     n = len(problem.nodes)
     # internal releases (hinges).
-    r = 0 # NI
+    r = 2 # NI
 
+    print(f"Static indeterminacy check: a = {a}, c = {c}, n = {n}, r = {r}")
     # Degree of static indeterminacy
     f = a + 3 * (c - n) - r
 
@@ -26,6 +28,41 @@ def check_static_determinacy(problem: ProblemDefinition) -> int:
 
     return f
 
+def fixed_joint_reaction(joint_reactions_1: List[Joint], joint_reactions_2: List[Joint]):
+
+    #for joint in joint_reactions_1:
+    #    print(f"Analyzing joint reaction at {joint.vector} with value {joint.value}")
+#
+    #for joint in joint_reactions_2:
+    #    print(f"Analyzing joint reaction at {joint.vector} with value {joint.value}")
+
+    #print(len(joint_reactions_1), len(joint_reactions_2))
+    if len(joint_reactions_1) != len(joint_reactions_2):
+        return False
+    else:
+        #print("Joint reactions are balanced.")
+        if len(joint_reactions_1) == 3:
+            vectors = [joint.vector for joint in joint_reactions_1]
+            has_x = any(vector[0] == 1 and vector[1] == 0 and vector[2] == 0 for vector in vectors)
+            has_y = any(vector[0] == 0 and vector[1] == 1 and vector[2] == 0 for vector in vectors)
+            has_m = any(vector[0] == 0 and vector[1] == 0 and vector[2] == 1 for vector in vectors)
+            if has_x and has_y and has_m:
+                return True
+    return False
+
+def split_in_base_systems(problem: ProblemDefinition):
+    """
+    Splits the problem into base systems for easier analysis.
+    """
+    #print(problem)
+    
+    for connection in problem.connections:
+        print(f"Connection from {connection.from_node} to {connection.to_node} with length {connection.length}")
+        Joint_reaction_1 = [_ for _ in problem.node(connection.from_node).reactions if isinstance(_, Joint) and _.from_node == connection.to_node]
+        Joint_reaction_2 = [_ for _ in problem.node(connection.to_node).reactions if isinstance(_, Joint) and _.from_node == connection.from_node]
+        is_fixed = fixed_joint_reaction(Joint_reaction_1, Joint_reaction_2)
+        print(f"Is connection fixed? {is_fixed}")
+        #print(f"Joint reactions for connection: {Joint_reaction_1}, {Joint_reaction_2}")
 
 def calculate_reaction_forces(problem: ProblemDefinition):
     """

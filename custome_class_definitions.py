@@ -8,27 +8,34 @@ from typing import List, Union
 
 @dataclass
 class Connection:
-    id: str
+    #id: str
     from_node: str
     to_node: str
-    length: float
+    length: float = None
 
     #EA: float
     #EI: float
 
 @dataclass
 class Bearing:
-    position: tuple[float, float]
     vector: tuple[float, float, float]
 
     value: float | None
+
+@dataclass
+class Joint:
+    vector: tuple[float, float, float]
+    from_node: str
+
+    #value: float | None
 
 
 @dataclass
 class Node:
     id: str
     position: tuple[float, float]
-    bearings: List[Bearing]
+    reactions: List[Bearing | Joint]
+
 
 
 @dataclass
@@ -55,5 +62,11 @@ class ProblemDefinition:
     connections: List[Connection]
     loads: List[Load]
 
+    def __post_init__(self):
+        self.node_map = {node.id: node for node in self.nodes}
+
+    def node(self, id) -> Node:
+        print(f"Retrieving node with id: {id}")
+        return self.node_map.get(id)
 
 Force = Union[Load, Bearing]

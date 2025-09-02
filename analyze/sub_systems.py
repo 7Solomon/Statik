@@ -1,7 +1,7 @@
 from collections import defaultdict, deque
 from typing import List, Set, Tuple, Dict, Any
 from data.custome_class_definitions import ProblemDefinition, Joint
-from analyze.bool_checker import has_full_xyzM
+from analyze.bool_checker import has_full_xyM
 
 def _joint_lists(problem: ProblemDefinition, a: str, b: str):
     """
@@ -61,10 +61,10 @@ def _find_directed_moment_capable_joints(
         ja, jb = _joint_lists(problem, a, b)  # ja: joints at a referencing b, jb: at b referencing a
         edge_joint_cache[(a,b)] = (ja,jb)
 
-        if has_full_xyzM(j.vector for j in ja):
+        if has_full_xyM(j.vector for j in ja):
             #print(f"moment capable direction: {a} -> {b}")
             directed_moment_capable.add((a,b))
-        if has_full_xyzM(j.vector for j in jb):
+        if has_full_xyM(j.vector for j in jb):
             #print(f"moment capable direction: {b} -> {a}")
             directed_moment_capable.add((b,a))
     return directed_moment_capable

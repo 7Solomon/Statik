@@ -37,4 +37,4 @@ def split_in_base_systems(problem: ProblemDefinition):
     Splits the problem into base systems for easier analysis.
     """
     systems = find_rigid_subsystems(problem)
-    analyze_subsystems(systems)
+    analyze_subsystems(problem, systems)

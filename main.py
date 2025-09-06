@@ -1,6 +1,7 @@
 
-from functions import check_static_determinacy, split_in_base_systems
+from src.analyze.functions import check_static_determinacy, split_in_base_systems
 from problem_definitions import *
+from src.GUIs.main_GUI import MainWindow
 
 
 
@@ -19,5 +20,20 @@ def test_verlauf_checker():
         print("The system is not statically determinate, cannot calculate reaction forces.")
 
 
+def test_start_GUI():
+    from PyQt5.QtWidgets import QApplication
+    import sys
+
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    sys.exit(app.exec_())
+
+def test_generate_dataset():
+    from src.generator.generate import generate_sample_dataset
+    generate_sample_dataset()
+
 if __name__ == "__main__":
-    test_verlauf_checker()
+    #test_verlauf_checker()
+    #test_start_GUI()
+    test_generate_dataset()

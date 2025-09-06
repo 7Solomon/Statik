@@ -1,4 +1,4 @@
-from data.custome_class_definitions import *
+from data.analyze_custome_class import *
 
 def einfeld_traeger():
     return ProblemDefinition(

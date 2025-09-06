@@ -1,7 +1,8 @@
 from collections import defaultdict, deque
 from typing import List, Set, Tuple, Dict, Any
-from data.custome_class_definitions import ProblemDefinition, Joint
-from analyze.bool_checker import has_full_xyM
+
+from data.analyze_custome_class import ProblemDefinition, Joint, SubSystem
+from src.analyze.bool_checker import has_full_xyM
 
 def _joint_lists(problem: ProblemDefinition, a: str, b: str):
     """
@@ -210,8 +211,11 @@ def find_rigid_subsystems(problem: ProblemDefinition) -> List[Dict[str,Any]]:
 
     # rest
     rest_systems = _find_rest_systems(stiff_systems, triangle_systems, all_edges)
+   
+    # populate
+    systems = []
+    for i, sys in enumerate(stiff_systems + triangle_systems + rest_systems):
+        systems.append(SubSystem(id=i, nodes=sys, bearings=[], joints=[]))
 
-    #print(f"Identified {len(stiff_systems)} stiff systems, {len(triangle_systems)} triangle systems, and {len(rest_systems)} rest systems.")
-    systems = stiff_systems + triangle_systems + rest_systems
     #print(systems)
     return systems

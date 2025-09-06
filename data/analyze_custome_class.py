@@ -1,9 +1,24 @@
 from abc import ABC
 from dataclasses import dataclass
-from typing import List, Union
+from typing import List, Set, Union
 
 #['festlager', 'loslager', 'einspannung', 'gelenk']
 
+@dataclass
+class Vec:
+    x: float
+    y: float
+    m: float
+
+    def __init__(self, x: float, y: float, m: float):
+        self.x = x
+        self.y = y
+        self.m = m
+
+    @property
+    def vec(self):
+        return (self.x, self.y, self.m)
+    
 
 
 @dataclass
@@ -19,14 +34,12 @@ class Connection:
 @dataclass
 class Bearing:
     vector: tuple[float, float, float]
-
     value: float | None
 
 @dataclass
 class Joint:
     vector: tuple[float, float, float]
     to_node: str
-
     #value: float | None
 
 
@@ -52,6 +65,15 @@ class PointLoad(Load):
 class DistributedLoad(Load):
     position: tuple[tuple[float, float], tuple[float, float]]
 
+
+@dataclass
+class SubSystem:
+    id: str
+    nodes: Set[Node]
+    bearings: List[Bearing]
+    joints: List[Joint]
+
+    isNotKinematic: bool | None = None
 
 
 

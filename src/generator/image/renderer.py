@@ -27,7 +27,7 @@ class StanliRenderer:
         img = self.create_image()
         draw = ImageDraw.Draw(img)
         
-        # Draw beams first (so they appear behind other elements)
+        # Draw beams first
         for beam in structure.beams:
             node1 = structure.get_node_by_id(beam.node1_id)
             node2 = structure.get_node_by_id(beam.node2_id)
@@ -39,15 +39,7 @@ class StanliRenderer:
                     beam.rounded_start, beam.rounded_end,
                     width=self.config.beam_width
                 )
-        
-        # Draw supports
-        for node in structure.nodes:
-            if node.support_type:
-                self.draw_support(
-                    draw, node.support_type, node.position, 
-                    size=self.config.support_size
-                )
-        
+
         # Draw hinges
         for hinge in structure.hinges:
             node = structure.get_node_by_id(hinge.node_id)
@@ -69,6 +61,21 @@ class StanliRenderer:
                     size=self.config.node_radius * 2
                 )
         
+        # Draw supports
+        for node in structure.nodes:
+            if node.support_type:
+                node_hinge = next((h for h in structure.hinges if h.node_id == node.id), None)
+                hinge_radius = self.config.node_radius if node_hinge else None
+                
+                support_rotation = getattr(node, 'rotation', 0) or 0
+
+                self.draw_support(
+                    draw, node.support_type, node.position, 
+                    support_rotation, size=self.config.support_size,
+                    hinge_radius=hinge_radius
+                )
+        
+        
         # Draw loads
         for load in structure.loads:
             node = structure.get_node_by_id(load.node_id)
@@ -78,20 +85,8 @@ class StanliRenderer:
                     load.rotation, 40.0 * load.magnitude
                 )
         
-        # Draw nodes (circles at connection points)
-        for node in structure.nodes:
-            if not node.support_type:  # Only draw nodes that don't have supports
-                self._draw_node_circle(draw, node.position)
-        
         return img
-    
-    def _draw_node_circle(self, draw: ImageDraw.Draw, position: Tuple[float, float]):
-        """Draw a small circle at node position"""
-        x, y = position
-        r = self.config.node_radius
-        bbox = [x - r, y - r, x + r, y + r]
-        draw.ellipse(bbox, fill=self.config.node_color, outline=(0, 0, 0), width=1)
-    
+
     def draw_beam(self, draw: ImageDraw.Draw, beam_type: BeamType,
                   start_pos: Tuple[float, float], end_pos: Tuple[float, float],
                   rounded_start: bool = False, rounded_end: bool = False,
@@ -101,11 +96,11 @@ class StanliRenderer:
         beam.draw(draw, start_pos, end_pos, rounded_start, rounded_end)
     
     def draw_support(self, draw: ImageDraw.Draw, support_type: SupportType,
-                    position: Tuple[float, float], rotation: float = 0,
-                    size: float = 25.0):
+                position: Tuple[float, float], rotation: float = 0,
+                size: float = 25.0, hinge_radius: Optional[float] = None):
         """Draw support of specified type"""
         support = StanliSupport(support_type, size)
-        support.draw(draw, position, rotation)
+        support.draw(draw, position, rotation, hinge_radius=hinge_radius)
     
     def draw_hinge(self, draw: ImageDraw.Draw, hinge_type: HingeType,
                    position: Tuple[float, float], rotation: float = 0,

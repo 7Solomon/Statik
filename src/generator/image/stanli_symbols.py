@@ -154,10 +154,24 @@ class StanliSupport(StanliSymbol):
         self.size = size
     
     def draw(self, draw: ImageDraw.Draw, position: Tuple[float, float], 
-             rotation: float = 0, **kwargs):
-        
+            rotation: float = 0, hinge_radius: Optional[float] = None, **kwargs):
+
         x, y = position
         s = self.size
+
+        if hinge_radius is not None:
+            # Offset distance so triangle peak touches hinge circle edge
+            offset_distance = s / 2 + hinge_radius
+            
+            cos_r = math.cos(math.radians(rotation))
+            sin_r = math.sin(math.radians(rotation))
+            
+            # Offset downward (positive Y) by default, then rotate
+            offset_x = offset_distance * sin_r
+            offset_y = offset_distance * cos_r
+            
+            x += offset_x
+            y += offset_y
         
         # Apply rotation
         cos_r = math.cos(math.radians(rotation))

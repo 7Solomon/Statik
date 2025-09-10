@@ -9,6 +9,8 @@ class Node:
     id: int
     position: Tuple[float, float]
     support_type: Optional[SupportType] = None
+    rotation: float = 0.0
+
 
 @dataclass 
 class Beam:

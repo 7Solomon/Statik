@@ -1,6 +1,7 @@
 import random
 import uuid
 from pathlib import Path
+from tqdm import tqdm
 
 from src.generator.config import DatasetConfig
 from src.generator.geometry import GeometryProcessor
@@ -43,7 +44,7 @@ class DatasetPipeline:
         for split_name, split_size in splits:
             print(f"Generating {split_size} {split_name} samples...")
             
-            for i in range(split_size):
+            for i in tqdm(range(split_size)):
                 #try:
                     # Generate structure
                     structure = self.structure_generator.generate_structure()
@@ -52,7 +53,7 @@ class DatasetPipeline:
                     structure = self.geometry_processor.normalize_coordinates(
                         structure, self.config.image_size
                     )
-                    
+                    #print(structure)
                     # Render to image
                     image = self.renderer.render_structure(structure)
                     
@@ -64,8 +65,8 @@ class DatasetPipeline:
                     self.dataset_manager.save_sample(image, structure, filename, split_name)
                     
                     sample_count += 1
-                    if sample_count % 100 == 0:
-                        print(f"Generated {sample_count}/{num_samples} samples")
+                    #if sample_count % 100 == 0:
+                    #    print(f"Generated {sample_count}/{num_samples} samples")
                         
                 #except Exception as e:
                 #    print(f"Error generating sample {i}: {e}")
@@ -78,9 +79,6 @@ def generate_sample_dataset():
     config = DatasetConfig()
     
     pipeline = DatasetPipeline(config)
-    pipeline.generate_dataset(num_samples=20)  # Adjust number as needed
-    #generator = StructuralSystemGenerator()
-    #structure = generator.generate_structure((800, 600))
-#
-    #img = render_structure_to_image(structure, (800, 600))
-    #img.save('test.png')
+    #pipeline.generate_dataset(num_samples=5000)
+    pipeline.generate_dataset(num_samples=20)
+    return pipeline.dataset_manager

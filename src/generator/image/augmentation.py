@@ -36,36 +36,46 @@ class ImageAugmenter:
     def _apply_rotation(self, image: Image.Image, structure: Structure) -> Tuple[Image.Image, Structure]:
         """Rotate image and update node coordinates (and element orientations)"""
         angle = random.randint(*self.config.rotation_range)
-        
+
+        # PIL rotates CCW for positive angle, about the image center
         rotated_image = image.rotate(angle, fillcolor=self.config.background_color)
-        
-        center_x, center_y = image.size[0] / 2, image.size[1] / 2
+
+        W, H = image.size
+        center_x, center_y = W / 2.0, H / 2.0
+
+        # In y-down image coordinates, CCW rotation by +angle uses:
+        # x' = x_c*cos + y_c*sin + cx
+        # y' = -x_c*sin + y_c*cos + cy
         angle_rad = np.radians(angle)
-        
+        cos_a = np.cos(angle_rad)
+        sin_a = np.sin(angle_rad)
+
         rotated_nodes = []
         for node in structure.nodes:
             x, y = node.position
             x_c = x - center_x
             y_c = y - center_y
-            new_x = x_c * np.cos(angle_rad) - y_c * np.sin(angle_rad) + center_x
-            new_y = x_c * np.sin(angle_rad) + y_c * np.cos(angle_rad) + center_y
-            rotated_nodes.append(Node(
-                id=node.id,
-                position=(new_x, new_y),
-                support_type=node.support_type
-            ))
-        
-        # Adjust rotations for hinges / loads if they have a rotation attribute (wrap 0-360)
+
+            new_x = x_c * cos_a + y_c * sin_a + center_x
+            new_y = -x_c * sin_a + y_c * cos_a + center_y
+
+            n2 = replace(node, position=(new_x, new_y)) if hasattr(node, "__dict__") else Node(
+                id=node.id, position=(new_x, new_y), support_type=node.support_type
+            )
+            # If your renderer treats positive rotation as clockwise, subtract angle here
+            if hasattr(n2, "rotation"):
+                setattr(n2, "rotation", (getattr(n2, "rotation", 0) - angle) % 360)
+            rotated_nodes.append(n2)
+
         rotated_hinges = [
-            replace(h, rotation=(h.rotation + angle) % 360) if hasattr(h, "rotation") else h
-            for h in structure.hinges
-        ] if structure.hinges else []
-        
+            replace(h, rotation=(getattr(h, "rotation", 0) - angle) % 360) if hasattr(h, "rotation") else h
+            for h in (structure.hinges or [])
+        ]
         rotated_loads = [
-            replace(l, rotation=(l.rotation + angle) % 360) if hasattr(l, "rotation") else l
-            for l in structure.loads
-        ] if structure.loads else []
-        
+            replace(l, rotation=(getattr(l, "rotation", 0) - angle) % 360) if hasattr(l, "rotation") else l
+            for l in (structure.loads or [])
+        ]
+
         rotated_structure = Structure(
             nodes=rotated_nodes,
             beams=structure.beams,
@@ -76,8 +86,8 @@ class ImageAugmenter:
     
     def _apply_blur(self, image: Image.Image) -> Image.Image:
         kernel_size = random.choice(self.config.blur_kernels)
-        return image.filter(ImageFilter.GaussianBlur(radius=kernel_size // 2))
-    
+        return image.filter(ImageFilter.GaussianBlur(radius = max(0.3, kernel_size / 3.0)))
+
     def _apply_noise(self, image: Image.Image) -> Image.Image:
         img_array = np.array(image)
         noise = np.random.normal(0, self.config.noise_intensity * 255, img_array.shape)

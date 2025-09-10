@@ -23,7 +23,7 @@ class DatasetConfig:
     # Visual properties
     node_radius: int = 8
     beam_width: int = 3
-    support_size: int = 15
+    support_size: int = 20
     node_color: Tuple[int, int, int] = (50, 50, 200)
     beam_color: Tuple[int, int, int] = (100, 100, 100)
     support_color: Tuple[int, int, int] = (200, 50, 50)

@@ -74,11 +74,20 @@ class DatasetPipeline:
         
         print(f"Dataset generation complete! Saved to: {self.config.output_dir}")
         print(f"Total samples: {sample_count}")
+    def preview_symbols(self):
+        """Open interactive symbol gallery windows."""
+        self.renderer.show_symbol_galleries()
 
 def generate_sample_dataset():
     config = DatasetConfig()
     
     pipeline = DatasetPipeline(config)
     #pipeline.generate_dataset(num_samples=5000)
-    pipeline.generate_dataset(num_samples=20)
+    pipeline.generate_dataset(num_samples=4)
     return pipeline.dataset_manager
+
+def visualize_test_GALLERIES():
+    config = DatasetConfig()
+    pipeline = DatasetPipeline(config)
+    pipeline.preview_symbols()
+    return pipeline

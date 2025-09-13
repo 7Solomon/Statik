@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Tuple, List
 import os
 
+from src.generator.image.stanli_symbols import  HingeType, SupportType
+
 @dataclass
 class DatasetConfig:
     # Dataset structure
@@ -47,6 +49,8 @@ class DatasetConfig:
     symbol_scale: float = 1.0
     
     # YOLO classes
-    classes: List[str] = field(default_factory=lambda: ["node", "support", "beam_connection"])
-
-    
+    classes: List[str] = field(default_factory=lambda: 
+        [
+            "FIXED_BEARING", "FLOATING_BEARING", "FIXED_SUPPORT", "SUPPORT", "SPRING", "TORSION_SPRING",
+            "FULL_JOINT", "HALF_JOINT", "SHEAR_JOINT", "NORMAL_FORCE_JOINT", "STIFF_CORNER"
+        ])

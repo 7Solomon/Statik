@@ -51,7 +51,7 @@ class YOLODatasetManager:
             'train': 'train/images',
             'val': 'val/images',
             'test': 'test/images',
-            'names': list(self.config.classes)  # ✅ fix here
+            'names': list(self.config.classes)
         }
         
         with open(self.output_dir / 'dataset.yaml', 'w') as f:
@@ -73,6 +73,14 @@ class YOLODatasetManager:
             for label in labels:
                 f.write(' '.join(map(str, label)) + '\n')
     
+    def _normalize_class_name(self, obj) -> str:
+        """Return the final symbolic name (e.g. FIXED_SUPPORT) from Enum or string."""
+        if hasattr(obj, "name"):
+            return obj.name
+        s = str(obj)
+        if "." in s:                    
+            s = s.split(".")[-1]
+        return s
     def _class_id(self, name: str) -> int:
         names = list(self.config.classes)
         if name not in names:
@@ -92,19 +100,17 @@ class YOLODatasetManager:
 
             # default small box for nodes
             box_size = self.config.node_radius * 2 / min(w, h)
-
+            
             if getattr(node, "support_type", None):
-                support_map = {
-                    "pinned": "support_pinned",
-                    "roller": "support_roller",
-                    "fixed": "support_fixed",
-                }
-                subtype = str(node.support_type).lower()
-                class_name = support_map.get(subtype, "support")
-                class_id = self._class_id(class_name)
+                subtype = self._normalize_class_name(node.support_type)
+                class_id = self._class_id(subtype)
                 box_size = self.config.support_size / min(w, h)
+            elif getattr(node, "hinge_type", None):
+                subtype = self._normalize_class_name(node.hinge_type)
+                class_id = self._class_id(subtype)
             else:
-                class_id = self._class_id("node")
+                print(f"Warning: Node {node.id} has no support_type or hinge_type")
+                #raise ValueError(f"Node {node.id} has no support_type or hinge_type")
 
             labels.append([class_id, x_norm, y_norm, box_size, box_size])
 

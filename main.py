@@ -40,7 +40,9 @@ def test_visualize_dataset():
     from src.generator.yolo import YOLODatasetManager, visualize_yolo_dataset
     visualize_yolo_dataset(r"C:\Users\Johan\Documents\programme\Statik\datasets\structures\dataset.yaml",
                        split="val", shuffle=True, invert_y=False)
-
+def test_visualize_gallery():
+    from src.generator.generate import visualize_test_GALLERIES
+    visualize_test_GALLERIES()
 
 def test_train():
     from src.vision.trainer import YOLOTrainer
@@ -54,3 +56,4 @@ if __name__ == "__main__":
     test_generate_dataset()
     #test_train()
     #test_visualize_dataset()
+    #test_visualize_gallery()

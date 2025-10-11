@@ -17,7 +17,7 @@ class Beam:
     id: int
     node1_id: int
     node2_id: int
-    beam_type: BeamType = BeamType.BENDING_WITH_FIBER
+    beam_type: BeamType = BeamType.BIEGUNG_MIT_FASER
     rounded_start: bool = False
     rounded_end: bool = False
 

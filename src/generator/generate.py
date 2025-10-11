@@ -49,24 +49,27 @@ class DatasetPipeline:
                     # Generate structure
                     structure = self.structure_generator.generate_structure()
                     
-                    # Normalize coordinates
+                    # Normalize coordinates (now uses actual symbol bounds)
                     structure = self.geometry_processor.normalize_coordinates(
                         structure, self.config.image_size
                     )
-                    #print(structure)
+                    
                     # Render to image
                     image = self.renderer.render_structure(structure)
                     
                     # Apply augmentations
                     image, structure = self.augmenter.augment(image, structure)
                     
+                    # Re-normalize if augmentation pushed elements outside bounds
+                    #structure = self.geometry_processor.renormalize_if_needed(
+                    #    structure, self.config.image_size, margin=0.15
+                    #)
+                    
                     # Save to dataset
                     filename = f"{split_name}_{i:06d}_{str(uuid.uuid4())[:8]}"
                     self.dataset_manager.save_sample(image, structure, filename, split_name)
                     
                     sample_count += 1
-                    #if sample_count % 100 == 0:
-                    #    print(f"Generated {sample_count}/{num_samples} samples")
                         
                 #except Exception as e:
                 #    print(f"Error generating sample {i}: {e}")

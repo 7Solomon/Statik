@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YOLO Dataset Generator & Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1, h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .generator-section {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .input-group {
+            flex: 1;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+        
+        .status.generating {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status.complete {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+        }
+        
+        .viewer-section {
+            display: none;
+        }
+        
+        .viewer-section.active {
+            display: block;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        select {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .canvas-container {
+            position: relative;
+            background: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 600px;
+        }
+        
+        canvas {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .info {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🏗️ YOLO Structural Dataset Generator</h1>
+            
+            <div class="generator-section">
+                <div class="input-group">
+                    <label for="num-samples">Number of Samples:</label>
+                    <input type="number" id="num-samples" value="100" min="1" max="10000">
+                </div>
+                <button id="generate-btn" class="btn-primary">Generate Dataset</button>
+            </div>
+            
+            <div id="status-container"></div>
+        </div>
+        
+        <div class="card viewer-section" id="viewer-section">
+            <h2>📊 Dataset Viewer</h2>
+            
+            <div class="controls">
+                <div>
+                    <label for="split-select">Split:</label>
+                    <select id="split-select">
+                        <option value="train">Train</option>
+                        <option value="val">Validation</option>
+                        <option value="test">Test</option>
+                    </select>
+                </div>
+                
+                <button id="prev-btn" class="btn-secondary">← Previous</button>
+                <button id="next-btn" class="btn-secondary">Next →</button>
+                <button id="toggle-y-btn" class="btn-secondary">Toggle Y-Axis</button>
+                
+                <span class="info" id="image-info"></span>
+            </div>
+            
+            <div class="canvas-container">
+                <canvas id="viewer"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentIndex = 0;
+        let images = [];
+        let currentSplit = 'train';
+        let invertY = false;
+        let colors = {};
+        
+        const generateBtn = document.getElementById('generate-btn');
+        const statusContainer = document.getElementById('status-container');
+        const viewerSection = document.getElementById('viewer-section');
+        const canvas = document.getElementById('viewer');
+        const ctx = canvas.getContext('2d');
+        
+        // Generation
+        generateBtn.addEventListener('click', async () => {
+            const numSamples = parseInt(document.getElementById('num-samples').value);
+            
+            generateBtn.disabled = true;
+            viewerSection.classList.remove('active');
+            
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({num_samples: numSamples})
+                });
+                
+                if (response.ok) {
+                    pollStatus();
+                }
+            } catch (error) {
+                showStatus('Error starting generation', 'error');
+                generateBtn.disabled = false;
+            }
+        });
+        
+        function pollStatus() {
+            const interval = setInterval(async () => {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                
+                showStatus(status.message, status.running ? 'generating' : 'complete', status.progress, status.total);
+                
+                if (!status.running) {
+                    clearInterval(interval);
+                    generateBtn.disabled = false;
+                    
+                    if (status.message.includes('complete')) {
+                        viewerSection.classList.add('active');
+                        loadColors();
+                        loadImages();
+                    }
+                }
+            }, 500);
+        }
+        
+        function showStatus(message, type, progress = 0, total = 0) {
+            const statusClass = type === 'generating' ? 'generating' : 
+                               type === 'error' ? 'error' : 'complete';
+            
+            let html = `<div class="status ${statusClass}">${message}`;
+            
+            if (type === 'generating' && total > 0) {
+                const percent = (progress / total * 100).toFixed(1);
+                html += `<div class="progress-bar"><div class="progress-fill" style="width: ${percent}%"></div></div>`;
+                html += `<div style="margin-top: 5px; font-size: 12px;">${progress} / ${total} (${percent}%)</div>`;
+            }
+            
+            html += '</div>';
+            statusContainer.innerHTML = html;
+        }
+        
+        // Viewer
+        async function loadColors() {
+            const response = await fetch('/api/colors');
+            colors = await response.json();
+        }
+        
+        async function loadImages() {
+            const response = await fetch(`/api/images/${currentSplit}`);
+            images = await response.json();
+            currentIndex = 0;
+            if (images.length > 0) {
+                await displayImage(currentIndex);
+            }
+        }
+        
+        async function displayImage(index) {
+            if (!images[index]) return;
+            
+            const image = images[index];
+            document.getElementById('image-info').textContent = 
+                `Image ${index + 1} / ${images.length} - ${image.filename}`;
+            
+            const img = new Image();
+            img.onload = async () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                
+                await drawLabels(image.stem, img.width, img.height);
+            };
+            img.src = `/images/${currentSplit}/${image.filename}`;
+        }
+        
+        async function drawLabels(stem, width, height) {
+            const response = await fetch(`/api/labels/${currentSplit}/${stem}`);
+            const labels = await response.json();
+            
+            labels.forEach(label => {
+                let cy = invertY ? (1 - label.cy) : label.cy;
+                
+                const x = (label.cx - label.w / 2) * width;
+                const y = (cy - label.h / 2) * height;
+                const w = label.w * width;
+                const h = label.h * height;
+                
+                const color = colors[label.class_id] || '#FF0000';
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, w, h);
+                
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.6;
+                ctx.fillRect(x, Math.max(0, y - 20), ctx.measureText(label.class_name).width + 8, 20);
+                ctx.globalAlpha = 1;
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '12px Arial';
+                ctx.fillText(label.class_name, x + 4, Math.max(14, y - 6));
+            });
+        }
+        
+        // Controls
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            currentIndex = (currentIndex - 1 + images.length) % images.length;
+            displayImage(currentIndex);
+        });
+        
+        document.getElementById('next-btn').addEventListener('click', () => {
+            currentIndex = (currentIndex + 1) % images.length;
+            displayImage(currentIndex);
+        });
+        
+        document.getElementById('toggle-y-btn').addEventListener('click', () => {
+            invertY = !invertY;
+            displayImage(currentIndex);
+        });
+        
+        document.getElementById('split-select').addEventListener('change', (e) => {
+            currentSplit = e.target.value;
+            loadImages();
+        });
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (!viewerSection.classList.contains('active')) return;
+            
+            if (e.key === 'ArrowRight' || e.key === 'd') {
+                document.getElementById('next-btn').click();
+            } else if (e.key === 'ArrowLeft' || e.key === 'a') {
+                document.getElementById('prev-btn').click();
+            } else if (e.key === 'f') {
+                document.getElementById('toggle-y-btn').click();
+            }
+        });
+    </script>
+</body>
+</html>

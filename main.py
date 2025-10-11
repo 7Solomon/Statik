@@ -3,7 +3,7 @@ from src.generator.config import DatasetConfig
 from src.analyze.functions import check_static_determinacy, split_in_base_systems
 from problem_definitions import *
 from src.GUIs.main_GUI import MainWindow
-
+import run
 
 
 def test_verlauf_checker():
@@ -50,10 +50,9 @@ def test_train():
     trainer = YOLOTrainer(config)
     trainer.train(epochs=5, batch_size=8, learning_rate=0.001)
 
+
 if __name__ == "__main__":
-    #test_verlauf_checker()
     #test_start_GUI()
     test_generate_dataset()
-    #test_train()
     #test_visualize_dataset()
-    #test_visualize_gallery()
+    #server.app.run(host="127.0.0.1", port=5000, debug=True)

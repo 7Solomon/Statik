@@ -48,9 +48,10 @@ class DatasetConfig:
     beam_connection_size: int = 6
     symbol_scale: float = 1.0
     
-    # YOLO classes
+    # YOLO classes - must match enum names in stanli_symbols.py
     classes: List[str] = field(default_factory=lambda: 
         [
-            "FIXED_BEARING", "FLOATING_BEARING", "FIXED_SUPPORT", "SUPPORT", "SPRING", "TORSION_SPRING",
-            "FULL_JOINT", "HALF_JOINT", "SHEAR_JOINT", "NORMAL_FORCE_JOINT", "STIFF_CORNER"
+            "FESTLAGER", "LOSLAGER", "FESTE_EINSPANNUNG", "GLEITLAGER", 
+            "FEDER", "TORSIONSFEDER",
+            "VOLLGELENK", "HALBGELENK", "SCHUBGELENK", "NORMALKRAFTGELENK", "BIEGESTEIFE_ECKE"
         ])

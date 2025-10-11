@@ -9,6 +9,8 @@ import random
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
+from src.generator.image.stanli_symbols import StanliSupport, StanliHinge, StanliLoad, SupportType
+
 class YOLODatasetManager:
     """Manages YOLO format dataset creation"""
     
@@ -74,176 +76,217 @@ class YOLODatasetManager:
                 f.write(' '.join(map(str, label)) + '\n')
     
     def _normalize_class_name(self, obj) -> str:
-        """Return the final symbolic name (e.g. FIXED_SUPPORT) from Enum or string."""
+        """Return uniform name (e.g. FESTE_EINSPANNUNG, VOLLGELENK)."""
         if hasattr(obj, "name"):
             return obj.name
         s = str(obj)
-        if "." in s:                    
+        if "." in s:
             s = s.split(".")[-1]
         return s
+
     def _class_id(self, name: str) -> int:
         names = list(self.config.classes)
         if name not in names:
-            raise ValueError(f"Class '{name}' not found in config.classes: {names}")
+            # Instead of silently producing -1 somewhere else, fail loud & early
+            raise ValueError(
+                f"Class '{name}' not found in config.classes. "
+                f"Add it to DatasetConfig.classes or dataset.yaml names list.\nCurrent: {names}"
+            )
         return names.index(name)
+
 
     def _structure_to_yolo_labels(self, structure: Structure, 
                                  image_size: Tuple[int, int]) -> List[List[float]]:
-        """Convert structure to YOLO format labels"""
+        """Convert structure to YOLO format labels with geometry-based bounding boxes."""
         labels = []
         w, h = image_size
 
+        # Process nodes (supports only)
         for node in structure.nodes:
-            x, y = node.position
-            x_norm = x / w
-            y_norm = y / h
-
-            # default small box for nodes
-            box_size = self.config.node_radius * 2 / min(w, h)
+            if not getattr(node, "support_type", None):
+                continue
             
-            if getattr(node, "support_type", None):
-                subtype = self._normalize_class_name(node.support_type)
+            subtype = self._normalize_class_name(node.support_type)
+            try:
                 class_id = self._class_id(subtype)
-                box_size = self.config.support_size / min(w, h)
-            elif getattr(node, "hinge_type", None):
-                subtype = self._normalize_class_name(node.hinge_type)
+            except ValueError:
+                continue
+            
+            # Get actual geometry-based bbox
+            support_symbol = StanliSupport(node.support_type)
+            rotation = getattr(node, "rotation", 0.0)
+            min_x, min_y, max_x, max_y = support_symbol.get_bbox(node.position, rotation)
+            
+            # Convert to YOLO format (normalized center + width/height)
+            cx = ((min_x + max_x) / 2) / w
+            cy = ((min_y + max_y) / 2) / h
+            bw = (max_x - min_x) / w
+            bh = (max_y - min_y) / h
+            
+            # Clamp to valid range and skip if degenerate
+            if bw <= 0 or bh <= 0:
+                continue
+            cx = max(0, min(1, cx))
+            cy = max(0, min(1, cy))
+            bw = max(0, min(1, bw))
+            bh = max(0, min(1, bh))
+            
+            labels.append([class_id, cx, cy, bw, bh])
+
+        # Process hinges (separate from nodes)
+        for hinge in getattr(structure, "hinges", []):
+            node = structure.get_node_by_id(hinge.node_id)
+            if not node:
+                continue
+            
+            subtype = self._normalize_class_name(hinge.hinge_type)
+            try:
                 class_id = self._class_id(subtype)
-            else:
-                print(f"Warning: Node {node.id} has no support_type or hinge_type")
-                #raise ValueError(f"Node {node.id} has no support_type or hinge_type")
+            except ValueError:
+                continue
+            
+            # Get actual geometry-based bbox
+            hinge_symbol = StanliHinge(hinge.hinge_type)
+            rotation = getattr(hinge, "rotation", 0.0)
+            
+            # Get connected node positions for context-aware hinges
+            p_init = None
+            p_end = None
+            if hinge.start_node_id is not None:
+                start_node = structure.get_node_by_id(hinge.start_node_id)
+                if start_node:
+                    p_init = start_node.position
+            if hinge.end_node_id is not None:
+                end_node = structure.get_node_by_id(hinge.end_node_id)
+                if end_node:
+                    p_end = end_node.position
+            
+            min_x, min_y, max_x, max_y = hinge_symbol.get_bbox(
+                node.position, rotation, p_init, p_end
+            )
+            
+            # Convert to YOLO format
+            cx = ((min_x + max_x) / 2) / w
+            cy = ((min_y + max_y) / 2) / h
+            bw = (max_x - min_x) / w
+            bh = (max_y - min_y) / h
+            
+            # Clamp and validate
+            if bw <= 0 or bh <= 0:
+                continue
+            cx = max(0, min(1, cx))
+            cy = max(0, min(1, cy))
+            bw = max(0, min(1, bw))
+            bh = max(0, min(1, bh))
+            
+            labels.append([class_id, cx, cy, bw, bh])
 
-            labels.append([class_id, x_norm, y_norm, box_size, box_size])
-
-        # TODO: add beam_connection labels
+        # Optional: Process loads
+        # Uncomment if you want to label loads as objects
+        # for load in getattr(structure, "loads", []):
+        #     node = structure.get_node_by_id(load.node_id)
+        #     if not node:
+        #         continue
+        #     
+        #     subtype = self._normalize_class_name(load.load_type)
+        #     try:
+        #         class_id = self._class_id(subtype)
+        #     except ValueError:
+        #         continue
+        #     
+        #     load_symbol = StanliLoad(load.load_type)
+        #     rotation = getattr(load, "rotation", 0.0)
+        #     min_x, min_y, max_x, max_y = load_symbol.get_bbox(node.position, rotation)
+        #     
+        #     cx = ((min_x + max_x) / 2) / w
+        #     cy = ((min_y + max_y) / 2) / h
+        #     bw = (max_x - min_x) / w
+        #     bh = (max_y - min_y) / h
+        #     
+        #     if bw > 0 and bh > 0:
+        #         labels.append([class_id, cx, cy, bw, bh])
 
         return labels
 
-    def visualize_dataset(
-        self,
-        split: str = "train",
-        indices: List[int] = None,
-        shuffle: bool = False,
-        invert_y: bool = False,
-        figsize: Tuple[int, int] = (8, 8),
-    ):
-        """
-        Interactive viewer for YOLO dataset (arrow keys to navigate).
-        Keys:
-          - Right/Left: next/prev image
-          - F: toggle invert_y (flip Y axis)
-          - Q or Esc: quit
-        """
+
+    def get_image_list(self, split: str = "train") -> List[Dict]:
+        """Get list of images with metadata for web viewer."""
         images_dir = self.output_dir / split / "images"
-        labels_dir = self.output_dir / split / "labels"
         if not images_dir.exists():
-            print(f"Images dir not found: {images_dir}")
-            return
-
-        img_paths = sorted([p for p in images_dir.glob("*") if p.suffix.lower() in {".jpg", ".jpeg", ".png"}])
-        if not img_paths:
-            print(f"No images in {images_dir}")
-            return
-
-        # Subset by indices if provided
-        if indices:
-            img_paths = [img_paths[i] for i in indices if 0 <= i < len(img_paths)]
-
-        if shuffle:
-            random.shuffle(img_paths)
-
-        class_names = list(self.config.classes)
-        cmap = plt.get_cmap("tab20")
-        colors = {i: cmap(i % 20) for i in range(len(class_names))}
-
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
-        fig.canvas.manager.set_window_title(f"YOLO {split} viewer")
-
-        state = {"i": 0, "invert_y": invert_y}
-
-        def load_labels_for(img_path: Path):
-            lbl_path = labels_dir / (img_path.stem + ".txt")
-            items = []
-            if lbl_path.exists():
-                with open(lbl_path, "r") as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if len(parts) != 5:
-                            continue
-                        try:
-                            cid = int(float(parts[0]))
-                            cx, cy, w, h = map(float, parts[1:])
-                            items.append((cid, cx, cy, w, h))
-                        except Exception:
-                            continue
-            return items
-
-        def draw(idx: int):
-            ax.clear()
-            img_path = img_paths[idx]
-            img = Image.open(img_path).convert("RGB")
-            ax.imshow(img)
-            ax.set_axis_off()
-
-            W, H = img.size
-            labels = load_labels_for(img_path)
-
-            for cid, cx, cy, w, h in labels:
-                # Optionally invert Y (useful if your generator's Y origin is bottom-left)
-                cy_draw = 1.0 - cy if state["invert_y"] else cy
-
-                box_w = w * W
-                box_h = h * H
-                x = cx * W - box_w / 2
-                y = cy_draw * H - box_h / 2
-
-                color = colors.get(cid, (1, 0, 0, 0.8))
-                rect = Rectangle((x, y), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
-                ax.add_patch(rect)
-                label = class_names[cid] if 0 <= cid < len(class_names) else f"class_{cid}"
-                ax.text(
-                    x,
-                    max(0, y - 4),
-                    label,
-                    color="white",
-                    fontsize=9,
-                    bbox=dict(facecolor=color, edgecolor="none", alpha=0.6, pad=1),
-                )
-
-            ax.set_title(
-                f"[{idx+1}/{len(img_paths)}] {img_path.name} | invert_y={state['invert_y']} | {split}",
-                fontsize=10,
-            )
-            fig.canvas.draw_idle()
-
-        def on_key(event):
-            if event.key in ("right", "d"):
-                state["i"] = (state["i"] + 1) % len(img_paths)
-                draw(state["i"])
-            elif event.key in ("left", "a"):
-                state["i"] = (state["i"] - 1) % len(img_paths)
-                draw(state["i"])
-            elif event.key in ("f",):
-                state["invert_y"] = not state["invert_y"]
-                draw(state["i"])
-            elif event.key in ("q", "escape"):
-                plt.close(fig)
-
-        fig.canvas.mpl_connect("key_press_event", on_key)
-        draw(state["i"])
-        plt.tight_layout()
-        plt.show()
+            return []
+        
+        img_paths = sorted([
+            p for p in images_dir.glob("*") 
+            if p.suffix.lower() in {".jpg", ".jpeg", ".png"}
+        ])
+        
+        return [
+            {
+                "index": i,
+                "filename": p.name,
+                "stem": p.stem,
+            }
+            for i, p in enumerate(img_paths)
+        ]
     
+    def get_labels_for_image(self, stem: str, split: str = "train") -> List[Dict]:
+        """Get labels for a specific image in web-friendly format."""
+        labels_dir = self.output_dir / split / "labels"
+        label_path = labels_dir / f"{stem}.txt"
+        
+        labels = []
+        if label_path.exists():
+            with open(label_path, "r") as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) != 5:
+                        continue
+                    try:
+                        class_id = int(float(parts[0]))
+                        cx, cy, w, h = map(float, parts[1:])
+                        class_name = (
+                            list(self.config.classes)[class_id] 
+                            if 0 <= class_id < len(self.config.classes) 
+                            else f"class_{class_id}"
+                        )
+                        labels.append({
+                            "class_id": class_id,
+                            "class_name": class_name,
+                            "cx": cx,
+                            "cy": cy,
+                            "w": w,
+                            "h": h,
+                        })
+                    except Exception:
+                        continue
+        return labels
+    
+    def get_class_colors(self) -> Dict[int, str]:
+        """Get color mapping for each class (as hex colors)."""
+        import matplotlib.pyplot as plt
+        cmap = plt.get_cmap("tab20")
+        colors = {}
+        for i in range(len(self.config.classes)):
+            rgba = cmap(i % 20)
+            # Convert to hex
+            hex_color = "#{:02x}{:02x}{:02x}".format(
+                int(rgba[0] * 255),
+                int(rgba[1] * 255),
+                int(rgba[2] * 255)
+            )
+            colors[i] = hex_color
+        return colors
 
-def visualize_yolo_dataset(
-    dataset: str | YOLODatasetManager,
-    split: str = "train",
-    indices: List[int] = None,
-    shuffle: bool = False,
-    invert_y: bool = False,
-):
-    """Convenience function to visualize a dataset using dataset.yaml."""
-    if isinstance(dataset, str):
-        mgr = YOLODatasetManager.from_dataset_yaml(dataset)
-    elif isinstance(dataset, YOLODatasetManager):
-        mgr = dataset
-    mgr.visualize_dataset(split=split, indices=indices, shuffle=shuffle, invert_y=invert_y)
+#def visualize_yolo_dataset(
+#    dataset: str | YOLODatasetManager,
+#    split: str = "train",
+#    indices: List[int] = None,
+#    shuffle: bool = False,
+#    invert_y: bool = False,
+#):
+#    """Convenience function to visualize a dataset using dataset.yaml."""
+#    if isinstance(dataset, str):
+#        mgr = YOLODatasetManager.from_dataset_yaml(dataset)
+#    elif isinstance(dataset, YOLODatasetManager):
+#        mgr = dataset
+#    mgr.visualize_dataset(split=split, indices=indices, shuffle=shuffle, invert_y=invert_y)

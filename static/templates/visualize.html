@@ -1,0 +1,94 @@
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-800">Visualize Results</h2>
+            <p class="text-slate-500 mt-1">Interactive visualization of your data</p>
+        </div>
+        <button onclick="window.history.back()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-colors">
+            ← Back
+        </button>
+    </div>
+    
+    <!-- Controls -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Time Step</label>
+                <input type="range" id="time-slider" min="0" max="100" value="0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                <div class="flex justify-between text-xs text-slate-500 mt-1">
+                    <span>0</span>
+                    <span id="time-value" class="font-medium text-slate-800">0</span>
+                    <span>100</span>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Color Scale</label>
+                <select id="colormap" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="viridis">Viridis</option>
+                    <option value="plasma">Plasma</option>
+                    <option value="jet">Jet</option>
+                    <option value="hot">Hot</option>
+                    <option value="cool">Cool</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">View Mode</label>
+                <select id="view-mode" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="2d">2D Heatmap</option>
+                    <option value="3d">3D Surface</option>
+                    <option value="contour">Contour Plot</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Visualization Canvas -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-slate-800">Plot</h3>
+            <div class="flex gap-2">
+                <button onclick="downloadPlot()" class="px-3 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors">
+                    💾 Export
+                </button>
+                <button onclick="resetView()" class="px-3 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors">
+                    🔄 Reset
+                </button>
+            </div>
+        </div>
+        
+        <!-- Canvas Container -->
+        <div class="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+            <canvas id="visualization-canvas" class="w-full" style="min-height: 500px;"></canvas>
+        </div>
+        
+        <!-- Legend / Color Scale -->
+        <div class="mt-4 flex items-center justify-center gap-4">
+            <span class="text-xs text-slate-500">Min</span>
+            <div class="flex-1 max-w-md h-4 rounded-full" id="color-legend" style="background: linear-gradient(to right, #440154, #31688e, #35b779, #fde724);"></div>
+            <span class="text-xs text-slate-500">Max</span>
+        </div>
+    </div>
+    
+    <!-- Stats Panel -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+            <p class="text-xs text-slate-500 mb-1">Min Value</p>
+            <p class="text-xl font-bold text-slate-800" id="stat-min">-</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+            <p class="text-xs text-slate-500 mb-1">Max Value</p>
+            <p class="text-xl font-bold text-slate-800" id="stat-max">-</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+            <p class="text-xs text-slate-500 mb-1">Mean</p>
+            <p class="text-xl font-bold text-slate-800" id="stat-mean">-</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+            <p class="text-xs text-slate-500 mb-1">Std Dev</p>
+            <p class="text-xl font-bold text-slate-800" id="stat-std">-</p>
+        </div>
+    </div>
+</div>

@@ -3,23 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Structural Analysis Pipeline</title>
-    <link rel="stylesheet" href="/static/css/dashboard.css">
-    <link rel="stylesheet" href="/static/css/main.css">
+    <title>DeepONet Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        dark: '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body>
-    <div class="app-container">
-        {% include 'sidebar.html' %}
-        <main class="main-content">
-            {% include 'sections/overview.html' %}
-            {% include 'sections/datasets.html' %}
-            {% include 'sections/training.html' %}
-            {% include 'sections/models.html' %}
-            {% include 'sections/prediction.html' %}
-            {% include 'sections/visualization.html' %}
-        </main>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <div class="flex">
+        <!-- Sidebar -->
+        <div id="sidebar"></div>
+        
+        <!-- Main Content -->
+        <div class="flex-1">
+            <div id="main-content" class="p-8 max-w-7xl mx-auto"></div>
+        </div>
     </div>
-    {% include 'modals.html' %}
+    
+    <!-- Modals -->
+    <div id="modals"></div>
+    
     <script type="module" src="/static/js/app.js"></script>
 </body>
 </html>

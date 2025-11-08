@@ -3,27 +3,20 @@ import { loadDatasetsList } from './datasets.js';
 import { loadModelsList } from './model.js';
 import { loadVisualization } from './visualizer.js';
 
-// Navigation
-document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-        e.preventDefault();
-        const section = item.dataset.section;
-        switchSection(section);
-    });
-});
-
 export function switchSection(sectionName) {
     // Update nav
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
     });
-    document.querySelector(`[data-section="${sectionName}"]`).classList.add('active');
+    const activeNav = document.querySelector(`[data-section="${sectionName}"]`);
+    if (activeNav) activeNav.classList.add('active');
     
     // Update content
     document.querySelectorAll('.content-section').forEach(section => {
         section.classList.remove('active');
     });
-    document.getElementById(`${sectionName}-section`).classList.add('active');
+    const activeSection = document.getElementById(`${sectionName}-section`);
+    if (activeSection) activeSection.classList.add('active');
     
     // Load section-specific data
     if (sectionName === 'overview') refreshState();
@@ -34,7 +27,7 @@ export function switchSection(sectionName) {
 
 export async function refreshState() {
     try {
-        const response = await fetch(`${API_URL}/state`);
+        const response = await fetch(`${API_URL}/api/state`);
         const state = await response.json();
         updateOverview(state);
     } catch (error) {
@@ -43,24 +36,26 @@ export async function refreshState() {
 }
 
 export function updateOverview(state) {
-    // Dataset info
-    document.getElementById('current-dataset').textContent = 
-        state.dataset.path ? state.dataset.path.split('/').pop() : 'None';
-    document.getElementById('dataset-status').textContent = 
-        state.dataset.exists ? 'Ready' : 'No dataset';
+    if (!state) return;
     
-    // Model info
-    document.getElementById('current-model').textContent = 
-        state.model.path ? state.model.path.split('/').pop() : 'None';
-    document.getElementById('model-status').textContent = 
-        state.model.exists ? 'Ready' : 'No model';
+    // Helper to safely set text content
+    const setText = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
     
-    // Runs info
-    document.getElementById('run-count').textContent = state.model.available_runs.length;
-    document.getElementById('runs-status').textContent = 
-        state.model.available_runs.length > 0 ? `${state.model.available_runs.length} run(s)` : 'No runs yet';
+    // Update counts in the overview cards (these match overview.html)
+    setText('dataset-count', state.dataset?.exists ? '1' : '0');
+    setText('model-count', state.model?.available_models?.length || '0');
+    setText('training-count', '0'); // TODO: track active training jobs
+    setText('prediction-count', '0'); // TODO: track predictions
     
-    // Workspace
-    document.getElementById('workspace-dir').textContent = 
-        state.content_dir.split('/').pop();
+    // Legacy support for old template elements (if they exist)
+    setText('current-dataset', state.dataset?.path ? state.dataset.path.split('/').pop() : 'None');
+    setText('dataset-status', state.dataset?.exists ? 'Ready' : 'No dataset');
+    setText('current-model', state.model?.path ? state.model.path.split('/').pop() : 'None');
+    setText('model-status', state.model?.exists ? 'Ready' : 'No model');
+    setText('run-count', state.model?.available_runs?.length || 0);
+    setText('runs-status', state.model?.available_runs?.length > 0 ? `${state.model.available_runs.length} run(s)` : 'No runs yet');
+    setText('workspace-dir', state.content_dir ? state.content_dir.split('/').pop() : '');
 }

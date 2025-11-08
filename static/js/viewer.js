@@ -9,6 +9,10 @@ class DatasetViewer {
         this.colors = {};
         
         this.canvas = document.getElementById('viewer');
+        if (!this.canvas) {
+            console.warn('Canvas element with id "viewer" not found. DatasetViewer requires a canvas element.');
+            return;
+        }
         this.ctx = this.canvas.getContext('2d');
         
         this.setupControls();
@@ -114,5 +118,5 @@ class DatasetViewer {
     }
 }
 
-// Initialize viewer when page loads
-const viewer = new DatasetViewer('http://localhost:5000/api', 'train');
+// Export the class for use in other modules
+export { DatasetViewer };

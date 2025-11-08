@@ -36,27 +36,41 @@ export function closeTrainModal() {
 // Model Management
 export async function loadModelsList() {
     try {
-        const response = await fetch(`${API_URL}/models`);
+        const response = await fetch(`${API_URL}/api/models`);
         const models = await response.json();
         
-        const listEl = document.getElementById('models-list');
+        const listEl = document.getElementById('model-list');
+        if (!listEl) {
+            console.warn('model-list element not found');
+            return;
+        }
+        
         listEl.innerHTML = '';
         
         if (models.length === 0) {
-            listEl.innerHTML = '<div class="list-item"><p>No models found</p></div>';
+            listEl.innerHTML = '<div class="text-center py-8 text-slate-500">No models found</div>';
             return;
         }
         
         models.forEach(model => {
             const item = document.createElement('div');
-            item.className = 'list-item';
+            item.className = 'bg-white rounded-2xl p-6 shadow-sm border border-slate-200';
             item.innerHTML = `
-                <div class="item-info">
-                    <h4>${model.name}</h4>
-                    <p>Run: ${model.run_name || 'Unknown'} | Created: ${model.created || 'Unknown'}</p>
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-slate-800 mb-1">${model.name}</h3>
+                        <p class="text-xs text-slate-500">Run: ${model.run_name || 'Unknown'} | Created: ${model.created || 'Unknown'}</p>
+                    </div>
+                    <button onclick="deleteModel('${model.run_name}')" 
+                            class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors">
+                        🗑️
+                    </button>
                 </div>
-                <div class="item-actions">
-                    <button class="btn-small btn-danger" onclick="deleteModel('${model.name}')">Delete</button>
+                <div class="flex gap-2">
+                    <button onclick="loadModel('${model.run_name}')" 
+                            class="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-sm">
+                        Load Model
+                    </button>
                 </div>
             `;
             listEl.appendChild(item);

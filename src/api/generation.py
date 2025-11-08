@@ -1,10 +1,8 @@
 from flask import Blueprint, jsonify, request, current_app
 import threading
-
 from src.generator.generate import DatasetPipeline
 
 bp = Blueprint('generation', __name__)
-
 
 @bp.route('/api/generate', methods=['POST'])
 def generate_dataset():
@@ -16,20 +14,42 @@ def generate_dataset():
     
     data = request.json
     num_samples = data.get('num_samples', 100)
+    dataset_name = data.get('dataset_name', f'dataset_{num_samples}')
+    
+    def status_update(current, total, message):
+        """Callback for pipeline to update status"""
+        app_state.generation_status.update({
+            'progress': current,
+            'total': total,
+            'message': message,
+            'percentage': int((current / total) * 100) if total > 0 else 0
+        })
     
     def generation_thread():
         try:
-            app_state.generation_status['running'] = True
-            app_state.generation_status['progress'] = 0
-            app_state.generation_status['total'] = num_samples
-            app_state.generation_status['message'] = 'Generating dataset...'
+            app_state.generation_status.update({
+                'running': True,
+                'progress': 0,
+                'total': num_samples,
+                'message': 'Initializing generation...',
+                'percentage': 0,
+                'dataset_name': dataset_name
+            })
             
-            pipeline = DatasetPipeline(app_state.dataset_config)
-            pipeline.generate_dataset(num_samples)
+            # Create pipeline with status callback
+            pipeline = DatasetPipeline(app_state.dataset_config, status_callback=status_update)
             
-            app_state.set_dataset_dir(app_state.dataset_config.output_dir)
-            app_state.generation_status['progress'] = num_samples
-            app_state.generation_status['message'] = 'Generation complete!'
+            # Generate dataset
+            output_dir = pipeline.generate_dataset(num_samples)
+            
+            # Set dataset directory in app state
+            app_state.set_dataset_dir(output_dir)
+            
+            app_state.generation_status.update({
+                'progress': num_samples,
+                'message': f'Complete! Dataset saved to {dataset_name}',
+                'percentage': 100
+            })
             app_state.save_state()
             
         except Exception as e:
@@ -42,14 +62,12 @@ def generate_dataset():
     thread = threading.Thread(target=generation_thread, daemon=True)
     thread.start()
     
-    return jsonify({'status': 'started'})
-
+    return jsonify({'status': 'started', 'dataset_name': dataset_name})
 
 @bp.route('/api/status')
 def get_status():
     """Get current generation status"""
     return jsonify(current_app.app_state.generation_status)
-
 
 @bp.route('/api/state')
 def get_app_state():

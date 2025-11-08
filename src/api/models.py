@@ -104,7 +104,8 @@ def train_model():
             
             # Update state with new model
             best_model_path = app_state.vision_config.get_best_model_path(f'train_{dataset_name}')
-            app_state.set_trained_model(best_model_path)
+            app_state.set_model_path(best_model_path)
+
             app_state.training_status['message'] = 'Training complete!'
             app_state.save_state()
             

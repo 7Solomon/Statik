@@ -5,6 +5,7 @@ from typing import List, Optional, Union, Any, Dict
 
 from ultralytics import YOLO
 import torch
+from .config import VisionConfig
 
 
 @dataclass
@@ -29,26 +30,48 @@ class ImagePrediction:
     orig_height: int
 
 class YoloPredictor:
-    """
-    Predictor for a trained YOLOv8 model produced by YOLOTrainer.
-    Expects config with: output_dir, image_size, classes
-    """
+    """Predictor with proper model path management"""
+    
     def __init__(
-                self, config,
-                model_path: Optional[Union[str, Path]] = None,
-                device: Optional[str] = None
-            ):
-        self.config = config
-        if model_path is None:
-            model_path = Path(config.output_dir) / ".." / "runs" / "detect" / "structural_detection_v1" / "weights" / "best.pt"
+        self,
+        vision_config: VisionConfig,
+        dataset_config=None,
+        model_path: Optional[Union[str, Path]] = None,
+        use_production_model: bool = True,
+        device: Optional[str] = None
+    ):
+        self.vision_config = vision_config
+        self.dataset_config = dataset_config
         
+        # Determine model path
+        if model_path is not None:
+            self.model_path = Path(model_path)
+        elif use_production_model:
+            # Use saved production model
+            self.model_path = vision_config.get_production_model_path()
+        else:
+            # Use latest training run
+            self.model_path = vision_config.get_best_model_path()
         
-        self.model_path = Path(model_path).resolve()
         if not self.model_path.exists():
-            raise FileNotFoundError(f"Model weights not found: {self.model_path}")
+            raise FileNotFoundError(
+                f"Model weights not found: {self.model_path}\n"
+                f"Available models: {vision_config.list_models()}\n"
+                f"Available runs: {vision_config.list_runs()}"
+            )
+        
+        print(f"Loading model from: {self.model_path}")
+        
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = YOLO(str(self.model_path))
         self.model.to(self.device)
+        
+        # Get classes
+        if dataset_config and hasattr(dataset_config, 'classes'):
+            self.classes = dataset_config.classes
+        else:
+            # Try to load from model
+            self.classes = self.model.names if hasattr(self.model, 'names') else {}
 
     def predict(
         self,
@@ -60,34 +83,23 @@ class YoloPredictor:
         show: bool = False,
         verbose: bool = False
     ) -> List[ImagePrediction]:
-        """
-        Run inference on:
-          - image file
-          - directory
-          - glob pattern
-          - video file
-          - webcam index (int)
-
-        Returns structured predictions (only for image-like sources; for video/webcam
-        you typically rely on saved results).
-        """
+        """Run inference"""
         results = self.model.predict(
             source=str(source),
-            imgsz=self.config.image_size[0],
+            imgsz=640,
             conf=conf,
             iou=iou,
             max_det=max_det,
             device=self.device,
             save=save,
             show=show,
-            verbose=verbose
+            verbose=verbose,
+            project=str(self.vision_config.predictions_dir) if save else None,
         )
 
         structured: List[ImagePrediction] = []
-        classes = getattr(self.config, "classes", None)
 
         for r in results:
-            # Skip frames without standard attributes (rare edge cases) maybe change in here!!!
             if not hasattr(r, "boxes"):
                 continue
 
@@ -96,6 +108,7 @@ class YoloPredictor:
                 xyxy = r.boxes.xyxy.cpu().numpy()
                 cls = r.boxes.cls.cpu().numpy()
                 confs = r.boxes.conf.cpu().numpy()
+                
                 for i in range(len(xyxy)):
                     x1, y1, x2, y2 = xyxy[i]
                     w = x2 - x1
@@ -103,7 +116,10 @@ class YoloPredictor:
                     cx = x1 + w / 2
                     cy = y1 + h / 2
                     cid = int(cls[i])
-                    cname = classes[cid] if classes and cid < len(classes) else str(cid)
+                    cname = self.classes.get(cid, str(cid)) if isinstance(self.classes, dict) else (
+                        self.classes[cid] if cid < len(self.classes) else str(cid)
+                    )
+                    
                     det_list.append(
                         Detection(
                             class_id=cid,
@@ -130,39 +146,3 @@ class YoloPredictor:
             )
 
         return structured
-
-    def predict_as_dicts(
-        self,
-        source: Union[str, Path, int],
-        **kwargs: Any
-    ) -> List[Dict[str, Any]]:
-        """Helper that converts ImagePrediction objects into plain dicts (JSON-friendly)."""
-        out = []
-        for p in self.predict(source, **kwargs):
-            out.append({
-                "source": p.source,
-                "orig_width": p.orig_width,
-                "orig_height": p.orig_height,
-                "detections": [
-                    {
-                        "class_id": d.class_id,
-                        "class_name": d.class_name,
-                        "confidence": d.confidence,
-                        "x1": d.x1,
-                        "y1": d.y1,
-                        "x2": d.x2,
-                        "y2": d.y2,
-                        "width": d.width,
-                        "height": d.height,
-                        "cx": d.cx,
-                        "cy": d.cy
-                    }
-                    for d in p.detections
-                ]
-            })
-        return out
-
-
-def load_default_predictor(config) -> YoloPredictor:
-    """Convenience loader using default training path."""
-    return YoloPredictor(config)

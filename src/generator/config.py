@@ -1,13 +1,14 @@
 from dataclasses import dataclass, field
 from typing import Tuple, List
-import os
+from pathlib import Path
 
-from src.generator.image.stanli_symbols import  HingeType, SupportType
 
 @dataclass
 class DatasetConfig:
-    # Dataset structure
-    output_dir: str = "datasets/structures"
+    """Configuration for dataset generation - paths set by AppState"""
+    
+    # Dataset structure (path will be set by AppState)
+    output_dir: Path = Path("temp_datasets")  # Default, gets overridden
     train_ratio: float = 0.8
     val_ratio: float = 0.15
     test_ratio: float = 0.05
@@ -42,16 +43,15 @@ class DatasetConfig:
     
     randomize_positions: bool = True
     enforce_static_determinacy: bool = True
-    scheibe_complexity: float = 0.6  # Probability of adding additional scheiben
+    scheibe_complexity: float = 0.6
     
     support_line_width: int = 3
     beam_connection_size: int = 6
     symbol_scale: float = 1.0
     
-    # YOLO classes - must match enum names in stanli_symbols.py
-    classes: List[str] = field(default_factory=lambda: 
-        [
-            "FESTLAGER", "LOSLAGER", "FESTE_EINSPANNUNG", "GLEITLAGER", 
-            "FEDER", "TORSIONSFEDER",
-            "VOLLGELENK", "HALBGELENK", "SCHUBGELENK", "NORMALKRAFTGELENK", "BIEGESTEIFE_ECKE"
-        ])
+    # YOLO classes
+    classes: List[str] = field(default_factory=lambda: [
+        "FESTLAGER", "LOSLAGER", "FESTE_EINSPANNUNG", "GLEITLAGER", 
+        "FEDER", "TORSIONSFEDER",
+        "VOLLGELENK", "HALBGELENK", "SCHUBGELENK", "NORMALKRAFTGELENK", "BIEGESTEIFE_ECKE"
+    ])

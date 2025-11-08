@@ -60,10 +60,6 @@ class DatasetPipeline:
                     # Apply augmentations
                     image, structure = self.augmenter.augment(image, structure)
                     
-                    # Re-normalize if augmentation pushed elements outside bounds
-                    #structure = self.geometry_processor.renormalize_if_needed(
-                    #    structure, self.config.image_size, margin=0.15
-                    #)
                     
                     # Save to dataset
                     filename = f"{split_name}_{i:06d}_{str(uuid.uuid4())[:8]}"

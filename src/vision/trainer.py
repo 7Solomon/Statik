@@ -8,6 +8,7 @@ class YOLOTrainer:
         self.model = YOLO(model_path)
         
     def train(self, 
+            dataset_path: Path,
             epochs: int = 50,
             batch_size: int = 16,
             learning_rate: float = 0.01,
@@ -16,7 +17,6 @@ class YOLOTrainer:
             name: str = 'structural_detection'):
 
         # Verify dataset exists
-        dataset_path = Path(self.config.output_dir)
         data_yaml = dataset_path / "dataset.yaml"
         if not data_yaml.exists():
             raise FileNotFoundError(f"Dataset YAML not found: {data_yaml}")

@@ -21,14 +21,6 @@ def test_verlauf_checker():
         print("The system is not statically determinate, cannot calculate reaction forces.")
 
 
-def test_start_GUI():
-    from PyQt5.QtWidgets import QApplication
-    import sys
-
-    app = QApplication(sys.argv)
-    main_window = MainWindow()
-    main_window.show()
-    sys.exit(app.exec_())
 
 def test_generate_dataset():
     from src.generator.generate import generate_sample_dataset

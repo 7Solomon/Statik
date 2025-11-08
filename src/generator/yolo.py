@@ -16,7 +16,8 @@ class YOLODatasetManager:
     
     def __init__(self, config):
         self.config = config
-        self.output_dir = Path(config.output_dir)
+        dirs = os.listdir(config.output_dir)
+        self.output_dir = config.output_dir / str(len(dirs))
 
     @classmethod
     def from_dataset_yaml(cls, dataset_yaml: str):

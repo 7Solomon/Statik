@@ -1,0 +1,87 @@
+<!-- Generate Dataset Modal -->
+<div id="generate-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Generate Dataset</h2>
+            <span class="close" onclick="closeGenerateModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="generate-modal-alert" class="alert" style="display: none;"></div>
+            
+            <div class="form-group">
+                <label for="gen-num-samples">Number of Samples:</label>
+                <input type="number" id="gen-num-samples" value="100" min="1">
+            </div>
+            
+            <div class="form-group">
+                <label for="gen-dataset-name">Dataset Name:</label>
+                <input type="text" id="gen-dataset-name" placeholder="e.g., my_dataset">
+                <small>Leave empty for auto-generated timestamp name</small>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeGenerateModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="startGeneration()">Generate</button>
+        </div>
+    </div>
+</div>
+
+<!-- Train Model Modal -->
+<div id="train-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Train Model</h2>
+            <span class="close" onclick="closeTrainModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="train-modal-alert" class="alert" style="display: none;"></div>
+            
+            <div class="form-group">
+                <label for="train-dataset-select">Select Dataset *</label>
+                <select id="train-dataset-select" required>
+                    <option value="">Select a dataset...</option>
+                </select>
+                <small>Choose which dataset to train on</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="train-base-model">Base Model:</label>
+                <select id="train-base-model">
+                    <option value="yolov8n.pt">YOLOv8 Nano</option>
+                    <option value="yolov8s.pt">YOLOv8 Small</option>
+                    <option value="yolov8m.pt">YOLOv8 Medium</option>
+                    <option value="yolov8l.pt">YOLOv8 Large</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="train-epochs">Epochs:</label>
+                <input type="number" id="train-epochs" value="50" min="1">
+            </div>
+            
+            <div class="form-group">
+                <label for="train-batch">Batch Size:</label>
+                <input type="number" id="train-batch" value="16" min="1">
+            </div>
+            
+            <div class="form-group">
+                <label for="train-image-size">Image Size:</label>
+                <input type="number" id="train-image-size" value="640" min="32" step="32">
+            </div>
+            
+            <div class="form-group">
+                <label for="train-lr">Learning Rate:</label>
+                <input type="number" id="train-lr" value="0.01" step="0.001" min="0.0001">
+            </div>
+            
+            <div class="form-group">
+                <label for="train-patience">Early Stopping Patience:</label>
+                <input type="number" id="train-patience" value="10" min="1">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeTrainModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="startTraining()">Start Training</button>
+        </div>
+    </div>
+</div>

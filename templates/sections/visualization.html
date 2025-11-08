@@ -1,0 +1,33 @@
+<section id="visualize-section" class="content-section">
+    <div class="section-header">
+        <h2>Dataset Visualization</h2>
+        <p>Browse and inspect your dataset</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Controls</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label for="viz-split">Split:</label>
+                <select id="viz-split" onchange="loadVisualization()">
+                    <option value="train">Train</option>
+                    <option value="val">Validation</option>
+                    <option value="test">Test</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Viewer</h3>
+        </div>
+        <div class="card-body">
+            <div id="viewer-container">
+                <p>Select a dataset to visualize</p>
+            </div>
+        </div>
+    </div>
+</section>

@@ -4,7 +4,6 @@ import os
 
 app = create_app()
 
-# Add the routes that should be at the top level (not in blueprints)
 @app.route('/')
 def index():
     """Main dashboard page"""

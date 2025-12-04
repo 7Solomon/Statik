@@ -1,4 +1,4 @@
-import { API_URL, showAlert } from './config.js';
+import { API_URL, showAlert } from '../config.js';
 
 // Poll for generation status
 let statusPollInterval = null;
@@ -6,29 +6,29 @@ let statusPollInterval = null;
 export async function startGeneration() {
     const form = document.getElementById('generate-form');
     const formData = new FormData(form);
-    
+
     const data = {
         num_samples: parseInt(formData.get('num_samples')),
         dataset_name: formData.get('dataset_name') || `dataset_${Date.now()}`
     };
-    
+
     try {
         const response = await fetch(`${API_URL}/api/generate`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             showAlert(error.error || 'Failed to start generation', 'error');
             return;
         }
-        
+
         closeGenerateModal();
         showProgressModal();
         startStatusPolling();
-        
+
     } catch (error) {
         showAlert('Error starting generation: ' + error.message, 'error');
     }
@@ -54,18 +54,18 @@ function startStatusPolling() {
     if (statusPollInterval) {
         clearInterval(statusPollInterval);
     }
-    
+
     statusPollInterval = setInterval(async () => {
         try {
             const response = await fetch(`${API_URL}/api/status`);
             const status = await response.json();
-            
+
             updateProgressUI(status);
-            
+
             if (!status.running) {
                 clearInterval(statusPollInterval);
                 statusPollInterval = null;
-                
+
                 setTimeout(() => {
                     closeProgressModal();
                     loadDatasetsList();
@@ -82,20 +82,20 @@ function updateProgressUI(status) {
     const progressText = document.getElementById('generation-progress-text');
     const progressMessage = document.getElementById('generation-message');
     const progressPercent = document.getElementById('generation-percent');
-    
+
     if (progressBar) {
         const percentage = status.percentage || 0;
         progressBar.style.width = `${percentage}%`;
     }
-    
+
     if (progressText) {
         progressText.textContent = `${status.progress || 0} / ${status.total || 0}`;
     }
-    
+
     if (progressMessage) {
         progressMessage.textContent = status.message || 'Processing...';
     }
-    
+
     if (progressPercent) {
         progressPercent.textContent = `${status.percentage || 0}%`;
     }
@@ -105,23 +105,23 @@ export async function loadDatasetsList() {
     try {
         const response = await fetch(`${API_URL}/api/datasets`);
         const datasets = await response.json();
-        
+
         const container = document.getElementById('dataset-list');
         const emptyState = document.getElementById('empty-state');
-        
+
         if (!container) {
             console.warn('dataset-list element not found');
             return;
         }
-        
+
         if (datasets.length === 0) {
             container.innerHTML = '';
             if (emptyState) emptyState.classList.remove('hidden');
             return;
         }
-        
+
         if (emptyState) emptyState.classList.add('hidden');
-        
+
         if (container) {
             container.innerHTML = datasets.map(dataset => `
                 <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-all duration-200">
@@ -164,7 +164,7 @@ export async function loadDatasetsList() {
                 </div>
             `).join('');
         }
-        
+
     } catch (error) {
         console.error('Error loading datasets:', error);
         showAlert('Failed to load datasets', 'error');
@@ -173,12 +173,12 @@ export async function loadDatasetsList() {
 
 export async function deleteDataset(name) {
     if (!confirm(`Delete dataset "${name}"?`)) return;
-    
+
     try {
         const response = await fetch(`${API_URL}/api/datasets/${name}`, {
             method: 'DELETE'
         });
-        
+
         if (response.ok) {
             showAlert('Dataset deleted', 'success');
             loadDatasetsList();

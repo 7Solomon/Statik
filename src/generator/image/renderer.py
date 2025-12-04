@@ -3,7 +3,7 @@ import numpy as np
 from typing import Optional, Tuple, List
 import matplotlib.pyplot as plt
 
-from model.generator_class import Structure
+from models.generator_class import Structure
 from src.generator.image.stanli_symbols import BeamType, HingeType, LoadType, StanliBeam, StanliHinge, StanliLoad, StanliSupport, SupportType
 
 class StanliRenderer:

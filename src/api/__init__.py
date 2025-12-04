@@ -1,3 +1,3 @@
-from src.api.routes import register_routes
+from src.api.register import register_blueprints
 
 __all__ = ['register_routes']

@@ -2,7 +2,7 @@ import os
 import json
 from typing import List, Dict, Tuple
 from pathlib import Path
-from model.generator_class import Structure
+from models.generator_class import Structure
 import random
 import yaml
 from PIL import Image

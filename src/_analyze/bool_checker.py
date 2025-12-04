@@ -1,7 +1,7 @@
 from typing import List, Iterable, Optional, Sequence
 
 from src.analyze.geometrie import concurrency_point_2d
-from model.analyze_custome_class import Bearing, Joint
+from models._analyze_custome_class import Bearing, Joint
 
 MOMENT_VEC = (0, 0, 1)
 X_VEC = (1, 0, 0)

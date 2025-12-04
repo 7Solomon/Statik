@@ -1,7 +1,7 @@
 import { API_URL, showAlert } from './config.js';
-import { loadDatasetsList } from './datasets.js';
-import { loadModelsList } from './model.js';
-import { loadVisualization } from './visualizer.js';
+import { loadDatasetsList } from './plugins/datasets.js';
+import { loadModelsList } from './plugins/models/model.js';
+import { loadVisualization } from './plugins/models/visualization.js';
 
 export function switchSection(sectionName) {
     // Update nav
@@ -10,14 +10,14 @@ export function switchSection(sectionName) {
     });
     const activeNav = document.querySelector(`[data-section="${sectionName}"]`);
     if (activeNav) activeNav.classList.add('active');
-    
+
     // Update content
     document.querySelectorAll('.content-section').forEach(section => {
         section.classList.remove('active');
     });
     const activeSection = document.getElementById(`${sectionName}-section`);
     if (activeSection) activeSection.classList.add('active');
-    
+
     // Load section-specific data
     if (sectionName === 'overview') refreshState();
     if (sectionName === 'datasets') loadDatasetsList();
@@ -37,19 +37,19 @@ export async function refreshState() {
 
 export function updateOverview(state) {
     if (!state) return;
-    
+
     // Helper to safely set text content
     const setText = (id, text) => {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
     };
-    
+
     // Update counts in the overview cards (these match overview.html)
     setText('dataset-count', state.dataset?.exists ? '1' : '0');
     setText('model-count', state.model?.available_models?.length || '0');
     setText('training-count', '0'); // TODO: track active training jobs
     setText('prediction-count', '0'); // TODO: track predictions
-    
+
     // Legacy support for old template elements (if they exist)
     setText('current-dataset', state.dataset?.path ? state.dataset.path.split('/').pop() : 'None');
     setText('dataset-status', state.dataset?.exists ? 'Ready' : 'No dataset');

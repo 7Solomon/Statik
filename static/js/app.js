@@ -1,10 +1,12 @@
 import { API_URL, showAlert } from './config.js';
 import { refreshState, updateOverview, switchSection } from './state.js';
-import { loadDatasetsList, startGeneration, deleteDataset } from './datasets.js';
-import { loadModelsList, startTraining, pollTrainingStatus, showTrainModal, closeTrainModal, deleteModel, loadModel } from './model.js';
-import { runPrediction, displayPredictionResults } from './prediction.js';
-import { loadVisualization } from './visualizer.js';
+import { loadDatasetsList, startGeneration, deleteDataset } from './plugins/datasets.js';
+import { loadModelsList, startTraining, pollTrainingStatus, showTrainModal, closeTrainModal, deleteModel, loadModel, runPrediction, initModels } from './plugins/models/model.js';
+import { loadVisualization } from './plugins/models/visualization.js';
+import { initLabeler } from './plugins/labeler/labeler.js';
 
+
+// ---------------------
 // Template loading function
 async function loadTemplate(name) {
     try {
@@ -16,20 +18,29 @@ async function loadTemplate(name) {
         return `<div class="p-4 text-red-600">Error loading ${name}</div>`;
     }
 }
+async function loadComponent(id, url) {
+    const el = document.getElementById(id);
+    if (!el) {
+        console.error(`Element #${id} not found.`);
+        return;
+    }
+    const response = await fetch(url);
+    const html = await response.text();
+    el.innerHTML = html;
+}
 
 // Load sidebar and modals (these are persistent)
 async function initializeApp() {
     // Load sidebar
-    const sidebar = await loadTemplate('sidebar');
-    document.getElementById('sidebar').innerHTML = sidebar;
-    
+    await loadComponent("sidebar", "/static/templates/components/sidebar.html");
+
     // Load modals
     const modals = await loadTemplate('modals');
     document.getElementById('modals').innerHTML = modals;
-    
+
     // Setup navigation
     setupNavigation();
-    
+
     // Load default page (overview)
     await loadPage('overview');
 }
@@ -40,7 +51,7 @@ function setupNavigation() {
             e.preventDefault();
             const href = link.getAttribute('href');
             const page = href.replace('#', '');
-            
+
             // Update active state with Tailwind classes
             document.querySelectorAll('.nav-item').forEach(l => {
                 l.classList.remove('bg-blue-50', 'text-blue-600', 'active');
@@ -48,7 +59,7 @@ function setupNavigation() {
             });
             link.classList.remove('text-slate-600');
             link.classList.add('bg-blue-50', 'text-blue-600', 'active');
-            
+
             // Load page
             await loadPage(page);
         });
@@ -59,14 +70,24 @@ function setupNavigation() {
 async function loadPage(pageName) {
     const mainContent = document.getElementById('main-content');
     mainContent.innerHTML = '<div class="text-center py-8">Loading...</div>';
-    
-    const content = await loadTemplate(pageName);
+
+    const templatePaths = {
+        'overview': 'overview',
+        'datasets': 'plugins/datasets',
+        'models': 'plugins/models',
+        'labeler': 'plugins/labeler'
+    };
+
+    // Use the mapped path, or default to the pageName if not listed
+    const path = templatePaths[pageName] || pageName;
+
+    const content = await loadTemplate(path);
     mainContent.innerHTML = content;
-    
+
     // Wait for DOM to update before calling page-specific initialization
     // Use setTimeout(0) to defer execution until after DOM updates
     setTimeout(() => {
-        switch(pageName) {
+        switch (pageName) {
             case 'overview':
                 refreshState();
                 break;
@@ -74,17 +95,10 @@ async function loadPage(pageName) {
                 loadDatasetsList();
                 break;
             case 'models':
-                loadModelsList();
+                initModels();
                 break;
-            case 'training':
-                // Training page initialization
-                break;
-            case 'prediction':
-                // Load models for prediction dropdown
-                loadModelsList();
-                break;
-            case 'visualization':
-                loadVisualization();
+            case 'labeler':
+                initLabeler();
                 break;
         }
     }, 0);

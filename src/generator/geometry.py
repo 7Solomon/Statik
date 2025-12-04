@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple
 
-from model.generator_class import Structure, Node
+from models.generator_class import Structure, Node
 from src.generator.image.stanli_symbols import StanliSupport, StanliHinge, StanliLoad
 
 # Maximum symbol extents (in mm, converted to pixels in normalization)

@@ -15,7 +15,7 @@ def create_app(content_dir=Path("content")):
     app.app_state.load_state()
     
     # Register API blueprints
-    from src.api.routes import register_routes
-    register_routes(app)
+    from src.api.register import register_blueprints
+    register_blueprints(app)
     
     return app

@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image, ImageFilter
 from dataclasses import replace
 
-from data.generator_class import Structure, Node  # Updated import
+from model.generator_class import Structure, Node  # Updated import
 from src.generator.geometry import GeometryProcessor
 
 

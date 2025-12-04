@@ -57,13 +57,13 @@ def train_model():
         return jsonify({'error': 'Training already in progress'}), 400
     
     data = request.json
-    dataset_name = data.get('dataset_name')
-    epochs = data.get('epochs', 50)
-    batch_size = data.get('batch_size', 16)
-    learning_rate = data.get('learning_rate', 0.01)
-    base_model = data.get('base_model', 'yolov8n.pt')
-    patience = data.get('patience', 50)
-    image_size = data.get('image_size', 640)
+    dataset_name = model.get('dataset_name')
+    epochs = model.get('epochs', 50)
+    batch_size = model.get('batch_size', 16)
+    learning_rate = model.get('learning_rate', 0.01)
+    base_model = model.get('base_model', 'yolov8n.pt')
+    patience = model.get('patience', 50)
+    image_size = model.get('image_size', 640)
     
     if not dataset_name:
         return jsonify({'error': 'dataset_name is required'}), 400

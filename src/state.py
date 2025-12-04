@@ -58,7 +58,7 @@ class AppState:
     
     def has_dataset(self) -> bool:
         """Check if dataset is available"""
-        if self.dataset_dir is None:
+        if not hasattr(self, 'dataset_dir'):
             # Check if default dataset exists
             default_dataset = self.dataset_config.output_dir / "dataset.yaml"
             if default_dataset.exists():
@@ -128,12 +128,12 @@ class AppState:
             'content_dir': str(self.content_dir.absolute()),
             'dataset': {
                 'exists': self.has_dataset(),
-                'path': str(self.dataset_dir) if self.dataset_dir else None,
+                'path': str(self.dataset_dir) if hasattr(self, 'dataset_dir') else None,
                 'output_dir': str(self.dataset_config.output_dir)
             },
             'model': {
                 'exists': self.has_model(),
-                'path': str(self.trained_model_path) if self.trained_model_path else None,
+                'path': str(self.trained_model_path) if hasattr(self, 'trained_model_path') else None,
                 'available_runs': self.vision_config.list_runs(),
                 'available_models': self.vision_config.list_models()
             },

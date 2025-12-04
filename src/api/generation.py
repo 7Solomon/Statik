@@ -13,8 +13,8 @@ def generate_dataset():
         return jsonify({'error': 'Generation already in progress'}), 400
     
     data = request.json
-    num_samples = data.get('num_samples', 100)
-    dataset_name = data.get('dataset_name', f'dataset_{num_samples}')
+    num_samples = model.get('num_samples', 100)
+    dataset_name = model.get('dataset_name', f'dataset_{num_samples}')
     
     def status_update(current, total, message):
         """Callback for pipeline to update status"""

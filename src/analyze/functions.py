@@ -3,7 +3,7 @@ from typing import List
 
 from src.analyze.sub_systems import find_rigid_subsystems
 from src.analyze.kinematics_sub import analyze_subsystems
-from data.analyze_custome_class import Bearing, DistributedLoad, Joint, PointLoad, ProblemDefinition
+from model.analyze_custome_class import Bearing, DistributedLoad, Joint, PointLoad, ProblemDefinition
 
 def check_static_determinacy(problem: ProblemDefinition) -> int:
     """

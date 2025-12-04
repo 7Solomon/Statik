@@ -2,7 +2,7 @@ import random
 import math
 from typing import List, Tuple, Optional
 
-from data.generator_class import Beam, Hinge, Node, Load, Structure, SupportType
+from model.generator_class import Beam, Hinge, Node, Load, Structure, SupportType
 from src.generator.image.stanli_symbols import BeamType, SupportType, HingeType, LoadType
 from src.generator.image.renderer import StanliRenderer
 

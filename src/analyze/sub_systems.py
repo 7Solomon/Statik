@@ -1,7 +1,7 @@
 from collections import defaultdict, deque
 from typing import List, Set, Tuple, Dict, Any
 
-from data.analyze_custome_class import ProblemDefinition, Joint, SubSystem
+from model.analyze_custome_class import ProblemDefinition, Joint, SubSystem
 from src.analyze.bool_checker import has_full_xyM
 
 def _joint_lists(problem: ProblemDefinition, a: str, b: str):

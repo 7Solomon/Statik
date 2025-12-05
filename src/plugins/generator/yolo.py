@@ -7,7 +7,7 @@ import random
 import yaml
 from PIL import Image
 
-from src.generator.image.stanli_symbols import StanliSupport, StanliHinge, StanliLoad, SupportType
+from src.plugins.generator.image.stanli_symbols import StanliSupport, StanliHinge, StanliLoad, SupportType
 
 class YOLODatasetManager:
     """Manages YOLO format dataset creation"""

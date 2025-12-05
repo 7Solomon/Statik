@@ -3,19 +3,18 @@ from typing import Optional
 from pathlib import Path 
 import json
 
-from src.generator.config import DatasetConfig
-from src.generator.yolo import YOLODatasetManager
-from src.vision.config import VisionConfig
+from src.plugins.analyze.config import SystemConfig
+from src.plugins.generator.config import DatasetConfig
+from src.plugins.generator.yolo import YOLODatasetManager
+from src.plugins.vision.config import VisionConfig
 
 
 @dataclass
 class AppState:
     """Centralized application state management that coordinates all configs"""
     
-    # Base directory for entire application
     content_dir: Path = Path("content")
     
-    # Sub-configurations (initialized in __post_init__)
     dataset_config: DatasetConfig = field(init=False)
     vision_config: VisionConfig = field(init=False)
     
@@ -29,16 +28,11 @@ class AppState:
         """Initialize all configurations with coordinated paths"""
         self.content_dir = Path(self.content_dir)
         self.content_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Initialize dataset config with content_dir
-        self.dataset_config = DatasetConfig()
-        self.dataset_config.output_dir = self.content_dir / "datasets"
-        
-        # Initialize vision config with content_dir
-        self.vision_config = VisionConfig(
-            base_dir=self.content_dir / "vision"
-        )
-        
+
+        self.dataset_config = DatasetConfig(root_dir=self.content_dir)
+        self.vision_config = VisionConfig(root_dir=self.content_dir)
+        self.system_config = SystemConfig(root_dir=self.content_dir)
+
         # Initialize generation status
         self.generation_status = {
             'running': False,
@@ -46,7 +40,7 @@ class AppState:
             'total': 0,
             'message': 'Ready to generate'
         }
-        
+
         # Initialize training status
         self.training_status = {
             'running': False,
@@ -55,6 +49,7 @@ class AppState:
             'message': '',
             'current_epoch': 0
         }
+
     
     def has_dataset(self) -> bool:
         """Check if dataset is available"""

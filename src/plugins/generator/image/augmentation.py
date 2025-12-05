@@ -5,7 +5,7 @@ from PIL import Image, ImageFilter
 from dataclasses import replace
 
 from models.generator_class import Structure, Node  # Updated import
-from src.generator.geometry import GeometryProcessor
+from src.plugins.generator.geometry import GeometryProcessor
 
 
 class ImageAugmenter:

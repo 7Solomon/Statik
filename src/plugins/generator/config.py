@@ -1,14 +1,15 @@
 from dataclasses import dataclass, field
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from pathlib import Path
-
 
 @dataclass
 class DatasetConfig:
-    """Configuration for dataset generation - paths set by AppState"""
-    
-    # Dataset structure (path will be set by AppState)
-    output_dir: Path = Path("temp_datasets")  # Default, gets overridden
+    """Configuration for dataset generation - paths coordinated by AppState"""
+    folder_name: str = "datasets"
+    root_dir: Optional[Path] = field(default=None, repr=False)
+    output_dir: Path = field(init=False)
+
+    # --- Generation Settings---
     train_ratio: float = 0.8
     val_ratio: float = 0.15
     test_ratio: float = 0.05
@@ -55,3 +56,9 @@ class DatasetConfig:
         "FEDER", "TORSIONSFEDER",
         "VOLLGELENK", "HALBGELENK", "SCHUBGELENK", "NORMALKRAFTGELENK", "BIEGESTEIFE_ECKE"
     ])
+
+    def __post_init__(self):
+        """Initialize directory structure"""
+        self.base_dir = self.root_dir / self.folder_name
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        self.output_dir = self.base_dir  # JUST FOR COMPATABILITY BUT THIS NEEDS TO BE LOOKED AFTER IF NESECARRY AND WHAT IT DO

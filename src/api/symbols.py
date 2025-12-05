@@ -1,7 +1,7 @@
 from flask import Blueprint, send_file, jsonify, request
 import io
 from PIL import Image, ImageDraw
-from src.generator.image.stanli_symbols import (
+from src.plugins.generator.image.stanli_symbols import (
     StanliSupport, StanliHinge,
     SupportType, HingeType,
 )

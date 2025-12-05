@@ -75,7 +75,7 @@ def train_model():
     
     def training_thread():
         try:
-            from src.vision.trainer import YOLOTrainer
+            from src.plugins.vision.trainer import YOLOTrainer
             
             app_state.training_status = {
                 'running': True,

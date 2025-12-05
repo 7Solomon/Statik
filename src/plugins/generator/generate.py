@@ -2,12 +2,12 @@ import random
 import uuid
 from pathlib import Path
 from tqdm import tqdm
-from src.generator.config import DatasetConfig
-from src.generator.geometry import GeometryProcessor
-from src.generator.image.augmentation import ImageAugmenter
-from src.generator.image.renderer import StanliRenderer
-from src.generator.image.structure_generator import StructuralSystemGenerator
-from src.generator.yolo import YOLODatasetManager
+from src.plugins.generator.config import DatasetConfig
+from src.plugins.generator.geometry import GeometryProcessor
+from src.plugins.generator.image.augmentation import ImageAugmenter
+from src.plugins.generator.image.renderer import StanliRenderer
+from src.plugins.generator.image.structure_generator import StructuralSystemGenerator
+from src.plugins.generator.yolo import YOLODatasetManager
 
 class DatasetPipeline:
     """Main pipeline for generating structural engineering datasets"""

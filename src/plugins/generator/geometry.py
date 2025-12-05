@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple
 
 from models.generator_class import Structure, Node
-from src.generator.image.stanli_symbols import StanliSupport, StanliHinge, StanliLoad
+from src.plugins.generator.image.stanli_symbols import StanliSupport, StanliHinge, StanliLoad
 
 # Maximum symbol extents (in mm, converted to pixels in normalization)
 MAX_SUPPORT_EXTENT_MM = 25.0  # Largest support (FEDER + hatching)

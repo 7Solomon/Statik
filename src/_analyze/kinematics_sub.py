@@ -1,6 +1,6 @@
 from typing import List
 
-from src.analyze.bool_checker import has_combined_xyM
+from src.plugins.analyze.bool_checker import has_combined_xyM
 from models._analyze_custome_class import Bearing, Joint, ProblemDefinition, SubSystem
 
 def check_kinematics(system: SubSystem, problem: ProblemDefinition):

@@ -3,13 +3,12 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
-
 @dataclass
 class VisionConfig:
     """Configuration for YOLO training and prediction - paths coordinated by AppState"""
-    
-    # Base directory (set by AppState)
-    base_dir: Path = Path("temp_vision")  # Default, gets overridden
+    folder_name: str = "vision"
+    root_dir: Path = field(default=Path("."), repr=False)
+    base_dir: Path = field(init=False)
     
     # Subdirectories (auto-created)
     datasets_dir: Path = field(init=False)
@@ -28,7 +27,9 @@ class VisionConfig:
     
     def __post_init__(self):
         """Initialize directory structure"""
-        self.base_dir = Path(self.base_dir)
+        # Construct the full path: content/vision
+        self.base_dir = self.root_dir / self.folder_name
+        self.base_dir.mkdir(parents=True, exist_ok=True)
         
         # Define subdirectories
         self.datasets_dir = self.base_dir / "datasets"
@@ -110,7 +111,7 @@ class VisionConfig:
         }
     
     def save_trained_model(self, source_run_name: Optional[str] = None, 
-                          target_model_name: Optional[str] = None):
+                           target_model_name: Optional[str] = None):
         """Copy best model from run directory to models directory"""
         import shutil
         

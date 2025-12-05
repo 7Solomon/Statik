@@ -87,3 +87,47 @@ export function getExportData() {
         gridSize: SystemState.gridSize
     };
 }
+
+
+export function loadSystem(data) {
+    if (!data) return;
+
+    clearSystem();
+
+    if (data.gridSize) {
+        SystemState.gridSize = parseFloat(data.gridSize) || 1.0;
+        const gridInput = document.getElementById('grid-size-input');
+        if (gridInput) gridInput.value = SystemState.gridSize;
+    }
+
+    if (Array.isArray(data.nodes)) {
+        SystemState.nodes = data.nodes.map(n => ({
+            id: n.id,
+            x: n.x,
+            y: n.y,
+            // Restore visual properties from saved data or default to 'none'
+            symbolType: n._visual_type || 'none',
+            rotation: n._visual_rotation || 0,
+            // Reconstruct fixData object from flat properties
+            fixData: {
+                fix_x: !!n.fix_x,
+                fix_y: !!n.fix_y,
+                fix_m: !!n.fix_m,
+                // We might need to persist 'category' if it was part of the original logic, 
+                // but usually fix_x/y/m determines the physics.
+                category: n.category || undefined
+            }
+        }));
+    }
+
+    if (Array.isArray(data.members)) {
+        // We can just copy them directly if the ID structure matches
+        SystemState.members = data.members.map(m => ({
+            id: m.id,
+            startNodeId: m.startNodeId,
+            endNodeId: m.endNodeId
+        }));
+    }
+
+    console.log("System Loaded:", SystemState);
+}

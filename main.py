@@ -1,6 +1,6 @@
 
-from src.generator.config import DatasetConfig
-from src.analyze.functions import check_static_determinacy, split_in_base_systems
+from src.plugins.generator.config import DatasetConfig
+from src.plugins.analyze.functions import check_static_determinacy, split_in_base_systems
 from problem_definitions import *
 
 
@@ -21,21 +21,21 @@ def test_verlauf_checker():
 
 
 def test_generate_dataset():
-    from src.generator.generate import generate_sample_dataset
-    from src.generator.yolo import visualize_yolo_dataset
+    from src.plugins.generator.generate import generate_sample_dataset
+    from src.plugins.generator.yolo import visualize_yolo_dataset
     dataset = generate_sample_dataset()
     visualize_yolo_dataset(dataset)
 
 def test_visualize_dataset():
-    from src.generator.yolo import YOLODatasetManager, visualize_yolo_dataset
+    from src.plugins.generator.yolo import YOLODatasetManager, visualize_yolo_dataset
     visualize_yolo_dataset(r"C:\Users\Johan\Documents\programme\Statik\datasets\structures\dataset.yaml",
                        split="val", shuffle=True, invert_y=False)
 def test_visualize_gallery():
-    from src.generator.generate import visualize_test_GALLERIES
+    from src.plugins.generator.generate import visualize_test_GALLERIES
     visualize_test_GALLERIES()
 
 def test_train():
-    from src.vision.trainer import YOLOTrainer
+    from src.plugins.vision.trainer import YOLOTrainer
     config = DatasetConfig()
     trainer = YOLOTrainer(config)
     trainer.train(epochs=5, batch_size=8, learning_rate=0.001)

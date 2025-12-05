@@ -5,6 +5,8 @@ import { loadModelsList, startTraining, pollTrainingStatus, showTrainModal, clos
 import { loadVisualization } from './plugins/models/visualization.js';
 import { initLabeler } from './plugins/labeler/interactionHandler.js';
 import { runAnalysis } from './plugins/labeler/analysisHandler.js'
+import { triggerRender } from './plugins/labeler/interactionHandler.js'
+
 
 // ---------------------
 // Template loading function
@@ -136,6 +138,8 @@ window.deleteModel = deleteModel;
 window.loadModel = loadModel;
 window.togglePanel = togglePanel;
 window.runAnalysis = runAnalysis;
+window.triggerRender = triggerRender;
+
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {

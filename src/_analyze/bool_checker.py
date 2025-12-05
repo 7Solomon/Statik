@@ -1,6 +1,6 @@
 from typing import List, Iterable, Optional, Sequence
 
-from src.analyze.geometrie import concurrency_point_2d
+from src.plugins.analyze.geometrie import concurrency_point_2d
 from models._analyze_custome_class import Bearing, Joint
 
 MOMENT_VEC = (0, 0, 1)

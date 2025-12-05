@@ -1,8 +1,8 @@
 import numpy as np
 from typing import List 
 
-from src.analyze.sub_systems import find_rigid_subsystems
-from src.analyze.kinematics_sub import analyze_subsystems
+from src.plugins.analyze.sub_systems import find_rigid_subsystems
+from src.plugins.analyze.kinematics_sub import analyze_subsystems
 from models._analyze_custome_class import Bearing, DistributedLoad, Joint, PointLoad, ProblemDefinition
 
 def check_static_determinacy(problem: ProblemDefinition) -> int:

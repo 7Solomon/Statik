@@ -3,8 +3,8 @@ import math
 from typing import List, Tuple, Optional
 
 from models.generator_class import Beam, Hinge, Node, Load, Structure, SupportType
-from src.generator.image.stanli_symbols import BeamType, SupportType, HingeType, LoadType
-from src.generator.image.renderer import StanliRenderer
+from src.plugins.generator.image.stanli_symbols import BeamType, SupportType, HingeType, LoadType
+from src.plugins.generator.image.renderer import StanliRenderer
 
 
 

@@ -2,7 +2,7 @@ from typing import List, Tuple, Dict, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from src.generator.image.stanli_symbols import BeamType, HingeType, LoadType, SupportType
+from src.plugins.generator.image.stanli_symbols import BeamType, HingeType, LoadType, SupportType
 
 @dataclass
 class Node:

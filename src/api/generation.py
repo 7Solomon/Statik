@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, current_app
 import threading
-from src.generator.generate import DatasetPipeline
+from src.plugins.generator.generate import DatasetPipeline
 
 bp = Blueprint('generation', __name__)
 

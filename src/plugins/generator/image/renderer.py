@@ -4,7 +4,7 @@ from typing import Optional, Tuple, List
 import matplotlib.pyplot as plt
 
 from models.generator_class import Structure
-from src.generator.image.stanli_symbols import BeamType, HingeType, LoadType, StanliBeam, StanliHinge, StanliLoad, StanliSupport, SupportType
+from src.plugins.generator.image.stanli_symbols import BeamType, HingeType, LoadType, StanliBeam, StanliHinge, StanliLoad, StanliSupport, SupportType
 
 class StanliRenderer:
     """Main renderer for stanli symbols"""

@@ -3,6 +3,8 @@ import * as Data from './structureData.js';
 import * as Renderer from './renderEngine.js';
 import { initSystemView, runAnalysis } from './analysisHandler.js';
 
+
+import './fileManager.js';
 // --- State ---
 let canvas, ctx;
 let currentTool = { category: 'connection', name: 'member' };
@@ -15,6 +17,10 @@ let interactionState = {
 };
 let SYMBOL_DEFINITIONS = {};
 let resizeObserver;
+
+export function triggerRender() {
+    Renderer.renderScene(ctx, canvas, interactionState);
+}
 
 // --- Initialization  ---
 export async function initLabeler() {
@@ -71,9 +77,6 @@ function handleResize(container) {
     triggerRender();
 }
 
-function triggerRender() {
-    Renderer.renderScene(ctx, canvas, interactionState);
-}
 
 function updateRotationPreview() {
     const img = document.getElementById('rotation-preview');
@@ -152,12 +155,6 @@ function exposeGlobalFunctions() {
         }
     };
 
-    window.saveSystem = () => {
-        const data = Data.getExportData();
-        console.log("System Data:", data);
-        alert("IMPLEMENT A WAY TO SAVE ON SERVER");
-    };
-
     window.toggleSystemView = () => {
         const body = document.getElementById('system-view-body');
         if (!body) return;
@@ -165,6 +162,8 @@ function exposeGlobalFunctions() {
         const btn = document.querySelector('#system-view-panel button[onclick="toggleSystemView()"]');
         if (btn) btn.textContent = hidden ? 'Expand' : 'Collapse';
     };
+
+
 }
 
 function updateUIButtons() {

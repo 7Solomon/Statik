@@ -1,6 +1,7 @@
 export const GridSystem = {
     // Configuration
-    canvasScaleFactor: 10.0, // Canvas is always 10 * L wide
+    canvasScaleFactor: 20.0,
+    originOffsetGrids: 2.0, // Number of grid squares from bottom-left to origin
 
     /**
      * Converts Pixel Coordinates to Real Coordinates (Meters)
@@ -10,9 +11,12 @@ export const GridSystem = {
         const aspectRatio = canvas.height / canvas.width;
         const totalRealHeight = totalRealWidth * aspectRatio;
 
+        // Apply offset so (0,0) is not at corner
+        const offsetReal = GridSystem.originOffsetGrids * gridSizeReal;
+
         return {
-            x: (pixelX / canvas.width) * totalRealWidth,
-            y: (1.0 - (pixelY / canvas.height)) * totalRealHeight // Invert Y
+            x: (pixelX / canvas.width) * totalRealWidth - offsetReal,
+            y: (1.0 - (pixelY / canvas.height)) * totalRealHeight - offsetReal
         };
     },
 
@@ -24,9 +28,11 @@ export const GridSystem = {
         const aspectRatio = canvas.height / canvas.width;
         const totalRealHeight = totalRealWidth * aspectRatio;
 
+        const offsetReal = GridSystem.originOffsetGrids * gridSizeReal;
+
         return {
-            x: (realX / totalRealWidth) * canvas.width,
-            y: (1.0 - (realY / totalRealHeight)) * canvas.height // Invert Y back
+            x: ((realX + offsetReal) / totalRealWidth) * canvas.width,
+            y: (1.0 - ((realY + offsetReal) / totalRealHeight)) * canvas.height
         };
     },
 
@@ -42,9 +48,12 @@ export const GridSystem = {
         const totalRealWidth = GridSystem.canvasScaleFactor * gridSizeReal;
         const aspectRatio = canvas.height / canvas.width;
         const totalRealHeight = totalRealWidth * aspectRatio;
+        const offsetReal = GridSystem.originOffsetGrids * gridSizeReal;
 
         // Vertical Lines
-        for (let x = 0; x <= totalRealWidth + 0.1; x += gridSizeReal) {
+        const startX = -offsetReal;
+        const endX = totalRealWidth - offsetReal;
+        for (let x = Math.floor(startX / gridSizeReal) * gridSizeReal; x <= endX; x += gridSizeReal) {
             const p = GridSystem.toPixel(x, 0, canvas, gridSizeReal);
             ctx.beginPath();
             ctx.moveTo(p.x, 0);
@@ -53,7 +62,9 @@ export const GridSystem = {
         }
 
         // Horizontal Lines
-        for (let y = 0; y <= totalRealHeight + 0.1; y += gridSizeReal) {
+        const startY = -offsetReal;
+        const endY = totalRealHeight - offsetReal;
+        for (let y = Math.floor(startY / gridSizeReal) * gridSizeReal; y <= endY; y += gridSizeReal) {
             const p = GridSystem.toPixel(0, y, canvas, gridSizeReal);
             ctx.beginPath();
             ctx.moveTo(0, p.y);
@@ -79,7 +90,7 @@ export const GridSystem = {
         ctx.stroke();
 
         ctx.fillStyle = colors.axis;
-        ctx.font = '10px monospace';
+        ctx.font = '12px monospace';
         ctx.fillText("(0,0)", pOrigin.x + 5, pOrigin.y - 5);
     }
 };

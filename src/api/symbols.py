@@ -1,4 +1,4 @@
-from flask import Blueprint, send_file, jsonify
+from flask import Blueprint, send_file, jsonify, request
 import io
 from PIL import Image, ImageDraw
 from src.generator.image.stanli_symbols import (
@@ -8,31 +8,73 @@ from src.generator.image.stanli_symbols import (
 
 bp = Blueprint('symbols', __name__, url_prefix='/symbols')
 
-SYMBOL_MAP = {
-    # Supports
-    'festlager': (StanliSupport, SupportType.FESTLAGER, (50.0, 30.0)),
-    'loslager': (StanliSupport, SupportType.LOSLAGER, (50.0, 30.0)),
-    'einspannung': (StanliSupport, SupportType.FESTE_EINSPANNUNG, (50.0, 30.0)),
-    'gleitlager': (StanliSupport, SupportType.GLEITLAGER, (50.0, 30.0)),
-    'feder': (StanliSupport, SupportType.FEDER, (50.0, 30.0)),
-    'torsionsfeder': (StanliSupport, SupportType.TORSIONSFEDER, (50.0, 30.0)),
-    
-    # Hinges
-    'vollgelenk': (StanliHinge, HingeType.VOLLGELENK, (50.0, 50.0)),
-    'halbgelenk': (StanliHinge, HingeType.HALBGELENK, (50.0, 50.0)),
-    'schubgelenk': (StanliHinge, HingeType.SCHUBGELENK, (50.0, 50.0)),
+SYMBOL_METADATA = {
+    'festlager': {
+        'category': 'support',
+        'fix_x': True, 'fix_y': True, 'fix_m': False,
+        'anchor': [50.0, 30.0],
+        'class': StanliSupport, 'enum': SupportType.FESTLAGER
+    },
+    'loslager': {
+        'category': 'support',
+        'fix_x': False, 'fix_y': True, 'fix_m': False,
+        'anchor': [50.0, 30.0],
+        'class': StanliSupport, 'enum': SupportType.LOSLAGER
+    },
+    'einspannung': {
+        'category': 'support',
+        'fix_x': True, 'fix_y': True, 'fix_m': True,
+        'anchor': [50.0, 30.0],
+        'class': StanliSupport, 'enum': SupportType.FESTE_EINSPANNUNG
+    },
+    'gleitlager': {
+        'category': 'support',
+        'fix_x': True, 'fix_y': False, 'fix_m': True,
+        'anchor': [50.0, 30.0],
+        'class': StanliSupport, 'enum': SupportType.GLEITLAGER
+    },
+    'vollgelenk': {
+        'category': 'hinge',
+        'releases_m': True, # Hint for member end
+        'anchor': [50.0, 50.0],
+        'class': StanliHinge, 'enum': HingeType.VOLLGELENK
+    }
 }
 
-@bp.route('/get/<name>', methods=['GET'])
+@bp.get('/definitions')
+def get_definitions():
+    """
+    Returns the physics/logic definition for the frontend.
+    The frontend is now 'dumb' and just stores these values.
+    """
+    # Filter out the internal python classes before sending JSON
+    client_data = {}
+    for key, data in SYMBOL_METADATA.items():
+        client_data[key] = {
+            'category': data['category'],
+            'fix_x': data.get('fix_x', False),
+            'fix_y': data.get('fix_y', False),
+            'fix_m': data.get('fix_m', False),
+            'anchor': data['anchor']
+        }
+    return jsonify(client_data)
+
+@bp.get('/get/<name>')
 def get_symbol_image(name):
+    """
+    Generates and returns the PNG for a symbol.
+    """
     name = name.lower()
+    rotation_deg = request.args.get('rotation', default=0, type=float)
     
-    if name not in SYMBOL_MAP:
+    if name not in SYMBOL_METADATA:
         return jsonify({"error": f"Unknown symbol: {name}"}), 404
     
     try:
-        # Unpack config
-        ClassType, EnumValue, center_pos = SYMBOL_MAP[name]
+        data = SYMBOL_METADATA[name]
+        ClassType = data['class']
+        EnumValue = data['enum']
+        center_pos = tuple(data['anchor'])
 
         # Create Image
         img = Image.new('RGBA', (100, 100), (255, 255, 255, 0))
@@ -41,13 +83,12 @@ def get_symbol_image(name):
         # Draw Symbol
         symbol = ClassType(EnumValue)
         
-        # Supports take extra rotation arg, Hinges don't need it but can take it
+        # Apply rotation logic
         if ClassType == StanliSupport:
-            symbol.draw(draw, center_pos, rotation=0)
+            symbol.draw(draw, center_pos, rotation=rotation_deg)
         else:
             symbol.draw(draw, center_pos)
 
-        # Return PNG
         buf = io.BytesIO()
         img.save(buf, format='PNG')
         buf.seek(0)

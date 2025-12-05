@@ -3,8 +3,7 @@ import { refreshState, updateOverview, switchSection } from './state.js';
 import { loadDatasetsList, startGeneration, deleteDataset } from './plugins/datasets.js';
 import { loadModelsList, startTraining, pollTrainingStatus, showTrainModal, closeTrainModal, deleteModel, loadModel, runPrediction, initModels } from './plugins/models/model.js';
 import { loadVisualization } from './plugins/models/visualization.js';
-import { initLabeler } from './plugins/labeler/labeler.js';
-
+import { initLabeler } from './plugins/labeler/interactionHandler.js';
 
 // ---------------------
 // Template loading function

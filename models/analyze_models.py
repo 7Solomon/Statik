@@ -16,11 +16,11 @@ class Node:
     
     # Boundary Conditions
     # If True, the movement in that direction is blocked (Supported).
-    fix_x: bool = False  # DE: [translate:fest in x-Richtung]
-    fix_y: bool = False  # DE: [translate:fest in y-Richtung]
+    fix_x: bool = False
+    fix_y: bool = False
     
     # Only relevant for Frames (Rahmen), usually False for Trusses (Fachwerke)
-    fix_m: bool = False  # DE: [translate:drehfest / Einspannung]
+    fix_m: bool = False
 
     @property
     def coordinates(self) -> np.ndarray:
@@ -36,8 +36,8 @@ class Member:
     Kinematically, this represents a 'distance constraint' between two points.
     """
     id: int
-    start_node: Node  # DE: [translate:Anfangsknoten]
-    end_node: Node    # DE: [translate:Endknoten]
+    start_node: Node
+    end_node: Node
     
     # System properties can be added here later (e.g., EA, EI)
     # For pure kinematics (rigid body), we only need geometry.

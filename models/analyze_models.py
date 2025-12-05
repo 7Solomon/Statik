@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 import numpy as np
 
 @dataclass
@@ -76,26 +76,88 @@ class StructuralSystem:
         member = Member(new_id, start, end)
         self.members.append(member)
         return member
+    
+    @classmethod
+    def create(cls, nodes_data: List[dict], members_data: List[dict]) -> 'StructuralSystem':
+        system = cls()
+        
+        id_to_node = {}
+        for n in nodes_data:
+            node = Node(
+                id=int(n["id"]),
+                x=float(n["x"]),
+                y=float(n["y"]),
+                fix_x=bool(n.get("fix_x", False)),
+                fix_y=bool(n.get("fix_y", False)),
+                fix_m=bool(n.get("fix_m", False)),
+            )
+            system.nodes.append(node)
+            id_to_node[node.id] = node
 
+        for m in members_data:
+            if m["startNodeId"] not in id_to_node or m["endNodeId"] not in id_to_node:
+                raise ValueError(f"Member references missing node: {m}")
+
+            start = id_to_node[m["startNodeId"]]
+            end = id_to_node[m["endNodeId"]]
+            
+            member = Member(
+                id=int(m["id"]),
+                start_node=start,
+                end_node=end,
+            )
+            system.members.append(member)
+            
+        return system
 
 
 @dataclass
-class KinematicResult:
+class RigidBody:
     """
-    Stores the result of a kinematic analysis.
-    DE: [translate:Kinematisches Ergebnis]
+    Represents a connected group of members moving together (Scheibe).
     """
-    is_mechanism: bool
-    dof: int  # Degree of Freedom (Laufgrad f)
+    id: int
+    member_ids: List[int]
     
-    # The movement vector (eigenmode) for every node
-    # Key: Node ID, Value: [vx, vy] (Velocity vector)
-    node_velocities: dict[int, np.ndarray] = field(default_factory=dict)
+    # 'rotation' or 'translation'
+    movement_type: str
+    
+    # If rotation: coordinates of the Pole (ICR) [px, py]
+    # If translation: velocity vector [vx, vy]
+    center_or_vector: np.ndarray
 
-    # The calculated Pole (ICR) for every member
-    # Key: Member ID, Value: [px, py] (Pole coordinates)
-    member_poles: dict[int, np.ndarray] = field(default_factory=dict)
-    
-    # Groups of members that move together as one Rigid Body
-    # [Starrkörper / Scheiben]
-    rigid_bodies: List[List[int]] = field(default_factory=list)
+    def to_dict(self):
+        """Helper for JSON serialization"""
+        return {
+            "id": self.id,
+            "member_ids": self.member_ids,
+            "movement_type": self.movement_type,
+            "center_or_vector": [float(self.center_or_vector[0]), float(self.center_or_vector[1])]
+        }
+
+@dataclass
+class KinematicResult:
+    is_kinematic: bool
+    dof: int
+    node_velocities: Dict[int, np.ndarray] = field(default_factory=dict)
+    member_poles: Dict[int, np.ndarray] = field(default_factory=dict)
+    rigid_bodies: List[RigidBody] = field(default_factory=list)
+
+    def to_dict(self):
+        """Serializes the entire result object for the API."""
+        
+        def vec_to_list(v):
+            return [float(v[0]), float(v[1])] if v is not None else None
+
+        return {
+            "is_kinematic": bool(self.is_kinematic),
+            "dof": int(self.dof),
+            
+            "node_velocities": {
+                int(k): vec_to_list(v) for k, v in self.node_velocities.items()
+            },
+            "member_poles": {
+                int(k): vec_to_list(v) for k, v in self.member_poles.items()
+            },
+            "rigid_bodies": [rb.to_dict() for rb in self.rigid_bodies]
+        }

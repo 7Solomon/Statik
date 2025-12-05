@@ -1,171 +1,209 @@
-<div class="max-w-7xl mx-auto h-[600px] flex flex-col p-4">
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-4 px-6 pt-4">
-        <div class="flex items-center gap-4">
-            <h2 class="text-2xl font-bold text-slate-800">System Labeler</h2>
+<div class="max-w-7xl mx-auto flex flex-col p-4 gap-4">
 
-            <!-- NEW: Grid Size Input -->
+    <!-- Header Area -->
+    <div class="flex justify-between items-center px-2">
+        <h2 class="text-2xl font-bold text-slate-800">System Labeler</h2>
+
+        <div class="flex gap-2">
+            <!-- Grid Size Input -->
             <div class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                <span class="text-xs font-semibold text-slate-500 uppercase">Raster (L):</span>
+                <span class="text-xs font-semibold text-slate-500 uppercase">Raster:</span>
                 <input type="number" id="grid-size-input" value="1.0" step="0.1" min="0.1"
                     class="w-16 bg-white border border-slate-300 rounded px-2 py-0.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500"
                     onchange="updateGridSize(this.value)">
                 <span class="text-xs text-slate-400">m</span>
             </div>
-        </div>
 
-        <div class="flex gap-2">
-            <!-- Toggle Button will be injected here by JS or you can hardcode it -->
-            <button onclick="toggleGrid()"
-                class="px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors text-sm font-medium">
-                Toggle Grid
-            </button>
+            <!-- Action Buttons -->
             <button onclick="clearCanvas()"
                 class="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors text-sm font-medium">
-                Clear All
+                Clear
             </button>
+
+            <button onclick="runAnalysis()"
+                class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg transition-colors text-sm font-medium shadow-sm">
+                Analyze
+            </button>
+
             <button onclick="saveSystem()"
                 class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium shadow-sm">
-                Save System
+                Save
             </button>
         </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="flex-1 flex gap-6 px-6 pb-6 min-h-0">
-
-        <!-- Canvas Container (unchanged) -->
-        <div class="flex-[4] bg-white rounded-xl shadow-sm border border-slate-200 relative overflow-hidden cursor-crosshair"
-            id="canvas-container">
-            <canvas id="structure-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
-            <div
-                class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-md shadow-sm text-xs text-slate-500 font-mono border border-slate-200">
-                x: <span id="coord-x">0.00</span>, y: <span id="coord-y">0.00</span>
-            </div>
+    <!-- PANEL 1: EDITOR (Open by default) -->
+    <div id="editor-panel" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- Panel Header -->
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+            onclick="togglePanel('editor')">
+            <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span> Editor
+            </h3>
+            <!-- Chevron Icon (Rotated 180deg because it starts OPEN) -->
+            <svg id="arrow-editor" class="w-5 h-5 text-slate-400 transform transition-transform duration-200 rotate-180"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
         </div>
 
+        <!-- Panel Body (Visible by default) -->
+        <div id="body-editor" class="p-4 transition-all duration-300 ease-in-out">
+            <div class="h-[600px] flex gap-6">
 
-        <!-- Tools Sidebar -->
-        <div class="w-80 flex flex-col gap-4 overflow-y-auto pr-2">
+                <!-- Canvas Container -->
+                <div class="flex-[4] bg-white rounded-lg border border-slate-200 relative overflow-hidden cursor-crosshair shadow-inner"
+                    id="canvas-container">
+                    <canvas id="structure-canvas" class="absolute top-0 left-0 w-full h-full block"></canvas>
 
-            <!-- SECTION 1: CONNECTIONS (Stab) -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="font-semibold mb-3 text-slate-800 text-sm uppercase tracking-wide">System</h3>
-                <div class="grid grid-cols-2 gap-2">
-                    <!-- Connection Tool -->
-                    <button onclick="setTool('connection', 'member')" id="btn-connection-member"
-                        class="tool-btn w-full flex items-center justify-center gap-2 border-2 border-slate-200 p-2 rounded hover:border-blue-400 transition-all">
-                        <div class="w-4 h-0.5 bg-slate-600"></div> <!-- Simple line icon -->
-                        <span class="text-sm font-medium">Stab (Member)</span>
-                    </button>
-
-                    <!-- Delete Tool (Optional) -->
-                    <button onclick="setTool('delete', 'delete')" id="btn-delete-delete"
-                        class="tool-btn w-full flex items-center justify-center gap-2 border-2 border-slate-200 p-2 rounded hover:bg-red-50 hover:border-red-400 transition-all text-red-600">
-                        <span class="text-sm font-medium">Löschen</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- SECTION 2: SUPPORTS (Lager) -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="font-semibold mb-3 text-slate-800 text-sm uppercase tracking-wide">Lager (Supports)</h3>
-                <div class="grid grid-cols-3 gap-2">
-                    <!-- Dynamic Buttons -->
-                    <button onclick="setTool('support', 'festlager')" id="btn-support-festlager"
-                        class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-blue-400">
-                        <img src="/symbols/get/festlager" class="w-full h-8 object-contain mb-1 pointer-events-none">
-                        <span class="text-[10px] block text-center text-slate-600">Fest</span>
-                    </button>
-                    <button onclick="setTool('support', 'loslager')" id="btn-support-loslager"
-                        class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-blue-400">
-                        <img src="/symbols/get/loslager" class="w-full h-8 object-contain mb-1 pointer-events-none">
-                        <span class="text-[10px] block text-center text-slate-600">Los</span>
-                    </button>
-                    <button onclick="setTool('support', 'einspannung')" id="btn-support-einspannung"
-                        class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-blue-400">
-                        <img src="/symbols/get/einspannung" class="w-full h-8 object-contain mb-1 pointer-events-none">
-                        <span class="text-[10px] block text-center text-slate-600">Einsp.</span>
-                    </button>
-                    <button onclick="setTool('support', 'gleitlager')" id="btn-support-gleitlager"
-                        class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-blue-400">
-                        <img src="/symbols/get/gleitlager" class="w-full h-8 object-contain mb-1 pointer-events-none">
-                        <span class="text-[10px] block text-center text-slate-600">Gleit</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- SECTION 3: HINGES (Gelenke) -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="font-semibold mb-3 text-slate-800 text-sm uppercase tracking-wide">Gelenke (Hinges)</h3>
-                <div class="grid grid-cols-3 gap-2">
-                    <button onclick="setTool('hinge', 'vollgelenk')" id="btn-hinge-vollgelenk"
-                        class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-green-400">
-                        <img src="/symbols/get/vollgelenk" class="w-full h-8 object-contain mb-1 pointer-events-none">
-                        <span class="text-[10px] block text-center text-slate-600">Voll</span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mt-auto">
-                <label class="text-xs font-bold text-slate-500 uppercase mb-2 block">
-                    Rotation
-                </label>
-
-                <!-- Preset angle buttons -->
-                <div class="flex flex-wrap gap-2 mb-3" id="rotation-presets">
-                    <!-- Buttons will call updateRotation and also update active state -->
-                    <button type="button"
-                        class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
-                        data-angle="0" onclick="selectPresetRotation(0)">
-                        0°
-                    </button>
-                    <button type="button"
-                        class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
-                        data-angle="90" onclick="selectPresetRotation(90)">
-                        90°
-                    </button>
-                    <button type="button"
-                        class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
-                        data-angle="180" onclick="selectPresetRotation(180)">
-                        180°
-                    </button>
-                    <button type="button"
-                        class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
-                        data-angle="270" onclick="selectPresetRotation(270)">
-                        270°
-                    </button>
-                </div>
-
-                <!-- Custom angle input -->
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-xs text-slate-500">Custom:</span>
-                    <input type="number" id="rotation-custom" min="0" max="360" step="1"
-                        class="w-20 bg-white border border-slate-300 rounded px-2 py-0.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500"
-                        oninput="selectCustomRotation(this.value)">
-                    <span class="text-xs text-slate-400">deg</span>
-                </div>
-
-                <!-- Preview: shows current tool symbol rotated -->
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center gap-1 text-xs text-slate-500">
-                        <span>Aktuell:</span>
-                        <span class="font-mono" id="rotation-display">0</span>°
+                    <!-- Coordinates Overlay -->
+                    <div
+                        class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-md shadow-sm text-xs text-slate-500 font-mono border border-slate-200 pointer-events-none">
+                        x: <span id="coord-x">0.00</span>, y: <span id="coord-y">0.00</span>
                     </div>
-                    <div class="flex-1 flex items-center justify-end">
-                        <div
-                            class="w-12 h-12 border border-slate-200 rounded flex items-center justify-center bg-slate-50">
-                            <!-- This image will be updated by JS when tool/rotation changes -->
-                            <img id="rotation-preview" src="/symbols/get/festlager?rotation=0"
-                                class="max-w-full max-h-full object-contain pointer-events-none" alt="Rotation preview">
+                </div>
+
+                <!-- Tools Sidebar -->
+                <div class="w-72 flex flex-col gap-4 overflow-y-auto pr-1">
+
+                    <!-- SECTION 1: CONNECTIONS (Stab) -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 class="font-semibold mb-3 text-slate-800 text-sm uppercase tracking-wide">System</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <!-- Connection Tool -->
+                            <button onclick="setTool('connection', 'member')" id="btn-connection-member"
+                                class="tool-btn w-full flex items-center justify-center gap-2 border-2 border-slate-200 p-2 rounded hover:border-blue-400 transition-all">
+                                <div class="w-4 h-0.5 bg-slate-600"></div> <!-- Simple line icon -->
+                                <span class="text-sm font-medium">Stab</span>
+                            </button>
+
+                            <!-- Delete Tool -->
+                            <button onclick="setTool('delete', 'delete')" id="btn-delete-delete"
+                                class="tool-btn w-full flex items-center justify-center gap-2 border-2 border-slate-200 p-2 rounded hover:bg-red-50 hover:border-red-400 transition-all text-red-600">
+                                <span class="text-sm font-medium">Löschen</span>
+                            </button>
                         </div>
                     </div>
+
+                    <!-- SECTION 2: SUPPORTS (Lager) -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 class="font-semibold mb-3 text-slate-800 text-sm uppercase tracking-wide">Lager (Supports)
+                        </h3>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="setTool('support', 'festlager')" id="btn-support-festlager"
+                                class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-blue-400">
+                                <img src="/symbols/get/festlager"
+                                    class="w-full h-8 object-contain mb-1 pointer-events-none">
+                                <span class="text-[10px] block text-center text-slate-600">Fest</span>
+                            </button>
+                            <button onclick="setTool('support', 'loslager')" id="btn-support-loslager"
+                                class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-blue-400">
+                                <img src="/symbols/get/loslager"
+                                    class="w-full h-8 object-contain mb-1 pointer-events-none">
+                                <span class="text-[10px] block text-center text-slate-600">Los</span>
+                            </button>
+                            <button onclick="setTool('support', 'einspannung')" id="btn-support-einspannung"
+                                class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-blue-400">
+                                <img src="/symbols/get/einspannung"
+                                    class="w-full h-8 object-contain mb-1 pointer-events-none">
+                                <span class="text-[10px] block text-center text-slate-600">Einsp.</span>
+                            </button>
+                            <button onclick="setTool('support', 'gleitlager')" id="btn-support-gleitlager"
+                                class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-blue-400">
+                                <img src="/symbols/get/gleitlager"
+                                    class="w-full h-8 object-contain mb-1 pointer-events-none">
+                                <span class="text-[10px] block text-center text-slate-600">Gleit</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 3: HINGES (Gelenke) -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 class="font-semibold mb-3 text-slate-800 text-sm uppercase tracking-wide">Gelenke (Hinges)
+                        </h3>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="setTool('hinge', 'vollgelenk')" id="btn-hinge-vollgelenk"
+                                class="tool-btn border-2 border-slate-200 p-2 rounded hover:border-green-400">
+                                <img src="/symbols/get/vollgelenk"
+                                    class="w-full h-8 object-contain mb-1 pointer-events-none">
+                                <span class="text-[10px] block text-center text-slate-600">Voll</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 4: ROTATION -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mt-auto">
+                        <label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Rotation</label>
+
+                        <!-- Preset angle buttons -->
+                        <div class="flex flex-wrap gap-2 mb-3" id="rotation-presets">
+                            <button type="button"
+                                class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
+                                data-angle="0" onclick="selectPresetRotation(0)">0°</button>
+                            <button type="button"
+                                class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
+                                data-angle="90" onclick="selectPresetRotation(90)">90°</button>
+                            <button type="button"
+                                class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
+                                data-angle="180" onclick="selectPresetRotation(180)">180°</button>
+                            <button type="button"
+                                class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
+                                data-angle="270" onclick="selectPresetRotation(270)">270°</button>
+                        </div>
+
+                        <!-- Custom angle input -->
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-xs text-slate-500">Custom:</span>
+                            <input type="number" id="rotation-custom" min="0" max="360" step="1"
+                                class="w-20 bg-white border border-slate-300 rounded px-2 py-0.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500"
+                                oninput="selectCustomRotation(this.value)">
+                            <span class="text-xs text-slate-400">deg</span>
+                        </div>
+
+                        <!-- Preview -->
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-1 text-xs text-slate-500">
+                                <span>Aktuell:</span>
+                                <span class="font-mono" id="rotation-display">0</span>°
+                            </div>
+                            <div class="flex-1 flex items-center justify-end">
+                                <div
+                                    class="w-12 h-12 border border-slate-200 rounded flex items-center justify-center bg-slate-50">
+                                    <img id="rotation-preview" src="/symbols/get/festlager?rotation=0"
+                                        class="max-w-full max-h-full object-contain pointer-events-none"
+                                        alt="Rotation preview">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
-
         </div>
-
     </div>
 
-</div>
+    <!-- PANEL 2: SYSTEM VIEW (Hidden by default) -->
+    <div id="system-panel" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- Panel Header -->
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+            onclick="togglePanel('system')">
+            <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Analysis Result
+            </h3>
+            <!-- Chevron Icon (Not rotated because it starts CLOSED) -->
+            <svg id="arrow-system" class="w-5 h-5 text-slate-400 transform transition-transform duration-200"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        </div>
+
+        <!-- Panel Body (Hidden by default: display: none) -->
+        <div id="body-system" class="p-4 transition-all duration-300 ease-in-out" style="display: none;">
+            <div class="h-96 w-full bg-slate-50 rounded-lg border border-slate-200 relative overflow-hidden shadow-inner"
+                id="system-view-container">
+                <canvas id="system-view-canvas" class="absolute inset-0 w-full h-full block"></canvas>
+            </div>
+        </div>
+    </div>
+
 </div>

@@ -1,11 +1,20 @@
 import numpy as np
-from typing import Dict, List, Optional
-from models.analyze_models import Node, Member, StructuralSystem
+from typing import Dict, List, Optional, Tuple
+from models.analyze_models import Node, Member, RigidBody, StructuralSystem
 
 
-def calculate_poles(system: StructuralSystem, velocity_dict: Dict[int, np.ndarray]):
-    """Calculates the Instantaneous Center of Rotation (Pole) for each member."""
+def calculate_poles(
+    system: StructuralSystem, 
+    velocity_dict: Dict[int, np.ndarray]
+) -> Tuple[Dict[int, Optional[np.ndarray]], Dict[int, np.ndarray]]:
+    """
+    Calculates the Pole (ICR) for each member.
+    Returns:
+        - member_poles: {member_id: [px, py] or None}
+        - translation_dirs: {member_id: [vx, vy] (normalized)} for members with infinite poles
+    """
     member_poles = {}
+    translation_dirs = {}
     
     for member in system.members:
         nA = member.start_node
@@ -19,32 +28,44 @@ def calculate_poles(system: StructuralSystem, velocity_dict: Dict[int, np.ndarra
         
         L2 = np.dot(r_BA, r_BA)
         
+        # Calculate angular velocity omega
         # Cross product in 2D: x1*y2 - y1*x2
         omega = (r_BA[0] * v_BA[1] - r_BA[1] * v_BA[0]) / L2
         
         if abs(omega) < 1e-6:
-            member_poles[member.id] = None 
+            # --- Case: Pure Translation (Infinite Pole) ---
+            member_poles[member.id] = None
+            
+            # Calculate normalized direction from one of the nodes
+            norm = np.linalg.norm(vA)
+            if norm > 1e-9:
+                translation_dirs[member.id] = vA / norm
+            else:
+                translation_dirs[member.id] = np.zeros(2)
         else:
+            # --- Case: Rotation (Finite Pole) ---
             # Pole calculation: P = A + r_AP
             # r_AP is rotated vA scaled by omega
             px = nA.x - vA[1] / omega
             py = nA.y + vA[0] / omega
             member_poles[member.id] = np.array([px, py])
             
-    return member_poles
+    return member_poles, translation_dirs
 
 def group_into_subsystems(
     member_poles: Dict[int, Optional[np.ndarray]], 
     translation_velocity_dict: Dict[int, np.ndarray] = None,
     tolerance: float = 1e-4
-) -> List[List[int]]:
-    """Groups members into Rigid Bodies (Scheiben)."""
-    groups = []
+) -> List[RigidBody]:
+    """
+    Groups members into Rigid Bodies (Scheiben) and returns structured objects.
+    """
+    groups_data = [] # Temporary storage for algorithm
 
     for m_id, pole in member_poles.items():
         matched = False
         
-        for group in groups:
+        for group in groups_data:
             # CASE A: Finite Rotation
             if pole is not None and group['type'] == 'rotation':
                 dist = np.linalg.norm(pole - group['val'])
@@ -58,31 +79,40 @@ def group_into_subsystems(
                 if translation_velocity_dict:
                     v_this = translation_velocity_dict.get(m_id, np.zeros(2))
                     v_group = group['val']
-                    # Check if normalized vectors are close (dot product ~ 1 or -1 for same axis)
-                    # For rigid bodies, we usually care about magnitude direction too, 
-                    # but for grouping "Scheiben" usually just direction matters.
-                    # Using abs(dot) checks parallelism.
+                    
+                    # Check if normalized vectors are close
                     if np.isclose(np.abs(np.dot(v_this, v_group)), 1.0, atol=tolerance):
                         group['members'].append(m_id)
                         matched = True
                         break
                 else:
+                    # If no velocity data, group all translating members together (fallback)
                     group['members'].append(m_id)
                     matched = True
                     break
 
         if not matched:
             if pole is not None:
-                groups.append({'type': 'rotation', 'val': pole, 'members': [m_id]})
+                groups_data.append({'type': 'rotation', 'val': pole, 'members': [m_id]})
             else:
                 v_ref = np.zeros(2)
                 if translation_velocity_dict:
                     v_ref = translation_velocity_dict.get(m_id, np.zeros(2))
-                groups.append({'type': 'translation', 'val': v_ref, 'members': [m_id]})
+                groups_data.append({'type': 'translation', 'val': v_ref, 'members': [m_id]})
     
-    return [g['members'] for g in groups]
+    # Convert to RigidBody objects
+    rigid_bodies = []
+    for i, g in enumerate(groups_data):
+        rb = RigidBody(
+            id=i,
+            member_ids=g['members'],
+            movement_type=g['type'],
+            center_or_vector=g['val']
+        )
+        rigid_bodies.append(rb)
+        
+    return rigid_bodies
 
-# --- 3. TEST PIPELINE ---
 
 def test_pipeline():
 

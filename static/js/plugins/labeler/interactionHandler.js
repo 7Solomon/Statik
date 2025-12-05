@@ -1,6 +1,7 @@
 import { GridSystem } from './gridSystem.js';
 import * as Data from './structureData.js';
 import * as Renderer from './renderEngine.js';
+import { initSystemView, runAnalysis } from './analysisHandler.js';
 
 // --- State ---
 let canvas, ctx;
@@ -47,6 +48,7 @@ export async function initLabeler() {
     // 6. Initial Render
     triggerRender();
 
+    initSystemView();
     // 7. Restore UI State (Optional: Highlight default button)
     window.setTool('connection', 'member');
 }
@@ -153,7 +155,15 @@ function exposeGlobalFunctions() {
     window.saveSystem = () => {
         const data = Data.getExportData();
         console.log("System Data:", data);
-        alert("System saved to Console (F12)");
+        alert("IMPLEMENT A WAY TO SAVE ON SERVER");
+    };
+
+    window.toggleSystemView = () => {
+        const body = document.getElementById('system-view-body');
+        if (!body) return;
+        const hidden = body.classList.toggle('hidden');
+        const btn = document.querySelector('#system-view-panel button[onclick="toggleSystemView()"]');
+        if (btn) btn.textContent = hidden ? 'Expand' : 'Collapse';
     };
 }
 

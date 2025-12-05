@@ -1,9 +1,10 @@
-import { API_URL, showAlert } from './config.js';
+import { API_URL, showAlert, togglePanel } from './config.js';
 import { refreshState, updateOverview, switchSection } from './state.js';
 import { loadDatasetsList, startGeneration, deleteDataset } from './plugins/datasets.js';
 import { loadModelsList, startTraining, pollTrainingStatus, showTrainModal, closeTrainModal, deleteModel, loadModel, runPrediction, initModels } from './plugins/models/model.js';
 import { loadVisualization } from './plugins/models/visualization.js';
 import { initLabeler } from './plugins/labeler/interactionHandler.js';
+import { runAnalysis } from './plugins/labeler/analysisHandler.js'
 
 // ---------------------
 // Template loading function
@@ -133,6 +134,8 @@ window.loadVisualization = loadVisualization;
 window.deleteDataset = deleteDataset;
 window.deleteModel = deleteModel;
 window.loadModel = loadModel;
+window.togglePanel = togglePanel;
+window.runAnalysis = runAnalysis;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {

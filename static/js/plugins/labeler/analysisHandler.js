@@ -1,5 +1,5 @@
 import * as Data from './structureData.js';
-import { renderSystemView } from './renderEngine.js';
+import { renderSystemView } from './rendering/index.js';
 import { showAlert } from '../../config.js';
 
 // --- State ---

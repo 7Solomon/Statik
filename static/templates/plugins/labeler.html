@@ -138,53 +138,24 @@
                             </button>
                         </div>
                     </div>
+                    <!-- Add this Block to your Toolbar in labeler.html -->
 
-                    <!-- SECTION 4: ROTATION -->
-                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mt-auto">
-                        <label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Rotation</label>
-
-                        <!-- Preset angle buttons -->
-                        <div class="flex flex-wrap gap-2 mb-3" id="rotation-presets">
-                            <button type="button"
-                                class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
-                                data-angle="0" onclick="selectPresetRotation(0)">0°</button>
-                            <button type="button"
-                                class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
-                                data-angle="90" onclick="selectPresetRotation(90)">90°</button>
-                            <button type="button"
-                                class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
-                                data-angle="180" onclick="selectPresetRotation(180)">180°</button>
-                            <button type="button"
-                                class="rot-btn px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-blue-50"
-                                data-angle="270" onclick="selectPresetRotation(270)">270°</button>
-                        </div>
-
-                        <!-- Custom angle input -->
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="text-xs text-slate-500">Custom:</span>
-                            <input type="number" id="rotation-custom" min="0" max="360" step="1"
-                                class="w-20 bg-white border border-slate-300 rounded px-2 py-0.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500"
-                                oninput="selectCustomRotation(this.value)">
-                            <span class="text-xs text-slate-400">deg</span>
-                        </div>
-
-                        <!-- Preview -->
-                        <div class="flex items-center gap-3">
-                            <div class="flex items-center gap-1 text-xs text-slate-500">
-                                <span>Aktuell:</span>
-                                <span class="font-mono" id="rotation-display">0</span>°
-                            </div>
-                            <div class="flex-1 flex items-center justify-end">
-                                <div
-                                    class="w-12 h-12 border border-slate-200 rounded flex items-center justify-center bg-slate-50">
-                                    <img id="rotation-preview" src="/symbols/get/festlager?rotation=0"
-                                        class="max-w-full max-h-full object-contain pointer-events-none"
-                                        alt="Rotation preview">
-                                </div>
-                            </div>
+                    <!-- LOAD TOOLS -->
+                    <div class="mb-6">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Loads</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="setTool('load', 'force')"
+                                class="tool-btn flex flex-col items-center justify-center p-2 rounded bg-slate-50 border border-slate-200 hover:bg-white hover:border-blue-400 hover:shadow-sm transition-all text-slate-600">
+                                <span class="text-xl font-bold">↓</span>
+                                <span class="text-[10px] mt-1">Force</span>
+                            </button>
+                            <button onclick="setTool('load', 'moment')"
+                                class="tool-btn flex flex-col items-center justify-center p-2 rounded bg-slate-50 border border-slate-200 hover:bg-white hover:border-blue-400 hover:shadow-sm transition-all text-slate-600">
+                                <span class="text-xl font-bold">↻</span>
+                                <span class="text-[10px] mt-1">Moment</span>
+                            </button>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>

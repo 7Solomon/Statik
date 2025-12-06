@@ -8,14 +8,14 @@ import numpy as np
 
 bp = Blueprint('analyze', __name__, url_prefix='/analyze')
 
-
 @bp.route("/system", methods=["POST"])
 def analyze_system():
     payload = request.get_json(force=True)
     try:
         system = StructuralSystem.create(
             payload.get("nodes", []), 
-            payload.get("members", [])
+            payload.get("members", []),
+            payload.get("loads", [])
         )
         
         node_velocities, dof = solve_kinematics(system)
@@ -34,6 +34,7 @@ def analyze_system():
         response["system"] = {
             "nodes": payload.get("nodes", []),
             "members": payload.get("members", []),
+            "loads": payload.get("loads", []),
             "gridSize": payload.get("gridSize", 1.0)
         }
         print(response)

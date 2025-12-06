@@ -1,66 +1,61 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Dict
+from typing import List, Literal, Tuple, Optional, Dict, Union
 import numpy as np
+
+
+@dataclass
+class Load:
+    id: int
+    type: Literal['force', 'moment', 'distributed']
+    
+    # Values: [Fx, Fy, M] or [q_start, q_end]
+    values: list[float]  
+    
+    location_type: Literal['node', 'member', 'global']
+    location_id: int
+    
+    # t can be float (point) or tuple (range) or None (node)
+    t: Union[float, Tuple[float, float], None] = None
+
+    # Helper to get vector for nodal loads (legacy support)
+    def to_vector(self) -> np.ndarray:
+        if len(self.values) >= 3:
+             return np.array(self.values[:3])
+        # Pad with zeros if values are missing (e.g. only q given)
+        padded = self.values + [0.0] * (3 - len(self.values))
+        return np.array(padded[:3])
 
 @dataclass
 class Node:
-    """
-    Represents a joint in the system.
-    [Knoten]
-    
-    A node defines a position in space and its specific boundary conditions.
-    """
     id: int
     x: float
     y: float
-    
-    # Boundary Conditions
-    # If True, the movement in that direction is blocked (Supported).
     fix_x: bool = False
     fix_y: bool = False
-    
-    # Only relevant for Frames (Rahmen), usually False for Trusses (Fachwerke)
     fix_m: bool = False
 
     @property
     def coordinates(self) -> np.ndarray:
-        """Returns position as a vector"""
         return np.array([self.x, self.y])
 
 @dataclass
 class Member:
-    """
-    Represents a connection between two nodes.
-    [Stab]
-    
-    Kinematically, this represents a 'distance constraint' between two points.
-    """
     id: int
     start_node: Node
     end_node: Node
-    
-    # System properties can be added here later (e.g., EA, EI)
-    # For pure kinematics (rigid body), we only need geometry.
 
     def length(self) -> float:
-        """Calculates the length of the member"""
         return np.linalg.norm(self.end_node.coordinates - self.start_node.coordinates)
     
     def direction_vector(self) -> np.ndarray:
-        """
-        Returns the normalized direction vector
-        """
         delta = self.end_node.coordinates - self.start_node.coordinates
         return delta / np.linalg.norm(delta)
 
 @dataclass
 class StructuralSystem:
-    """
-    The container for the entire system.
-    [Tragwerk / System]
-    """
     nodes: List[Node] = field(default_factory=list)
     members: List[Member] = field(default_factory=list)
+    loads: List[Load] = field(default_factory=list)
 
     def add_node(self, x: float, y: float, fix_x=False, fix_y=False) -> Node:
         new_id = len(self.nodes)
@@ -71,16 +66,27 @@ class StructuralSystem:
     def add_member(self, start_node_id: int, end_node_id: int) -> Member:
         start = next(n for n in self.nodes if n.id == start_node_id)
         end = next(n for n in self.nodes if n.id == end_node_id)
-        
         new_id = len(self.members)
         member = Member(new_id, start, end)
         self.members.append(member)
         return member
+
+    def add_load(self, node_id: int, fx=0.0, fy=0.0, m=0.0) -> Load:
+        new_id = len(self.loads)
+        load = Load(
+            id=new_id, 
+            type='force' if m == 0 else 'moment',
+            values=[fx, fy, m],
+            location_type='node',
+            location_id=node_id,
+            t=None
+        )
+        self.loads.append(load)
+        return load
     
     @classmethod
-    def create(cls, nodes_data: List[dict], members_data: List[dict]) -> 'StructuralSystem':
+    def create(cls, nodes_data: List[dict], members_data: List[dict], loads_data: List[dict]) -> 'StructuralSystem':
         system = cls()
-        
         id_to_node = {}
         for n in nodes_data:
             node = Node(
@@ -97,16 +103,33 @@ class StructuralSystem:
         for m in members_data:
             if m["startNodeId"] not in id_to_node or m["endNodeId"] not in id_to_node:
                 raise ValueError(f"Member references missing node: {m}")
-
             start = id_to_node[m["startNodeId"]]
             end = id_to_node[m["endNodeId"]]
-            
             member = Member(
                 id=int(m["id"]),
                 start_node=start,
                 end_node=end,
             )
             system.members.append(member)
+        
+        for l in loads_data:
+            raw_t = l.get('t')
+            parsed_t = None
+            if raw_t is not None:
+                if isinstance(raw_t, list):
+                    parsed_t = tuple(raw_t)
+                else:
+                    parsed_t = float(raw_t)
+
+            load = Load(
+                id=int(l['id']),
+                type=l['type'],
+                values=[float(v) for v in l.get('values', [])],
+                location_type=l['locationType'],
+                location_id=int(l['locationId']),
+                t=parsed_t
+            )
+            system.loads.append(load)
             
         return system
 

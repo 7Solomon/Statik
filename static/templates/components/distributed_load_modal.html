@@ -1,0 +1,50 @@
+<!-- Distributed Load Input Modal -->
+<div id="dist-load-modal"
+    class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-96">
+        <h3 class="text-lg font-bold text-slate-800 mb-4">Distributed Load Properties</h3>
+
+        <!-- Magnitude -->
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-slate-600 mb-1">Magnitude (kN/m)</label>
+            <input type="number" id="dist-mag"
+                class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                value="5">
+        </div>
+
+        <div class="flex gap-4 mb-6">
+            <!-- Start Position -->
+            <div class="flex-1">
+                <label class="block text-sm font-medium text-slate-600 mb-1">Start (0-1)</label>
+                <input type="number" id="dist-start" step="0.1" min="0" max="1"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                    value="0">
+                <span class="text-xs text-slate-400">0 = Start Node</span>
+            </div>
+            <!-- End Position -->
+            <div class="flex-1">
+                <label class="block text-sm font-medium text-slate-600 mb-1">End (0-1)</label>
+                <input type="number" id="dist-end" step="0.1" min="0" max="1"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                    value="1">
+                <span class="text-xs text-slate-400">1 = End Node</span>
+            </div>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-slate-600 mb-1">Angle (Degrees)</label>
+            <input type="number" id="dist-angle"
+                class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                value="90" placeholder="90 for Vertical Down">
+            <span class="text-xs text-slate-400">90° = Down, 0° = Right</span>
+        </div>
+
+
+        <div class="flex justify-end gap-3">
+            <button id="dist-cancel"
+                class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancel</button>
+            <button id="dist-confirm"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-md">Apply
+                Load</button>
+        </div>
+    </div>
+</div>

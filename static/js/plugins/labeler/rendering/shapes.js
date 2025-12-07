@@ -1,6 +1,8 @@
 import { SystemState } from '../structureData.js';
 import { GridSystem } from '../gridSystem.js';
 import { getSymbolImage } from './assets.js';
+import { drawStanliDistributedLoad, drawStanliPointLoad, drawStanliMoment } from './customeShapes/loads.js';
+import { drawStanliMember } from './customeShapes/members.js';
 
 export const COLORS = {
     node: '#1e293b',
@@ -13,22 +15,26 @@ export const COLORS = {
     moment: '#f59e0b'
 };
 
-export function drawMembers(ctx, canvas, gridSize) {
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = COLORS.member;
-    ctx.beginPath();
 
+export function drawMembers(ctx, canvas, gridSize) {
     SystemState.members.forEach(m => {
         const n1 = SystemState.nodes.find(n => n.id === m.startNodeId);
         const n2 = SystemState.nodes.find(n => n.id === m.endNodeId);
+
         if (n1 && n2) {
             const p1 = GridSystem.toPixel(n1.x, n1.y, canvas, gridSize);
             const p2 = GridSystem.toPixel(n2.x, n2.y, canvas, gridSize);
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
+
+            // Map your backend Enum/ID to a string style
+            // Example: m.type might be 1 (Normal), 2 (Fiber), etc.
+            let visualType = 'normal';
+            if (m.type === 'fiber' || m.type === 1) visualType = 'fiber';
+            else if (m.type === 'truss' || m.type === 2) visualType = 'truss';
+            else if (m.type === 'hidden' || m.type === 3) visualType = 'hidden';
+
+            drawStanliMember(ctx, p1, p2, visualType);
         }
     });
-    ctx.stroke();
 }
 
 export function drawGhostMember(ctx, canvas, interactionState, gridSize) {
@@ -84,21 +90,25 @@ export function drawNodes(ctx, canvas, hoveredNodeId, gridSize, SYMBOL_DEFINITIO
     });
 }
 
-export function drawLoads(ctx, canvas, gridSize) {
+export function drawLoads(ctx, canvas, gridSize, SYMBOL_DEFINITIONS) {
     if (!SystemState.loads) return;
 
     SystemState.loads.forEach(load => {
         let pStart = null, pEnd = null;
-        let angleRad = (load.angle * Math.PI) / 180;
 
+        // 1. Handle Node Loads (Point Forces / Moments)
         if (load.locationType === 'node') {
             const node = SystemState.nodes.find(n => n.id === load.locationId);
             if (!node) return;
             pStart = GridSystem.toPixel(node.x, node.y, canvas, gridSize);
-            pEnd = pStart;
-        } else if (load.locationType === 'member') {
+            pEnd = pStart; // Point loads have same start/end
+        }
+
+        // 2. Handle Member Loads
+        else if (load.locationType === 'member') {
             const member = SystemState.members.find(m => m.id === load.locationId);
             if (!member) return;
+
             const n1 = SystemState.nodes.find(n => n.id === member.startNodeId);
             const n2 = SystemState.nodes.find(n => n.id === member.endNodeId);
             if (!n1 || !n2) return;
@@ -108,12 +118,22 @@ export function drawLoads(ctx, canvas, gridSize) {
                 y: n1.y + (n2.y - n1.y) * t
             });
 
-            if (Array.isArray(load.t)) {
-                const w1 = lerp(load.t[0]);
-                const w2 = lerp(load.t[1]);
+            // --- FIX FOR DISTRIBUTED LOADS ---
+            if (load.type === 'distributed') {
+                // Use the tStart/tEnd we saved in event_logic.js
+                // Fallback to 0 and 1 if undefined
+                const t0 = (load.tStart !== undefined) ? load.tStart : 0;
+                const t1 = (load.tEnd !== undefined) ? load.tEnd : 1;
+
+                const w1 = lerp(t0);
+                const w2 = lerp(t1);
+
                 pStart = GridSystem.toPixel(w1.x, w1.y, canvas, gridSize);
                 pEnd = GridSystem.toPixel(w2.x, w2.y, canvas, gridSize);
-            } else {
+            }
+            // --- FIX FOR POINT LOADS ON MEMBER ---
+            else {
+                // Standard single 't'
                 const w = lerp(load.t);
                 pStart = GridSystem.toPixel(w.x, w.y, canvas, gridSize);
                 pEnd = pStart;
@@ -128,65 +148,35 @@ export function drawLoads(ctx, canvas, gridSize) {
         ctx.lineWidth = 2;
 
         if (load.type === 'distributed') {
-            const steps = 6;
-            const dx = (pEnd.x - pStart.x);
-            const dy = (pEnd.y - pStart.y);
-            const arrowLen = 30;
-            const ox = Math.cos(angleRad + Math.PI) * arrowLen;
-            const oy = Math.sin(angleRad + Math.PI) * arrowLen;
-
-            ctx.beginPath();
-            ctx.moveTo(pStart.x + ox, pStart.y + oy);
-            ctx.lineTo(pEnd.x + ox, pEnd.y + oy);
-            ctx.stroke();
-
-            for (let i = 0; i <= steps; i++) {
-                const t = i / steps;
-                const tx = pStart.x + dx * t;
-                const ty = pStart.y + dy * t;
-                drawArrowParams(ctx, tx + ox, ty + oy, tx, ty);
-            }
-        } else if (load.type === 'force') {
-            ctx.translate(pStart.x, pStart.y);
-            ctx.rotate(angleRad);
-            ctx.beginPath();
-            ctx.moveTo(0, -50);
-            ctx.lineTo(0, 0);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(-6, -15);
-            ctx.lineTo(0, 0);
-            ctx.lineTo(6, -15);
-            ctx.fill();
-        } else if (load.type === 'moment') {
-            ctx.translate(pStart.x, pStart.y);
-            ctx.strokeStyle = COLORS.moment;
-            ctx.fillStyle = COLORS.moment;
-            ctx.beginPath();
-            ctx.arc(0, 0, 20, 0, 1.5 * Math.PI);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(20, -5);
-            ctx.lineTo(25, 5);
-            ctx.lineTo(30, -5);
-            ctx.fill();
+            const angleToDraw = (load.angle !== undefined) ? load.angle : null;
+            drawStanliDistributedLoad(ctx, pStart, pEnd, 15, 30, true, angleToDraw);
         }
+        else if (load.type === 'force' || load.type === 'point') {
+            // Use load.angle if it exists, otherwise use 270 (down)
+            const angle = (load.angle !== undefined) ? load.angle : 90;
+            drawStanliPointLoad(ctx, pStart.x, pStart.y, angle);
+        }
+        else if (load.type === 'moment') {
+            drawStanliMoment(ctx, pStart.x, pStart.y, 20, true);
+        }
+
         ctx.restore();
     });
 }
 
-function drawArrowParams(ctx, x1, y1, x2, y2) {
-    const head = 6;
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const angle = Math.atan2(dy, dx);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x2, y2);
-    ctx.lineTo(x2 - head * Math.cos(angle - Math.PI / 6), y2 - head * Math.sin(angle - Math.PI / 6));
-    ctx.lineTo(x2 - head * Math.cos(angle + Math.PI / 6), y2 - head * Math.sin(angle + Math.PI / 6));
-    ctx.fill();
-}
+
+//function drawArrowParams(ctx, x1, y1, x2, y2) {
+//    const head = 6;
+//    const dx = x2 - x1;
+//    const dy = y2 - y1;
+//    const angle = Math.atan2(dy, dx);
+//    ctx.beginPath();
+//    ctx.moveTo(x1, y1);
+//    ctx.lineTo(x2, y2);
+//    ctx.stroke();
+//    ctx.beginPath();
+//    ctx.moveTo(x2, y2);
+//    ctx.lineTo(x2 - head * Math.cos(angle - Math.PI / 6), y2 - head * Math.sin(angle - Math.PI / 6));
+//    ctx.lineTo(x2 - head * Math.cos(angle + Math.PI / 6), y2 - head * Math.sin(angle + Math.PI / 6));
+//    ctx.fill();
+//}

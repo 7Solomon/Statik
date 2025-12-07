@@ -29,15 +29,26 @@ async function loadComponent(id, url) {
     const html = await response.text();
     el.innerHTML = html;
 }
+async function loadModals() {
+    try {
+        const [singleLoadHtml, distLoadHtml] = await Promise.all([
+            fetch('/static/templates/components/single_load_modal.html').then(r => r.text()),
+            fetch('/static/templates/components/distributed_load_modal.html').then(r => r.text())
+        ]);
+
+        document.getElementById('single_load_modal').innerHTML = singleLoadHtml;
+        document.getElementById('distributed_load_modal').innerHTML = distLoadHtml;
+    } catch (err) {
+        console.error("Failed to load modal templates:", err);
+    }
+}
 
 // Load sidebar and modals (these are persistent)
 async function initializeApp() {
     // Load sidebar
     await loadComponent("sidebar", "/static/templates/components/sidebar.html");
 
-    // Load modals
-    const modals = await loadTemplate('modals');
-    document.getElementById('modals').innerHTML = modals;
+    loadModals();
 
     // Setup navigation
     setupNavigation();

@@ -1,48 +1,41 @@
 import * as Data from './structureData.js';
 import { renderSystemView } from './rendering/index.js';
-import { showAlert } from '../../config.js';
 
 // --- State ---
 export const AnalysisState = {
     hasResult: false,
     isMechanism: false,
     dof: 0,
-    nodeVelocities: {},
-    memberPoles: {},
-    rigidBodies: [],
 
-    // Complete system copy for this view
+    // API Data
+    modes: [],
     systemData: null,
 
-    // Viewport State
-    view: {
-        panX: 0,
-        panY: 0,
-        zoom: 1.0
-    },
+    // Active Render Data (Swapped when dropdown changes)
+    activeModeIndex: 0,
+    nodeVelocities: {}, // Points to modes[i].velocities
+    rigidBodies: [],    // Points to modes[i].rigid_bodies
+    memberPoles: {},    // Points to modes[i].member_poles
 
-    // Animation State
+    // Viewport & Animation
+    amplitude: 0.5,
+    view: { panX: 0, panY: 0, zoom: 1.0 },
     animationTime: 0
 };
 
-let viewCanvas, viewCtx, resizeObserver;
-let animationFrameId;
-
+let viewCanvas, viewCtx, resizeObserver, animationFrameId;
 
 export function initSystemView() {
     viewCanvas = document.getElementById('system-view-canvas');
     const container = document.getElementById('system-view-container');
-
     if (!viewCanvas || !container) return;
 
     viewCtx = viewCanvas.getContext('2d');
 
-    // Robust resize handler
+    // Resize Handler
     const handleResize = () => {
         viewCanvas.width = container.clientWidth;
         viewCanvas.height = container.clientHeight;
-
-        // Center the view initially if we have data
         if (AnalysisState.systemData) centerView();
         redraw();
     };
@@ -50,70 +43,43 @@ export function initSystemView() {
     resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(container);
 
-    // Mouse Interaction (Pan & Zoom)
     setupInteraction(viewCanvas);
-
-    // Start Animation Loop
+    setupControls();
     startAnimationLoop();
-
-    // Initial call
     handleResize();
 }
 
-function redraw() {
-    if (!viewCtx || !viewCanvas) return;
-    // Use AnalysisState (includes systemData + view) to draw the view
-    renderSystemView(viewCtx, viewCanvas, AnalysisState);
+function setupControls() {
+    // Dropdown for Modes
+    const selector = document.getElementById('mode-selector');
+    if (selector) {
+        selector.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.value);
+            switchMode(idx);
+        });
+    }
+
+    // Slider for Amplitude
+    const slider = document.getElementById('amp-slider');
+    if (slider) {
+        slider.addEventListener('input', (e) => {
+            AnalysisState.amplitude = parseInt(e.target.value) / 100;
+        });
+    }
 }
 
-function setupInteraction(canvas) {
-    let isDragging = false;
-    let lastX = 0, lastY = 0;
+function switchMode(index) {
+    if (!AnalysisState.modes[index]) return;
 
-    canvas.addEventListener('mousedown', (e) => {
-        if (e.button === 1 || e.button === 0) { // Middle or Left mouse
-            isDragging = true;
-            lastX = e.clientX;
-            lastY = e.clientY;
-            canvas.style.cursor = 'grabbing';
-        }
-    });
+    AnalysisState.activeModeIndex = index;
 
-    window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        const dx = e.clientX - lastX;
-        const dy = e.clientY - lastY;
-        lastX = e.clientX;
-        lastY = e.clientY;
+    // SWAP DATA
+    const m = AnalysisState.modes[index];
+    AnalysisState.nodeVelocities = m.velocities;
+    AnalysisState.rigidBodies = m.rigid_bodies;
+    AnalysisState.memberPoles = m.member_poles;
 
-        AnalysisState.view.panX += dx;
-        AnalysisState.view.panY += dy;
-    });
-
-    window.addEventListener('mouseup', () => {
-        isDragging = false;
-        canvas.style.cursor = 'default';
-    });
-
-    canvas.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const zoomSpeed = 0.001;
-        const zoomChange = Math.exp(-e.deltaY * zoomSpeed);
-        AnalysisState.view.zoom *= zoomChange;
-        // Clamp zoom
-        AnalysisState.view.zoom = Math.max(0.1, Math.min(AnalysisState.view.zoom, 5.0));
-    });
-}
-
-function startAnimationLoop() {
-    const loop = (time) => {
-        AnalysisState.animationTime = time / 1000; // Seconds
-        if (viewCtx && viewCanvas && AnalysisState.hasResult) {
-            renderSystemView(viewCtx, viewCanvas, AnalysisState);
-        }
-        animationFrameId = requestAnimationFrame(loop);
-    };
-    animationFrameId = requestAnimationFrame(loop);
+    redraw();
 }
 
 // --- API Logic ---
@@ -128,50 +94,62 @@ export async function runAnalysis() {
         if (!res.ok) throw new Error('Analysis failed');
         const result = await res.json();
 
-        // Update State (handle possible key name variations)
+        // 1. Store Basic Info
         AnalysisState.hasResult = true;
-        AnalysisState.isMechanism = result.is_kinematic ?? result.is_mechanism ?? false;
-        AnalysisState.dof = result.dof ?? 0;
-        AnalysisState.nodeVelocities = result.node_velocities ?? {};
-        AnalysisState.memberPoles = result.member_poles ?? {};
-        AnalysisState.rigidBodies = result.rigid_bodies ?? [];
+        AnalysisState.isMechanism = result.is_kinematic;
+        AnalysisState.dof = result.dof;
+        AnalysisState.modes = result.modes || [];
+        AnalysisState.systemData = result.system;
 
-        // Store the system data returned from API or fallback to request payload
-        AnalysisState.systemData = result.system ?? {
-            nodes: payload.nodes || [],
-            members: payload.members || [],
-            gridSize: payload.gridSize ?? (Data.SystemState?.gridSize ?? 1.0)
-        };
+        // 2. Setup Dropdown
+        const selector = document.getElementById('mode-selector');
+        const controlsDiv = document.getElementById('view-controls');
 
-        // Auto-center view on new result
-        centerView();
-
-        // Ensure panel is open (reuse previous logic)
-        const body = document.getElementById('body-system');
-        if (body && body.style.display === 'none') {
-            if (window.togglePanel) {
-                window.togglePanel('system');
-            } else {
-                body.style.display = 'block';
-                const arrow = document.getElementById('arrow-system');
-                if (arrow) arrow.classList.add('rotate-180');
-            }
+        if (selector) {
+            selector.innerHTML = '';
+            AnalysisState.modes.forEach((m, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.text = `Mode ${i + 1}`;
+                selector.appendChild(opt);
+            });
         }
 
+        // 3. Activate Mode 0
+        if (AnalysisState.modes.length > 0) {
+            switchMode(0);
+            if (selector) selector.value = 0;
+            if (controlsDiv) controlsDiv.classList.remove('hidden');
+        } else {
+            if (controlsDiv) controlsDiv.classList.add('hidden');
+        }
+
+        // 4. View Setup
+        centerView();
+        openSystemPanel();
         redraw();
+
     } catch (e) {
         console.error(e);
-        alert('Analysis failed (see console).');
+        alert('Analysis failed.');
+    }
+}
+
+// --- Helpers ---
+
+function openSystemPanel() {
+    const body = document.getElementById('body-system');
+    if (body && body.style.display === 'none') {
+        if (window.togglePanel) window.togglePanel('system');
+        else body.style.display = 'block';
     }
 }
 
 function centerView() {
-    if (!AnalysisState.systemData || !Array.isArray(AnalysisState.systemData.nodes) || AnalysisState.systemData.nodes.length === 0) return;
+    if (!AnalysisState.systemData?.nodes?.length) return;
 
-    // Calculate bounding box of nodes
     const nodes = AnalysisState.systemData.nodes;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-
     nodes.forEach(n => {
         minX = Math.min(minX, n.x);
         maxX = Math.max(maxX, n.x);
@@ -179,24 +157,47 @@ function centerView() {
         maxY = Math.max(maxY, n.y);
     });
 
-    // Determine pixel scaling for grid units (approximate)
-    const gs = AnalysisState.systemData.gridSize ?? 1.0;
-    const gridSizePx = gs * 100; // 100px per grid unit default
-    const contentWidth = (maxX - minX) * gridSizePx;
-    const contentHeight = (maxY - minY) * gridSizePx;
+    const scale = 100; // Base scale matches renderer
+    const cx = (minX + maxX) / 2 * scale;
+    const cy = (minY + maxY) / 2 * scale;
 
-    // Center point in content pixels
-    const centerX = ((minX + maxX) / 2) * gridSizePx;
-    const centerY = ((minY + maxY) / 2) * gridSizePx;
+    AnalysisState.view.zoom = 0.8;
+    AnalysisState.view.panX = (viewCanvas.width / 2) - (cx * 0.8);
+    // Inverted Y axis correction:
+    AnalysisState.view.panY = (viewCanvas.height / 2) + (cy * 0.8);
 
-    // Canvas center
-    const cvsCX = viewCanvas.width / 2;
-    const cvsCY = viewCanvas.height / 2;
-
-    AnalysisState.view.panX = cvsCX - centerX;
-    AnalysisState.view.panY = cvsCY - centerY;
-    AnalysisState.view.zoom = 0.8; // Start slightly zoomed out
-
-    // Trigger a redraw
     redraw();
+}
+
+function redraw() {
+    if (viewCtx && viewCanvas) {
+        renderSystemView(viewCtx, viewCanvas, AnalysisState);
+    }
+}
+
+function startAnimationLoop() {
+    const loop = (time) => {
+        AnalysisState.animationTime = time / 1000;
+        if (AnalysisState.hasResult) redraw();
+        animationFrameId = requestAnimationFrame(loop);
+    };
+    animationFrameId = requestAnimationFrame(loop);
+}
+
+function setupInteraction(canvas) {
+    let isDragging = false, lastX = 0, lastY = 0;
+    canvas.addEventListener('mousedown', e => {
+        isDragging = true; lastX = e.clientX; lastY = e.clientY;
+    });
+    window.addEventListener('mousemove', e => {
+        if (!isDragging) return;
+        AnalysisState.view.panX += e.clientX - lastX;
+        AnalysisState.view.panY += e.clientY - lastY;
+        lastX = e.clientX; lastY = e.clientY;
+    });
+    window.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        AnalysisState.view.zoom *= Math.exp(-e.deltaY * 0.001);
+    });
 }

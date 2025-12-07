@@ -8,30 +8,30 @@ export const SystemState = {
 };
 
 // --- Load Management ---
-export function addLoad(target, type, values, angle = 0) {
-    // 1. Get a Primary Value for basic component calc
-    // If values is [10], val = 10. If [10, 20], val = 10 (start).
+export function addLoad(target, type, values, angle = 0, extraParams = {}) {
     const primaryValue = Array.isArray(values) ? values[0] : values;
 
     let fx = 0, fy = 0, m = 0;
 
-    if (type === 'force') {
+    // Physics for Point Loads / Moments
+    if (type === 'force' || type === 'point') { // Handle both names if you use them
         const rad = (angle * Math.PI) / 180;
         fx = primaryValue * Math.cos(rad);
         fy = primaryValue * Math.sin(rad);
-
     } else if (type === 'moment') {
         m = primaryValue;
     }
+    // Note: Distributed loads usually don't set global fx/fy here 
+    // because it depends on member length.
 
     const newLoad = {
         id: SystemState.loads.length > 0 ? Math.max(...SystemState.loads.map(l => l.id)) + 1 : 0,
 
         type: type,
-        values: Array.isArray(values) ? values : [values], // Always store as array
+        values: Array.isArray(values) ? values : [values],
         angle: angle,
 
-        // PHYSICS (Cached for Point Loads)
+        // PHYSICS
         fx: parseFloat(fx.toFixed(4)),
         fy: parseFloat(fy.toFixed(4)),
         m: parseFloat(m.toFixed(4)),
@@ -40,13 +40,18 @@ export function addLoad(target, type, values, angle = 0) {
         locationType: target.type, // 'node' or 'member'
         locationId: target.id,
 
-        // POSITON (Polymorphic: float or array)
-        t: target.t
+        // POSITION: Default to target.t, but allow override from extraParams
+        // This is crucial for Distributed Loads which pass { tStart, tEnd }
+        t: target.t,
+
+        // Spread extra params (tStart, tEnd) directly into the object
+        ...extraParams
     };
 
     SystemState.loads.push(newLoad);
     return newLoad;
 }
+
 
 export function deleteLoadsOnNode(nodeId) {
     SystemState.loads = SystemState.loads.filter(l => l.nodeId !== nodeId);
@@ -86,7 +91,7 @@ export function deleteNode(nodeId) {
 
 // --- Member Management ---
 
-export function addMember(startNodeId, endNodeId) {
+export function addMember(startNodeId, endNodeId, type) {
     // Prevent self-loops
     if (startNodeId === endNodeId) return;
 
@@ -100,7 +105,8 @@ export function addMember(startNodeId, endNodeId) {
         SystemState.members.push({
             id: SystemState.members.length, // Simple ID generation
             startNodeId,
-            endNodeId
+            endNodeId,
+            type: type
         });
     }
 }
@@ -169,7 +175,8 @@ export function loadSystem(data) {
         SystemState.members = data.members.map(m => ({
             id: m.id,
             startNodeId: m.startNodeId,
-            endNodeId: m.endNodeId
+            endNodeId: m.endNodeId,
+            type: m.type || 'normal'  // normal CAN BE LATER DELETED BUT NOW COMPATIABILITY
         }));
     }
 

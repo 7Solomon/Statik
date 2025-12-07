@@ -25,7 +25,7 @@ export function renderScene(ctx, canvas, interactionState, currentTool, currentR
 
     drawMembers(ctx, canvas, gridSize);
     drawGhostMember(ctx, canvas, interactionState, gridSize);
-    drawLoads(ctx, canvas, gridSize);
+    drawLoads(ctx, canvas, gridSize, SYMBOL_DEFINITIONS);
     drawNodes(ctx, canvas, interactionState.hoveredNodeId, gridSize, SYMBOL_DEFINITIONS);
 
     if (currentTool && interactionState.mousePos) {

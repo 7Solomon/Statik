@@ -136,51 +136,47 @@ class StructuralSystem:
 
 @dataclass
 class RigidBody:
-    """
-    Represents a connected group of members moving together (Scheibe).
-    """
     id: int
     member_ids: List[int]
-    
-    # 'rotation' or 'translation'
-    movement_type: str
-    
-    # If rotation: coordinates of the Pole (ICR) [px, py]
-    # If translation: velocity vector [vx, vy]
+    movement_type: str  # 'rotation' or 'translation'
     center_or_vector: np.ndarray
 
     def to_dict(self):
-        """Helper for JSON serialization"""
         return {
-            "id": self.id,
-            "member_ids": self.member_ids,
+            "id": int(self.id),  #  Force standard Python int
+            "member_ids": [int(mid) for mid in self.member_ids], # Force int list
             "movement_type": self.movement_type,
             "center_or_vector": [float(self.center_or_vector[0]), float(self.center_or_vector[1])]
+        }
+
+@dataclass
+class KinematicMode:
+    """Represents one specific independent movement (Degree of Freedom)"""
+    index: int
+    node_velocities: Dict[int, np.ndarray]
+    member_poles: Dict[int, np.ndarray]
+    rigid_bodies: List[RigidBody]
+
+    def to_dict(self):
+        def vec_to_list(v):
+            return [float(v[0]), float(v[1])] if v is not None else None
+
+        return {
+            "index": int(self.index), # Same force int
+            "velocities": {int(k): vec_to_list(v) for k, v in self.node_velocities.items()},
+            "member_poles": {int(k): vec_to_list(v) for k, v in self.member_poles.items()},
+            "rigid_bodies": [rb.to_dict() for rb in self.rigid_bodies]
         }
 
 @dataclass
 class KinematicResult:
     is_kinematic: bool
     dof: int
-    node_velocities: Dict[int, np.ndarray] = field(default_factory=dict)
-    member_poles: Dict[int, np.ndarray] = field(default_factory=dict)
-    rigid_bodies: List[RigidBody] = field(default_factory=list)
+    modes: List[KinematicMode] = field(default_factory=list)
 
     def to_dict(self):
-        """Serializes the entire result object for the API."""
-        
-        def vec_to_list(v):
-            return [float(v[0]), float(v[1])] if v is not None else None
-
         return {
             "is_kinematic": bool(self.is_kinematic),
-            "dof": int(self.dof),
-            
-            "node_velocities": {
-                int(k): vec_to_list(v) for k, v in self.node_velocities.items()
-            },
-            "member_poles": {
-                int(k): vec_to_list(v) for k, v in self.member_poles.items()
-            },
-            "rigid_bodies": [rb.to_dict() for rb in self.rigid_bodies]
+            "dof": int(self.dof), # also FORCE INT
+            "modes": [m.to_dict() for m in self.modes]
         }

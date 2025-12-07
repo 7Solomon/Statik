@@ -2,7 +2,7 @@ from flask import Blueprint, send_file, jsonify, request
 import io
 from PIL import Image, ImageDraw
 from src.plugins.generator.image.stanli_symbols import (
-    StanliSupport, StanliHinge,
+    LoadType, StanliLoad, StanliSupport, StanliHinge,
     SupportType, HingeType,
 )
 
@@ -38,25 +38,46 @@ SYMBOL_METADATA = {
         'releases_m': True, # Hint for member end
         'anchor': [50.0, 50.0],
         'class': StanliHinge, 'enum': HingeType.VOLLGELENK
+    },
+    'point_load': {
+        'category': 'load',
+        'anchor': (50.0, 50.0), 
+        'class': StanliLoad,
+        'enum': LoadType.EINZELLAST,
+        'topology': 'node',    # <--- Needs 1 node
+        'unit': 'kN'           # <--- UI label
+    },
+    'moment': {
+        'category': 'load',
+        'anchor': (50.0, 50.0),
+        'class': StanliLoad,
+        'enum': LoadType.MOMENT_UHRZEIGER,
+        'topology': 'node',    # <--- Needs 1 node
+        'unit': 'kNm'
+    },
+    'distributed_load': {
+        'category': 'load',
+        'anchor': (50.0, 50.0),
+        'class': StanliLoad,
+        'enum': LoadType.STRECKENLAST,
+        'topology': 'member',  # <--- NEW: Needs a member/line
+        'unit': 'kN/m'
     }
+
 }
 
 @bp.get('/definitions')
 def get_definitions():
     """
     Returns the physics/logic definition for the frontend.
-    The frontend is now 'dumb' and just stores these values.
     """
-    # Filter out the internal python classes before sending JSON
     client_data = {}
     for key, data in SYMBOL_METADATA.items():
-        client_data[key] = {
-            'category': data['category'],
-            'fix_x': data.get('fix_x', False),
-            'fix_y': data.get('fix_y', False),
-            'fix_m': data.get('fix_m', False),
-            'anchor': data['anchor']
-        }
+        clean_item = data.copy() 
+        clean_item.pop('class', None) # Remove <class 'StanliSupport'>
+        clean_item.pop('enum', None)  # Remove SupportType.FESTLAGER
+        client_data[key] = clean_item
+        
     return jsonify(client_data)
 
 @bp.get('/get/<name>')

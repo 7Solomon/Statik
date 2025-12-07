@@ -120,15 +120,11 @@ class StanliBeam(StanliSymbol):
         super().__init__()
         self.beam_type = beam_type
         if beam_type in (BeamType.BIEGUNG_MIT_FASER, BeamType.BIEGUNG_OHNE_FASER):
-            self.line_width = LINE_HUGE   # 4 (Bending is dominant)
+            self.line_width = LINE_HUGE
         elif beam_type == BeamType.FACHWERK:
-            self.line_width = LINE_NORMAL # 2 (Truss is standard/light)
+            self.line_width = LINE_BIG
         elif beam_type == BeamType.VERSTECKT:
-            self.line_width = LINE_SMALL  # 1 (Hidden is faint)
-        else:
-            # "Normal Beam"
-            self.line_width = LINE_BIG    # 3 (Standard Beam is thick, but less than bending)
-
+            self.line_width = LINE_NORMAL
 
     def draw(self, d: ImageDraw.Draw, a: Tuple[float,float], b: Tuple[float,float],
              rounded_start=False, rounded_end=False):
@@ -672,11 +668,16 @@ class StanliLoad(StanliSymbol):
              distance: Optional[float]=None,
              arc_angle: Optional[float]=None):
         if self.lt == LoadType.EINZELLAST:
-            self._single(...)
-        elif self.lt == LoadType.STRECKENLAST:  # <--- NEW HANDLE
-            self._distributed(d, pos, length)
+            self._single(d, pos, rotation_deg,
+                         length if length is not None else forceLength,
+                         distance if distance is not None else forceDistance)
         else:
-            self._moment(...)
+            self._moment(d, pos,
+                         distance if distance is not None else momentDistance,
+                         arc_angle if arc_angle is not None else momentAngleDefault,
+                         rotation_deg,
+                         clockwise=(self.lt == LoadType.MOMENT_UHRZEIGER))
+
     def _single(self, d, pos, rot, L_mm, D_mm):
         # TikZ: start at offset D, line forward length L, arrowhead at start (<-)
         ang = math.radians(rot)
@@ -687,34 +688,6 @@ class StanliLoad(StanliSymbol):
         # draw line from end to start (so we can put arrow at start consistent)
         d.line([end, start], fill="black", width=self.line_width)
         self._arrow_head(d, start, ang + math.pi)  # head pointing toward pos
-    
-    def _distributed(self, d, pos, L_mm, arrow_len_mm=8.0, spacing_mm=4.0):
-        L_px = mm(L_mm)
-        h_px = mm(arrow_len_mm)
-        step_px = mm(spacing_mm)
-        
-        # Start/End x-coordinates (centered around pos)
-        x_start = pos[0] - L_px / 2
-        x_end = pos[0] + L_px / 2
-        y_top = pos[1] - h_px / 2
-        y_bot = pos[1] + h_px / 2
-        
-        # 1. Draw the top connecting bar
-        d.line([(x_start, y_top), (x_end, y_top)], fill="black", width=self.line_width)
-        
-        # 2. Draw vertical arrows
-        # Calculate how many arrows fit
-        num_arrows = int(L_px / step_px)
-        
-        for i in range(num_arrows + 1):
-            x = x_start + i * step_px
-            if x > x_end + 1: break # Safety
-            
-            # Draw arrow shaft
-            d.line([(x, y_top), (x, y_bot)], fill="black", width=self.line_width)
-            
-            # Draw arrow head (pointing down)
-            self._arrow_head(d, (x, y_bot), math.radians(270), size_px=mm(1.5))
 
     def _moment(self, d, pos, radius_mm, angle_deg, rot_deg, clockwise: bool):
         # Build arc in TikZ sense: start angle 0 at +x (after rotation)

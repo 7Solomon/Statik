@@ -2,34 +2,49 @@ from datetime import datetime
 from flask import current_app, request, jsonify, Blueprint
 from src.plugins.analyze.kinematics import solve_kinematics
 from src.plugins.analyze.system import calculate_poles, group_into_subsystems
-from models.analyze_models import Node, Member, StructuralSystem, KinematicResult
+from models.analyze_models import KinematicMode, Node, Member, StructuralSystem, KinematicResult
 import numpy as np
 
 
 bp = Blueprint('analyze', __name__, url_prefix='/analyze')
-
 @bp.route("/system", methods=["POST"])
 def analyze_system():
     payload = request.get_json(force=True)
     try:
+        # 1. Build System
         system = StructuralSystem.create(
             payload.get("nodes", []), 
             payload.get("members", []),
             payload.get("loads", [])
         )
         
-        node_velocities, dof = solve_kinematics(system)
-        poles, trans_dirs = calculate_poles(system, node_velocities)
-        rigid_bodies = group_into_subsystems(poles, trans_dirs)
+        # 2. Solve Kinematics (Get list of velocity fields)
+        velocity_modes_list, dof = solve_kinematics(system)
         
+        # 3. Process Each Mode Independently
+        final_modes = []
+        
+        for i, velocity_dict in enumerate(velocity_modes_list):
+            poles, trans_dirs = calculate_poles(system, velocity_dict)
+            rigid_bodies = group_into_subsystems(poles, trans_dirs)
+            
+            # Create Mode Object
+            mode = KinematicMode(
+                index=i,
+                node_velocities=velocity_dict,
+                member_poles=poles,
+                rigid_bodies=rigid_bodies
+            )
+            final_modes.append(mode)
+        
+        # 4. Create Result
         result = KinematicResult(
             is_kinematic=(dof > 0),
             dof=dof,
-            node_velocities=node_velocities,
-            member_poles=poles,
-            rigid_bodies=rigid_bodies
+            modes=final_modes
         )
         
+        # 5. Send Response
         response = result.to_dict()
         response["system"] = {
             "nodes": payload.get("nodes", []),
@@ -37,12 +52,9 @@ def analyze_system():
             "loads": payload.get("loads", []),
             "gridSize": payload.get("gridSize", 1.0)
         }
-        print(response)
+        
         return jsonify(response), 200
 
-    except ValueError as e:
-        print(e)
-        return jsonify({"error": str(e)}), 400
     except Exception as e:
         print(e)
         return jsonify({"error": "Internal Analysis Error", "details": str(e)}), 500

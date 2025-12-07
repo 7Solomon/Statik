@@ -28,28 +28,75 @@ export function renderSystemView(ctx, canvas, state) {
 
     // 3. Calculate Animation Factor
     const animFactor = isMechanism ? Math.sin(animationTime * 3) : 0;
-    const amp = 0.5;
+    const amp = (state.amplitude !== undefined) ? state.amplitude : 0.5;
 
     // Helper: Transform grid coord (x,y) to pixel coord (in Transformed Space)
     // Since we flipped Y with scale(1, -1), we can just use normal (x,y).
+    // Inside renderSystemView function...
+
     const getDeformedPos = (node) => {
-        const scale = 100; // 100px per meter
+        const scale = 100;
         const px = node.x * scale;
         const py = node.y * scale;
 
-        let dx = 0, dy = 0;
+        // 0. Default: Return original position (STATIC)
+        // This ensures stationary parts are always drawn
+        const defaultPos = { x: px, y: py, ox: px, oy: py, rotation: 0 };
 
-        let v = state.nodeVelocities[node.id] ||
-            state.nodeVelocities[String(node.id)] ||
-            state.nodeVelocities[node.id + ".0"];
+        // Check if we have velocity data at all for this node
+        let v = state.nodeVelocities[node.id];
 
-        if (v) {
-            dx = v[0] * scale * amp * animFactor;
-            dy = v[1] * scale * amp * animFactor; // POSITIVE v[1] because Y is now UP
+        // If no velocity or effectively zero velocity, return static position
+        if (!v || (Math.abs(v[0]) < 1e-6 && Math.abs(v[1]) < 1e-6)) {
+            return defaultPos;
         }
 
-        return { x: px + dx, y: py + dy, ox: px, oy: py };
+        // 1. Find Rigid Body for ROTATION Logic
+        const rb = state.rigidBodies.find(b => {
+            return b.member_ids.some(mid => {
+                const m = state.systemData.members.find(mem => mem.id === mid);
+                return m && (m.startNodeId === node.id || m.endNodeId === node.id);
+            });
+        });
+
+        // 2. Linear Fallback (Translation or unknown body)
+        if (!rb || rb.movement_type === 'translation' || !rb.center_or_vector) {
+            const dx = v[0] * scale * amp * animFactor;
+            const dy = v[1] * scale * amp * animFactor;
+            return { x: px + dx, y: py + dy, ox: px, oy: py, rotation: 0 };
+        }
+
+        // 3. Rotational Physics (The Arc)
+        const center = rb.center_or_vector;
+        const cx = center[0] * scale;
+        const cy = center[1] * scale;
+
+        const rx = px - cx;
+        const ry = py - cy;
+        const radius = Math.sqrt(rx * rx + ry * ry);
+
+        // Safety check: if radius is tiny (node is ON the rotation center), it doesn't move
+        if (radius < 0.1) return defaultPos;
+
+        const currentAngle = Math.atan2(ry, rx);
+
+        // Calculate omega
+        const vMag = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+        const cross = rx * v[1] - ry * v[0];
+        const direction = cross > 0 ? 1 : -1;
+
+        // Calculate angle delta
+        const angleDelta = (vMag / (radius / scale)) * amp * animFactor * direction;
+
+        return {
+            x: cx + radius * Math.cos(currentAngle + angleDelta),
+            y: cy + radius * Math.sin(currentAngle + angleDelta),
+            ox: px,
+            oy: py,
+            rotation: angleDelta
+        };
     };
+
 
     // --- DRAW ORIGIN (Coordinate System) ---
     // Note: Since Y is flipped, drawing "down" means negative Y in local coords

@@ -9,6 +9,8 @@ import '../fileManager.js';
 let canvas, ctx;
 let currentTool = { category: 'connection', name: 'member' };
 let currentRotation = 0;
+let renderFrameId = null;
+
 let interactionState = {
     hoveredNodeId: null,
     dragStartNodeId: null,
@@ -128,24 +130,6 @@ function handleMouseUp(e) {
         activeDefinitions
     );
 
-    // 4. HANDLE MEMBER CONNECTION (The part likely missing or broken)
-    if (wasDragging) {
-        // Case A: Clicked on a valid second node (different from start)
-        if (snapped.nodeId !== null && snapped.nodeId !== interactionState.dragStartNodeId) {
-            Data.addMember(interactionState.dragStartNodeId, snapped.nodeId);
-            interactionState.dragStartNodeId = null; // Connection finished
-        }
-        // Case B: Clicked on empty space -> Create Node -> Connect
-        else if (snapped.nodeId === null) {
-            // Create a new node at the snap point
-            const newNode = Data.addNode(snapped.realX, snapped.realY);
-            // Connect start node to this new node
-            Data.addMember(interactionState.dragStartNodeId, newNode.id);
-            interactionState.dragStartNodeId = null; // Connection finished
-        }
-        // Case C: Clicked invalid (same node), do nothing, keep dragging
-    }
-
     triggerRender();
 }
 
@@ -198,6 +182,11 @@ function updateUIButtons() {
 function exposeGlobalFunctions() {
     window.setTool = (cat, name) => {
         currentTool = { category: cat, name: name };
+        if (cat === 'load' && name === 'force') {
+            window.updateRotation(90);
+        } else {
+            window.updateRotation(0);
+        }
         updateUIButtons();
     };
 

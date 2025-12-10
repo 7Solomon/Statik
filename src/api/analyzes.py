@@ -17,7 +17,6 @@ def analyze_system():
             payload.get("members", []),
             payload.get("loads", [])
         )
-        
         # 2. Solve Kinematics (Get list of velocity fields)
         velocity_modes_list, dof = solve_kinematics(system)
         
@@ -53,6 +52,7 @@ def analyze_system():
             "gridSize": payload.get("gridSize", 1.0)
         }
         
+        print(response)
         return jsonify(response), 200
 
     except Exception as e:

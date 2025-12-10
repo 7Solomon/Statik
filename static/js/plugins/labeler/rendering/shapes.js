@@ -15,7 +15,6 @@ export const COLORS = {
     moment: '#f59e0b'
 };
 
-
 export function drawMembers(ctx, canvas, gridSize) {
     SystemState.members.forEach(m => {
         const n1 = SystemState.nodes.find(n => n.id === m.startNodeId);
@@ -25,14 +24,17 @@ export function drawMembers(ctx, canvas, gridSize) {
             const p1 = GridSystem.toPixel(n1.x, n1.y, canvas, gridSize);
             const p2 = GridSystem.toPixel(n2.x, n2.y, canvas, gridSize);
 
-            // Map your backend Enum/ID to a string style
-            // Example: m.type might be 1 (Normal), 2 (Fiber), etc.
             let visualType = 'normal';
             if (m.type === 'fiber' || m.type === 1) visualType = 'fiber';
             else if (m.type === 'truss' || m.type === 2) visualType = 'truss';
             else if (m.type === 'hidden' || m.type === 3) visualType = 'hidden';
 
-            drawStanliMember(ctx, p1, p2, visualType);
+            const releases = m.releases || {
+                start: { m: false },
+                end: { m: false }
+            };
+
+            drawStanliMember(ctx, p1, p2, visualType, releases);
         }
     });
 }

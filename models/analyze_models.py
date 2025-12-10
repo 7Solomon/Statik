@@ -30,10 +30,12 @@ class Node:
     id: int
     x: float
     y: float
-    fix_x: bool = False
-    fix_y: bool = False
-    fix_m: bool = False
+    support_angle: float = 0.0
 
+    fix_x_local: bool = False # Fixed along the rotated X axis
+    fix_y_local: bool = False # Fixed along the rotated Y axis (Normal)
+    fix_m: bool = False
+    
     @property
     def coordinates(self) -> np.ndarray:
         return np.array([self.x, self.y])
@@ -43,6 +45,10 @@ class Member:
     id: int
     start_node: Node
     end_node: Node
+    releases: Dict[str, Dict[str, bool]] = field(default_factory=lambda: {
+        "start": {"m": False, "n": False, "q": False},
+        "end":   {"m": False, "n": False, "q": False}
+    })
 
     def length(self) -> float:
         return np.linalg.norm(self.end_node.coordinates - self.start_node.coordinates)
@@ -57,32 +63,67 @@ class StructuralSystem:
     members: List[Member] = field(default_factory=list)
     loads: List[Load] = field(default_factory=list)
 
-    def add_node(self, x: float, y: float, fix_x=False, fix_y=False) -> Node:
+    def add_node(self, x: float, y: float, fix_x_local=False, fix_y_local=False, fix_m=False, angle=0.0) -> Node:
         new_id = len(self.nodes)
-        node = Node(new_id, x, y, fix_x, fix_y)
+        node = Node(
+            id=new_id,
+            x=x,
+            y=y,
+            support_angle=angle,
+            fix_x_local=fix_x_local,
+            fix_y_local=fix_y_local,
+            fix_m=fix_m
+        )
         self.nodes.append(node)
         return node
 
-    def add_member(self, start_node_id: int, end_node_id: int) -> Member:
+    def add_member(
+        self, 
+        start_node_id: int, 
+        end_node_id: int, 
+        releases: Dict[str, Dict[str, bool]],
+
+    ) -> Member:
         start = next(n for n in self.nodes if n.id == start_node_id)
         end = next(n for n in self.nodes if n.id == end_node_id)
         new_id = len(self.members)
-        member = Member(new_id, start, end)
+        
+   
+        member = Member(
+            id=new_id, 
+            start_node=start, 
+            end_node=end, 
+            releases=releases
+        )
         self.members.append(member)
         return member
 
-    def add_load(self, node_id: int, fx=0.0, fy=0.0, m=0.0) -> Load:
+
+    def add_load(
+        self, 
+        location_type: Literal['node', 'member'], 
+        location_id: int, 
+        fx=0.0, 
+        fy=0.0, 
+        m=0.0, 
+        type: Literal['force', 'moment', 'distributed'] = 'force',
+        t: Union[float, Tuple[float, float], None] = None
+    ) -> Load:
         new_id = len(self.loads)
+        
+        values = [fx, fy, m]
+        
         load = Load(
             id=new_id, 
-            type='force' if m == 0 else 'moment',
-            values=[fx, fy, m],
-            location_type='node',
-            location_id=node_id,
-            t=None
+            type=type,
+            values=values,
+            location_type=location_type,
+            location_id=location_id,
+            t=t
         )
         self.loads.append(load)
         return load
+
     
     @classmethod
     def create(cls, nodes_data: List[dict], members_data: List[dict], loads_data: List[dict]) -> 'StructuralSystem':
@@ -93,8 +134,8 @@ class StructuralSystem:
                 id=int(n["id"]),
                 x=float(n["x"]),
                 y=float(n["y"]),
-                fix_x=bool(n.get("fix_x", False)),
-                fix_y=bool(n.get("fix_y", False)),
+                fix_x_local=bool(n.get("fix_x_local", False)),
+                fix_y_local=bool(n.get("fix_y_local", False)),
                 fix_m=bool(n.get("fix_m", False)),
             )
             system.nodes.append(node)
@@ -109,6 +150,7 @@ class StructuralSystem:
                 id=int(m["id"]),
                 start_node=start,
                 end_node=end,
+                releases=m["releases"]
             )
             system.members.append(member)
         

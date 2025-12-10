@@ -2,7 +2,7 @@ import copy
 import numpy as np
 from typing import List, Dict, Set, Tuple
 
-from models.analyze_models import StructuralSystem, Node, Member, NodalLoad
+from models.analyze_models import StructuralSystem, Node, Member
 
 class SystemSimplifier:
     """
@@ -53,7 +53,7 @@ class SystemSimplifier:
                 if len(member_ids) == 1:
                     node = self.node_map[n_id]
                     # Check if it is a true "Free End" (no supports)
-                    if not (node.fix_x or node.fix_y or node.fix_m):
+                    if not (node.fix_x_local or node.fix_y_local or node.fix_m):
                         nodes_to_prune.append(n_id)
 
             for tip_node_id in nodes_to_prune:

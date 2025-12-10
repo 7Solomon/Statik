@@ -118,8 +118,8 @@ def test_pipeline():
 
     ### DREI GELENK BOGEN
     system = StructuralSystem()
-    n0 = system.add_node(0, 0, fix_x=True, fix_y=True)
-    n1 = system.add_node(10, 0, fix_x=True, fix_y=True)
+    n0 = system.add_node(0, 0, fix_x_local=True, fix_y_local=True)
+    n1 = system.add_node(10, 0, fix_x_local=True, fix_y_local=True)
     n2 = system.add_node(5, 5) # The "Apex"
     
     # Left Leg (broken into two parts to test grouping)

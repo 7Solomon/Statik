@@ -1,25 +1,17 @@
-// event_logic.js
-
 import * as Data from '../structureData.js';
 import * as Utils from './utils.js';
 
+
 // --- 1. MOUSE DOWN (Start Rotation or Drag) ---
 export function handleMouseDown(snapped, raw, interactionState, currentRotation, currentTool) {
-    // Store the position where the mouse was PRESSED. 
-    // We will use this as the placement target even if the mouse moves to rotate.
     interactionState.placementOrigin = snapped;
 
-    // Check if this is a tool that should rotate (Supports, Hinges, Loads)
-    // And ensure we are NOT in the middle of a connection drag
     const isRotationalTool = ['support', 'hinge', 'load'].includes(currentTool.category);
 
     if (isRotationalTool) {
-        // --- START ROTATION MODE IMMEDIATELY ---
         interactionState.isRotating = true;
-        interactionState.initialMouseY = raw.y; // Pixel Y
-        interactionState.initialRotation = currentRotation; // Current Tool Rotation
-
-        //console.log("Rotation Mode Started");
+        interactionState.initialMouseY = raw.y;
+        interactionState.initialRotation = currentRotation;
         document.body.style.cursor = "ns-resize";
     }
 }
@@ -28,17 +20,12 @@ export function handleMouseDown(snapped, raw, interactionState, currentRotation,
 export function handleMouseMove(raw, interactionState) {
     if (interactionState.isRotating) {
         const deltaY = raw.y - interactionState.initialMouseY;
-
         let rawRotation = interactionState.initialRotation - deltaY;
-
-        // Normalize to 0-360
         rawRotation = (rawRotation % 360 + 360) % 360;
 
         const snapStep = 45;
         let newRotation = Math.round(rawRotation / snapStep) * snapStep;
-
         newRotation = newRotation % 360;
-        // -------------------------------------
 
         if (window.updateRotation) window.updateRotation(newRotation);
         return true;
@@ -47,24 +34,17 @@ export function handleMouseMove(raw, interactionState) {
 
 // --- 3. MOUSE UP (Confirm Placement) ---
 export function handleMouseUp(snapped, raw, currentTool, currentRotation, interactionState, canvas, SYMBOL_DEFINITIONS) {
-
-    // Determine the actual target coordinate.
-    // If we were rotating, 'snapped' is where we released the mouse (wrong spot).
-    // We want 'placementOrigin' (where we pressed the mouse).
     const targetPos = (interactionState.isRotating && interactionState.placementOrigin)
         ? interactionState.placementOrigin
         : snapped;
 
-    // Cleanup Rotation State
     if (interactionState.isRotating) {
         interactionState.isRotating = false;
         document.body.style.cursor = "default";
     }
 
-    // Execute Action at the Target Position
     executeStandardClick(targetPos, raw, currentTool, currentRotation, interactionState, canvas, SYMBOL_DEFINITIONS);
 
-    // RESET
     if (window.updateRotation) {
         if (currentTool['category'] === 'load' && currentTool['name'] === 'force') {
             window.updateRotation(90);
@@ -84,6 +64,7 @@ async function executeStandardClick(snapped, raw, currentTool, currentRotation, 
             const memberId = Utils.findMemberAt(raw.x, raw.y, canvas);
             if (memberId !== null) Data.deleteMember(memberId);
         }
+        window.triggerRender(); // Ensure render on delete
         return;
     }
 
@@ -96,72 +77,95 @@ async function executeStandardClick(snapped, raw, currentTool, currentRotation, 
                 // START DRAG
                 interactionState.dragStartNodeId = nodeId;
             } else {
-                // END DRAG (Connect Start -> Clicked Node)
-                // NEW: Pass currentTool.name (e.g., 'normal', 'truss')
-                Data.addMember(interactionState.dragStartNodeId, nodeId, currentTool.name);
+                // FINISH DRAG
+
+                // Helper to safely get releases and CATEGORY from a node
+                const getReleasesFromNode = (nId) => {
+                    const node = Data.SystemState.nodes.find(n => n.id === nId);
+                    if (!node || !node.fixData) {
+                        return { m: false, n: false, q: false, category: 'free_end' };
+                    }
+                    console.log(node)
+
+                    return {
+                        m: !node.fixData.fix_m,
+                        n: false,
+                        q: false,
+                        category: node.fixData.fix_m ? 'biegesteife_ecke' : 'vollgelenk'
+                    };
+
+
+                };
+
+                const releases = {
+                    start: getReleasesFromNode(interactionState.dragStartNodeId),
+                    end: getReleasesFromNode(nodeId)
+                };
+
+                Data.addMember(interactionState.dragStartNodeId, nodeId, currentTool.name, releases);
                 interactionState.dragStartNodeId = null;
             }
         }
-        else if (currentTool.category === 'support' || currentTool.category === 'hinge') {
-            applySymbolToNode(nodeId, currentTool.name, currentRotation, SYMBOL_DEFINITIONS);
+        else if (currentTool.category === 'support') {
+            const def = SYMBOL_DEFINITIONS[currentTool.name];
+            const fixData = {
+                fix_x_local: def.fix_x_local,
+                fix_y_local: def.fix_y_local,
+                fix_m: def.fix_m,
+            };
+            Data.updateNode(nodeId, currentTool.name, currentRotation, fixData)
+        }
+        else if (currentTool.category === 'hinge') {
+            const connectedMembers = Data.SystemState.members.filter(m =>
+                m.startNodeId === nodeId || m.endNodeId === nodeId
+            );
+            const def = SYMBOL_DEFINITIONS[currentTool.name];
+
+            connectedMembers.forEach(member => {
+                // Check which side of the member connects to this node
+                const isStart = member.startNodeId === nodeId;
+
+                // Create the new release object for just THIS specific end
+                const newEndRelease = {
+                    m: def.releases_m,
+                    n: def.releases_n,
+                    q: def.releases_q,
+                    category: currentTool.name // 'vollgelenk', 'normalkraft_gelenk', etc.
+                };
+
+                // Update the member's releases structure properly
+                const updatedReleases = {
+                    ...member.releases,
+                    [isStart ? 'start' : 'end']: newEndRelease
+                };
+
+                Data.updateMember(member.id, updatedReleases);
+            });
         }
         else if (currentTool.category === 'load') {
             if (currentTool.name === 'force') {
                 const mag = await askForMagnitude(10);
                 Data.addLoad({ type: 'node', id: nodeId }, currentTool.name, mag, currentRotation);
-                return;
-            } else if (currentTool.name === 'distributed') {
-                const params = await askForDistributedParams();
-
-                if (params) {
-                    Data.addLoad(
-                        { type: 'member', id: memberId }, // Target
-                        'distributed',                    // Type Name
-                        params.mag,                       // Magnitude
-                        0,                                // Rotation (usually 0 for local perpendicular)
-                        { tStart: params.t0, tEnd: params.t1 } // Extra Data
-                    );
-                    // Force re-render after async add
-                    if (window.triggerRender) window.triggerRender();
-                }
-                return;
             } else if (currentTool.name === 'moment') {
                 const mag = await askForMagnitude(10);
                 Data.addLoad({ type: 'node', id: nodeId }, currentTool.name, mag, currentRotation);
-                return
             }
-            return;
         }
     }
 
     // 3. CLICK ON EMPTY SPACE
-    // ... inside executeStandardClick ...
-
-    // 3. CLICK ON EMPTY SPACE (Potential Member Click)
     else {
-        // First: Check if we clicked on a MEMBER (Beam)
         const memberId = Utils.findMemberAt(raw.x, raw.y, canvas);
-
         if (memberId !== null) {
-            // --- DISTRIBUTED LOAD LOGIC ---
             if (currentTool.category === 'load' && currentTool.name === 'distributed') {
-                const params = await askForDistributedParams(); // Open Modal
-
+                const params = await askForDistributedParams();
                 if (params) {
-                    Data.addLoad(
-                        { type: 'member', id: memberId },
-                        'distributed',
-                        params.mag,
-                        0, // Rotation 0 usually means perpendicular to beam
-                        { tStart: params.t0, tEnd: params.t1 }
-                    );
+                    Data.addLoad({ type: 'member', id: memberId }, 'distributed', params.mag, 0, { tStart: params.t0, tEnd: params.t1 });
                     if (window.triggerRender) window.triggerRender();
                 }
-                return; // Stop here, don't create a node
+                return;
             }
-
-            // --- POINT LOAD ON MEMBER LOGIC ---
-            if (currentTool.category === 'load' && (currentTool.name === 'point' || currentTool.name === 'force')) {
+            if (currentTool.category === 'load' && ['point', 'force'].includes(currentTool.name)) {
                 const mag = await askForMagnitude(10);
                 if (mag !== null) {
                     const t = Utils.calculateMemberT(memberId, snapped.realX, snapped.realY);
@@ -170,50 +174,58 @@ async function executeStandardClick(snapped, raw, currentTool, currentRotation, 
                 return;
             }
         }
-        const newNode = Data.addNode(snapped.realX, snapped.realY);
 
-        if (currentTool.category === 'connection') {  // DONT KNOW ABTOHT THIS SHIT HERE, could be stupdid
+        // --- CONNECTION TOOL ---
+        if (currentTool.category === 'connection') {
+            const vollgelenkDef = SYMBOL_DEFINITIONS['vollgelenk'];
+
+            const defaultFixData = {
+                release_m: vollgelenkDef.releases_m,
+                release_n: vollgelenkDef.releases_n,
+                release_q: vollgelenkDef.releases_q,
+            };
+
+            const newNode = Data.addNode(snapped.realX, snapped.realY, 'vollgelenk', 0, defaultFixData);
+
             if (interactionState.dragStartNodeId === null) {
-                // Start dragging from this new node
                 interactionState.dragStartNodeId = newNode.id;
             } else {
-                // Finish connection to this new node
-                Data.addMember(interactionState.dragStartNodeId, newNode.id, currentTool.name);
+                // Same helper as above
+                const getReleasesFromNode = (nId) => {
+                    const node = Data.SystemState.nodes.find(n => n.id === nId);
+                    if (!node || !node.fixData) return { m: false, n: false, q: false, category: 'biegesteife_ecke' };
+                    return {
+                        m: node.fixData.release_m || false,
+                        n: node.fixData.release_n || false,
+                        q: node.fixData.release_q || false,
+                        category: node.symbolType || 'biegesteife_ecke'
+                    };
+                };
+
+                const releases = {
+                    start: getReleasesFromNode(interactionState.dragStartNodeId),
+                    end: getReleasesFromNode(newNode.id)
+                };
+                Data.addMember(interactionState.dragStartNodeId, newNode.id, currentTool.name, releases);
                 interactionState.dragStartNodeId = null;
             }
         }
-        else if (currentTool.category === 'support' || currentTool.category === 'hinge') {
-            applySymbolToNode(newNode.id, currentTool.name, currentRotation, SYMBOL_DEFINITIONS);
+
+        else if (currentTool.category === 'support') {
+            const def = SYMBOL_DEFINITIONS[currentTool.name];
+            const fixData = {
+                fix_x_local: def.fix_x_local,
+                fix_y_local: def.fix_y_local,
+                fix_m: def.fix_m,
+            };
+            Data.addNode(snapped.realX, snapped.realY, currentTool.name, currentRotation, fixData);
         }
-        // NO PLACEMENT IN EMPTY SPACE OF LOADS
-        //else if (currentTool.category === 'load') {
-        //    // Optional: Allow placing point loads on new nodes in empty space
-        //    if (currentTool.name === 'force') {
-        //        // We need to handle async here too if you want the modal
-        //        askForMagnitude(10).then(mag => {
-        //            if (mag !== null) Data.addLoad({ type: 'node', id: newNode.id }, 'force', mag, currentRotation);
-        //        });
-        //    }
-        //}
     }
+
+    // Always trigger render after an action
+    if (window.triggerRender) window.triggerRender();
 }
 
-
-
-// Helper
-function applySymbolToNode(nodeId, symbolName, rotation, SYMBOL_DEFINITIONS) {
-    const def = SYMBOL_DEFINITIONS[symbolName];
-    if (!def && symbolName !== 'none') return;
-
-    const fixData = def ? {
-        fix_x: def.fix_x || false,
-        fix_y: def.fix_y || false,
-        fix_m: def.fix_m || false,
-        category: def.category
-    } : { fix_x: false, fix_y: false, fix_m: false };
-
-    Data.updateNodeSymbol(nodeId, symbolName, rotation, fixData);
-}
 
 function askForMagnitude(defaultValue = 10) {
     return new Promise((resolve) => {

@@ -11,33 +11,45 @@ bp = Blueprint('symbols', __name__, url_prefix='/symbols')
 SYMBOL_METADATA = {
     'festlager': {
         'category': 'support',
-        'fix_x': True, 'fix_y': True, 'fix_m': False,
+        'fix_x_local': True, 'fix_y_local': True, 'fix_m': False,
         'anchor': [50.0, 30.0],
         'class': StanliSupport, 'enum': SupportType.FESTLAGER
     },
     'loslager': {
         'category': 'support',
-        'fix_x': False, 'fix_y': True, 'fix_m': False,
+        'fix_x_local': False, 'fix_y_local': True, 'fix_m': False,
         'anchor': [50.0, 30.0],
         'class': StanliSupport, 'enum': SupportType.LOSLAGER
     },
     'einspannung': {
         'category': 'support',
-        'fix_x': True, 'fix_y': True, 'fix_m': True,
+        'fix_x_local': True, 'fix_y_local': True, 'fix_m': True,
         'anchor': [50.0, 30.0],
         'class': StanliSupport, 'enum': SupportType.FESTE_EINSPANNUNG
     },
     'gleitlager': {
         'category': 'support',
-        'fix_x': True, 'fix_y': False, 'fix_m': True,
+        'fix_x_local': True, 'fix_y_local': False, 'fix_m': True,
         'anchor': [50.0, 30.0],
         'class': StanliSupport, 'enum': SupportType.GLEITLAGER
     },
     'vollgelenk': {
         'category': 'hinge',
-        'releases_m': True, # Hint for member end
+        'releases_n': False, 'releases_q': False,'releases_m': True,
         'anchor': [50.0, 50.0],
         'class': StanliHinge, 'enum': HingeType.VOLLGELENK
+    },
+    'biegesteife_ecke': {
+        'category': 'hinge',
+        'releases_n': False, 'releases_q': False,'releases_m': False,
+        'anchor': [50.0, 50.0],
+        'class': StanliHinge, 'enum': HingeType.BIEGESTEIFE_ECKE
+    },
+    'normalkraft_gelenk': {
+        'category': 'hinge',
+        'releases_n': True, 'releases_q': False,'releases_m': False,
+        'anchor': [50.0, 50.0],
+        'class': StanliHinge, 'enum': HingeType.NORMALKRAFTGELENK
     },
     'point_load': {
         'category': 'load',

@@ -58,28 +58,44 @@ export function deleteLoadsOnNode(nodeId) {
 }
 // --- Node Management ---
 
-export function addNode(x, y, symbolType = 'none', rotation = 0, fixData = {}) {
+
+export function addNode(x, y, symbolType, rotation, fixData) {
     const id = SystemState.nodes.length > 0 ? Math.max(...SystemState.nodes.map(n => n.id)) + 1 : 0;
+    console.log(fixData)
     const newNode = {
         id,
         x,
         y,
-        symbolType, // 'none', 'festlager', 'loslager', etc.
+        symbolType,
         rotation,
-        fixData: fixData || { fix_x: false, fix_y: false, fix_m: false }
+        fixData: fixData
     };
     SystemState.nodes.push(newNode);
     return newNode;
 }
 
-export function updateNodeSymbol(nodeId, symbolType, rotation, fixData) {
+export function updateNode(nodeId, symbolType, rotation, fixData) {
     const node = SystemState.nodes.find(n => n.id === nodeId);
     if (node) {
         node.symbolType = symbolType;
         node.rotation = rotation;
-        node.fixData = fixData;
+        node.fixData = {
+            fix_x_local: fixData.fix_x_local,
+            fix_y_local: fixData.fix_y_local,
+            fix_m: fixData.fix_m,
+            category: fixData.category
+        };
     }
 }
+
+export function updateMember(memberId, releases) {
+    console.log(releases)
+    const member = SystemState.members.find(m => m.id === memberId);
+    if (!member) return;
+    member.releases = releases;
+
+}
+
 
 export function deleteNode(nodeId) {
     // 1. Remove the node
@@ -90,26 +106,31 @@ export function deleteNode(nodeId) {
 }
 
 // --- Member Management ---
-
-export function addMember(startNodeId, endNodeId, type) {
-    // Prevent self-loops
+export function addMember(startNodeId, endNodeId, type, releases) {
     if (startNodeId === endNodeId) return;
+    console.log(releases)
 
-    // Check for duplicates
+
     const exists = SystemState.members.some(m =>
         (m.startNodeId === startNodeId && m.endNodeId === endNodeId) ||
         (m.startNodeId === endNodeId && m.endNodeId === startNodeId)
     );
+    //releases = {
+    //            start: { m: false, n: false, q: true, category: '' },
+    //            end: { m: false, n: false, q: true, category: '' }
+    //        }
 
     if (!exists) {
         SystemState.members.push({
-            id: SystemState.members.length, // Simple ID generation
+            id: SystemState.members.length,
             startNodeId,
             endNodeId,
-            type: type
+            type: type,
+            releases: releases
         });
     }
 }
+
 
 export function deleteMember(memberId) {
     SystemState.members = SystemState.members.filter(m => m.id !== memberId);
@@ -124,13 +145,14 @@ export function clearSystem() {
 // --- Export Utility ---
 
 export function getExportData() {
+    console.log(SystemState.members)
     return {
         nodes: SystemState.nodes.map(n => ({
             id: n.id,
             x: n.x,
             y: n.y,
-            fix_x: n.fixData.fix_x,
-            fix_y: n.fixData.fix_y,
+            fix_x_local: n.fixData.fix_x_local,
+            fix_y_local: n.fixData.fix_y_local,
             fix_m: n.fixData.fix_m,
             _visual_type: n.symbolType,
             _visual_rotation: n.rotation
@@ -162,10 +184,10 @@ export function loadSystem(data) {
             symbolType: n._visual_type || 'none',
             rotation: n._visual_rotation || 0,
             fixData: {
-                fix_x: !!n.fix_x,
-                fix_y: !!n.fix_y,
+                fix_x_local: !!n.fix_x_local,
+                fix_y_local: !!n.fix_y_local,
                 fix_m: !!n.fix_m,
-                category: n.category || undefined
+                category: n.category
             }
         }));
     }
@@ -176,6 +198,7 @@ export function loadSystem(data) {
             id: m.id,
             startNodeId: m.startNodeId,
             endNodeId: m.endNodeId,
+            releases: m.releases,
             type: m.type || 'normal'  // normal CAN BE LATER DELETED BUT NOW COMPATIABILITY
         }));
     }

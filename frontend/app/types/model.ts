@@ -77,3 +77,11 @@ export interface Load {
   // The angle of the load vector relative to the chosen system
   angle: number;
 }
+
+
+export interface AnalysisResult {
+  is_kinematic: boolean;
+  dof: number;
+  modes: any[];
+  system: any;
+}

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { InteractionState, ToolType, ViewportState } from '~/types/app';
-import type { Load, Member, Vec2, Node } from '~/types/model';
+import type { Load, Member, Vec2, Node, AnalysisResult } from '~/types/model';
 
-// --- Default Values ---
+export type AppMode = 'EDITOR' | 'ANALYSIS';
+
+// --- Default Values FOR EDITOR---
 const DEFAULT_VIEWPORT: ViewportState = {
     zoom: 50, // 50 pixels = 1 meter
     pan: { x: 400, y: 400 }, // Initial center offset
@@ -33,6 +35,8 @@ const DEFAULT_RELEASES = {
 
 // --- Store Interface ---
 interface AppState {
+    mode: AppMode;
+
     // Data
     nodes: Node[];
     members: Member[];
@@ -42,8 +46,13 @@ interface AppState {
     viewport: ViewportState;
     interaction: InteractionState;
 
+    // API 
+    analysisResult: AnalysisResult | null;
+
     // Actions
     actions: {
+        setMode: (mode: AppMode) => void;
+
         // Model Actions
         addNode: (pos: Vec2, supports?: Partial<Node['supports']>) => void;
         addMember: (startNodeId: string, endNodeId: string) => void;
@@ -58,18 +67,25 @@ interface AppState {
         setInteraction: (inter: Partial<InteractionState>) => void;
         setHoveredNode: (id: string | null) => void;
 
+        analyzeSystem: (name: string) => Promise<void>;
+        setAnalysisResult: (result: AnalysisResult | null) => void;
 
     };
 }
 
 // --- Store Implementation ---
 export const useStore = create<AppState>((set, get) => ({
+
+    mode: 'EDITOR',
+
     nodes: [],
     members: [],
     loads: [],
 
     viewport: DEFAULT_VIEWPORT,
     interaction: DEFAULT_INTERACTION,
+
+    analysisResult: null,
 
     actions: {
         addNode: (pos, supports) => {
@@ -161,6 +177,49 @@ export const useStore = create<AppState>((set, get) => ({
             set(state => ({
                 members: state.members.map(m => m.id === id ? { ...m, ...data } : m)
             }));
-        }
+        },
+
+        analyzeSystem: async (name: string) => {
+            const state = get();
+
+            const payload = {
+                name: name,
+                system: {
+                    nodes: state.nodes,
+                    members: state.members,
+                    loads: state.loads,
+                    // Save viewport settings to restore view later, why not
+                    meta: {
+                        gridSize: state.viewport.gridSize,
+                        zoom: state.viewport.zoom,
+                        pan: state.viewport.pan
+                    }
+                }
+            };
+
+            try {
+                const response = await fetch('http://localhost:5000/analyze/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Export failed: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log('System saved successfully:', result.slug);
+
+            } catch (error) {
+                console.error('Failed to export system:', error);
+            }
+        },
+
+        setMode: (mode) => set({ mode }),
+        setAnalysisResult: (result) => set({ analysisResult: result }),
     }
 }));
+3

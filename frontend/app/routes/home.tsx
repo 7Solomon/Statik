@@ -151,6 +151,7 @@ export default function Home() {
       {modalOpen === 'analyze' && (
         <AnalyzeSystemModal
           onClose={() => setModalOpen(null)}
+          onAnalysisComplete={handleAnalysisComplete}
         />
       )}
     </div>

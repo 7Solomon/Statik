@@ -1,9 +1,8 @@
 import { PropertiesPanel } from "~/features/ui/PropertiesPannel";
 import EditorCanvas from "../features/editor/EditorCanvas";
 import { useStore } from "../store/useStore";
-import type { Route } from ".react-router.gen";
 
-export function meta({ }: Route.MetaArgs) {
+export function meta() {
   return [
     { title: "Statik React Editor" },
     { name: "description", content: "Structural Analysis Editor" },

@@ -1,24 +1,24 @@
-import type { Member, Node, Vec2 } from '~/types/model';
+import type { Member, Node, Vec2, SupportValue } from '~/types/model';
 import * as Coords from '../../lib/coordinates';
 import type { InteractionState, ViewportState } from '~/types/app';
+import { SymbolRenderer } from './SymbolRenderer';
 
-// Visual Constants
+// --- Visual Constants ---
 const COLORS = {
     background: '#ffffff',
-    grid: '#e2e8f0', // Slate-200
-    axis: '#94a3b8', // Slate-400
-    member: '#334155', // Slate-700
-    node: '#3b82f6', // Blue-500
-    nodeFixed: '#ef4444', // Red-500 for supports
-    highlight: '#f59e0b', // Amber-500
+    grid: '#f1f5f9',
+    axis: '#cbd5e1',
+    member: '#334155',
+    node: '#3b82f6',
+    highlight: '#f59e0b',
+    support: '#0f172a',
     text: '#64748b'
 };
 
 const SIZES = {
     nodeRadius: 4,
     memberWidth: 3,
-    supportSize: 15, // Size of the triangle symbol in pixels
-    hingeRadius: 3
+    hingeOffset: 16, // <--- NEW: Distance from node center to hinge symbol
 };
 
 export class Renderer {
@@ -51,7 +51,7 @@ export class Renderer {
             }
         });
 
-        // 4. Draw Interaction (Ghost Member)
+        // 4. Ghost Member
         if (interaction.dragStartNodeId && interaction.activeTool === 'member') {
             const startNode = nodes.find(n => n.id === interaction.dragStartNodeId);
             if (startNode) {
@@ -66,39 +66,29 @@ export class Renderer {
         });
     }
 
-    /**
-     * Draw Infinite Grid
-     */
     private static drawGrid(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, viewport: ViewportState) {
+        // ... (Keep existing grid logic) ... 
+        // For brevity, assuming this is unchanged from previous message
         ctx.lineWidth = 1;
         ctx.strokeStyle = COLORS.grid;
-
-        // Calculate visible range in World Coordinates
         const topLeft = Coords.screenToWorld(0, 0, viewport, canvas.height);
         const bottomRight = Coords.screenToWorld(canvas.width, canvas.height, viewport, canvas.height);
-
         const gridSize = viewport.gridSize;
 
-        // Vertical Lines (X)
         const startX = Math.floor(topLeft.x / gridSize) * gridSize;
         const endX = Math.ceil(bottomRight.x / gridSize) * gridSize;
-
         ctx.beginPath();
         for (let x = startX; x <= endX; x += gridSize) {
-            const p = Coords.worldToScreen(x, 0, viewport); // Y doesn't matter for vertical line x-coord
+            const p = Coords.worldToScreen(x, 0, viewport);
             ctx.moveTo(p.x, 0);
             ctx.lineTo(p.x, canvas.height);
         }
         ctx.stroke();
 
-        // Horizontal Lines (Y)
-        const startY = Math.floor(bottomRight.y / gridSize) * gridSize; // Y is smaller at bottom in engineering? No, usually Y up.
-        // Let's just use min/max safely
         const minY = Math.min(topLeft.y, bottomRight.y);
         const maxY = Math.max(topLeft.y, bottomRight.y);
         const sY = Math.floor(minY / gridSize) * gridSize;
         const eY = Math.ceil(maxY / gridSize) * gridSize;
-
         ctx.beginPath();
         for (let y = sY; y <= eY; y += gridSize) {
             const p = Coords.worldToScreen(0, y, viewport);
@@ -107,21 +97,19 @@ export class Renderer {
         }
         ctx.stroke();
 
-        // Draw Axes (X=0 and Y=0)
         ctx.strokeStyle = COLORS.axis;
         ctx.lineWidth = 2;
         const origin = Coords.worldToScreen(0, 0, viewport);
-
         ctx.beginPath();
         ctx.moveTo(origin.x, 0);
-        ctx.lineTo(origin.x, canvas.height); // Y Axis
+        ctx.lineTo(origin.x, canvas.height);
         ctx.moveTo(0, origin.y);
-        ctx.lineTo(canvas.width, origin.y); // X Axis
+        ctx.lineTo(canvas.width, origin.y);
         ctx.stroke();
     }
 
     /**
-     * Draw Single Member
+     * Draw Single Member + Hinges with Offset
      */
     private static drawMember(
         ctx: CanvasRenderingContext2D,
@@ -133,6 +121,19 @@ export class Renderer {
         const p1 = Coords.worldToScreen(start.position.x, start.position.y, viewport);
         const p2 = Coords.worldToScreen(end.position.x, end.position.y, viewport);
 
+        // 1. Calculate Geometry
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+
+        // Normalize vector
+        const ux = dx / length;
+        const uy = dy / length;
+
+        // Angle in degrees
+        const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
+
+        // 2. Draw the Line (From node center to node center)
         ctx.lineWidth = SIZES.memberWidth;
         ctx.strokeStyle = COLORS.member;
         ctx.beginPath();
@@ -140,118 +141,109 @@ export class Renderer {
         ctx.lineTo(p2.x, p2.y);
         ctx.stroke();
 
-        // Draw Hinges (Releases)
-        // If start is released (moment = false/hinge), draw circle
-        // Note: In your model 'true' meant RELEASED (Hinge), 'false' meant FIXED.
-        // But verify your types/model.ts. I usually prefer boolean 'isFixed'.
-        // Let's assume released.start.mz === true means "Hinge"
+        // 3. Draw Hinges with Offset
+        // We move the draw position 'down' the line by SIZES.hingeOffset
 
-        if (member.releases.start.mz) {
-            this.drawHinge(ctx, p1, p2);
+        // Start Hinge Position: Move FROM p1 TOWARDS p2
+        const startHingePos = {
+            x: p1.x + ux * SIZES.hingeOffset,
+            y: p1.y + uy * SIZES.hingeOffset
+        };
+
+        // End Hinge Position: Move FROM p2 TOWARDS p1
+        const endHingePos = {
+            x: p2.x - ux * SIZES.hingeOffset,
+            y: p2.y - uy * SIZES.hingeOffset
+        };
+
+        this.drawReleaseSymbol(ctx, member.releases.start, startHingePos, angleDeg, viewport);
+
+        // Note: For the end node, we still rotate by 'angleDeg'.
+        // Why? Because symbols like 'Box' or 'Vertical Line' are symmetric.
+        // If you had a directional symbol (arrow), you'd need angleDeg + 180.
+        this.drawReleaseSymbol(ctx, member.releases.end, endHingePos, angleDeg, viewport);
+    }
+
+    private static drawReleaseSymbol(
+        ctx: CanvasRenderingContext2D,
+        release: { fx: boolean, fy: boolean, mz: boolean },
+        pos: { x: number, y: number },
+        rotationDeg: number,
+        viewport: ViewportState
+    ) {
+        let symbolKey: string | null = null;
+
+        // Priority Logic:
+        // 1. Axial (N) - Box Sleeve
+        if (release.fx) {
+            symbolKey = 'HINGE_NORMALKRAFTGELENK';
         }
-        if (member.releases.end.mz) {
-            this.drawHinge(ctx, p2, p1);
+        // 2. Shear (V) - Vertical Lines
+        else if (release.fy) {
+            symbolKey = 'HINGE_SCHUBGELENK';
+        }
+        // 3. Moment (M) - Circle
+        else if (release.mz) {
+            symbolKey = 'HINGE_VOLLGELENK';
+        }
+
+        if (symbolKey) {
+            // Draw white background for the symbol to cover the line beneath it
+            // (Optional, but looks cleaner for boxes/circles)
+            SymbolRenderer.draw(ctx, symbolKey, pos, rotationDeg, COLORS.member);
         }
     }
 
-    /**
-     * Helper: Draw a little white circle with black border to represent a hinge
-     * Offset slightly from the node towards the member center
-     */
-    private static drawHinge(ctx: CanvasRenderingContext2D, at: Vec2, towards: Vec2) {
-        // Calculate vector direction
-        const dx = towards.x - at.x;
-        const dy = towards.y - at.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-
-        // Offset by e.g. 10 pixels
-        const offset = 8;
-        const cx = at.x + (dx / len) * offset;
-        const cy = at.y + (dy / len) * offset;
-
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = COLORS.member;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, SIZES.hingeRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-    }
-
-    /**
-     * Draw Ghost Member (Interaction)
-     */
     private static drawGhostMember(ctx: CanvasRenderingContext2D, startWorld: Vec2, mouseWorld: Vec2, viewport: ViewportState) {
         const p1 = Coords.worldToScreen(startWorld.x, startWorld.y, viewport);
         const p2 = Coords.worldToScreen(mouseWorld.x, mouseWorld.y, viewport);
 
         ctx.lineWidth = 2;
         ctx.strokeStyle = COLORS.highlight;
-        ctx.setLineDash([5, 5]); // Dashed line
+        ctx.setLineDash([5, 5]);
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
         ctx.stroke();
-        ctx.setLineDash([]); // Reset
+        ctx.setLineDash([]);
     }
 
-    /**
-     * Draw Node & Symbol
-     */
     private static drawNode(ctx: CanvasRenderingContext2D, node: Node, viewport: ViewportState, isHovered: boolean) {
         const p = Coords.worldToScreen(node.position.x, node.position.y, viewport);
-
-        // 1. Draw Support Symbol (if supports exist)
         const { fixX, fixY, fixM } = node.supports;
+        const rotation = node.rotation;
 
-        ctx.save();
-        ctx.translate(p.x, p.y);
+        const isRigid = (val: SupportValue) => val === true;
+        const isFree = (val: SupportValue) => val === false;
+        const isSpring = (val: SupportValue) => typeof val === 'number';
 
-        // Rotation logic (if needed later)
-        // ctx.rotate(node.rotation * Math.PI / 180);
+        let symbolKey: string | null = null;
+        let activeColor = isHovered ? COLORS.highlight : COLORS.support;
 
-        ctx.strokeStyle = COLORS.nodeFixed;
-        ctx.lineWidth = 2;
-
-        if (fixX && fixY && fixM) {
-            // Fixed Support (Block/Hatch)
-            ctx.beginPath();
-            ctx.rect(-10, 5, 20, 10); // Draw block below
-            ctx.stroke();
-            // Hatching
-            ctx.beginPath();
-            ctx.moveTo(-10, 15); ctx.lineTo(-5, 5);
-            ctx.moveTo(0, 15); ctx.lineTo(5, 5);
-            ctx.moveTo(10, 15); ctx.lineTo(15, 5);
-            ctx.stroke();
+        if (isRigid(fixX) && isRigid(fixY) && isRigid(fixM)) {
+            symbolKey = 'SUPPORT_FESTE_EINSPANNUNG';
         }
-        else if (fixX && fixY && !fixM) {
-            // Pinned Support (Triangle)
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(-10, 15);
-            ctx.lineTo(10, 15);
-            ctx.closePath();
-            ctx.stroke();
+        else if (isRigid(fixX) && isRigid(fixY)) {
+            if (isSpring(fixM)) {
+                symbolKey = 'SUPPORT_TORSIONSFEDER';
+            } else {
+                symbolKey = 'SUPPORT_FESTLAGER';
+            }
         }
-        else if (!fixX && fixY && !fixM) {
-            // Roller (Triangle + Wheels/Line)
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(-10, 12);
-            ctx.lineTo(10, 12);
-            ctx.closePath();
-            ctx.stroke();
-
-            // Wheels
-            ctx.beginPath();
-            ctx.moveTo(-15, 15); ctx.lineTo(15, 15); // Floor line
-            ctx.stroke();
+        else if (isRigid(fixY) && isFree(fixX) && isFree(fixM)) {
+            symbolKey = 'SUPPORT_LOSLAGER';
+        }
+        else if (isRigid(fixX) && isFree(fixY)) {
+            symbolKey = 'SUPPORT_GLEITLAGER';
+        }
+        else if (isSpring(fixY) && isFree(fixX)) {
+            symbolKey = 'SUPPORT_FEDER';
         }
 
-        ctx.restore();
+        if (symbolKey) {
+            SymbolRenderer.draw(ctx, symbolKey, p, rotation, activeColor);
+        }
 
-        // 2. Draw Node Point
         ctx.fillStyle = isHovered ? COLORS.highlight : COLORS.node;
         ctx.beginPath();
         ctx.arc(p.x, p.y, SIZES.nodeRadius, 0, Math.PI * 2);

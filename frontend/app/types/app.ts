@@ -4,11 +4,13 @@ export type ToolType =
     | 'select'
     | 'node'
     | 'member'
-    | 'load_point'
-    | 'load_dist'
-    | 'support_fixed'
-    | 'support_pin'
-    | 'support_roller';
+    | 'support_festlager'
+    | 'support_loslager'
+    | 'support_feste_einspannung'
+    | 'support_gleitlager'
+    | 'support_feder'
+    | 'support_torsionsfeder';
+
 
 export interface ViewportState {
     zoom: number;      // Scale factor (pixels per meter)

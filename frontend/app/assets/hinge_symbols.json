@@ -1,0 +1,60 @@
+{
+    "HINGE_VOLLGELENK": [
+        {
+            "d": "M -6.00 0.00 A 6.00 6.00 0 1 0 6.00 0.00 A 6.00 6.00 0 1 0 -6.00 0.00 Z",
+            "type": "fill",
+            "color": "white"
+        },
+        {
+            "d": "M -6.00 0.00 A 6.00 6.00 0 1 0 6.00 0.00 A 6.00 6.00 0 1 0 -6.00 0.00 Z",
+            "type": "stroke",
+            "width": 2
+        }
+    ],
+    "HINGE_HALBGELENK": [],
+    "HINGE_SCHUBGELENK": [
+        {
+            "d": "M -2.00 0.00 A 2.00 2.00 0 1 0 2.00 0.00 A 2.00 2.00 0 1 0 -2.00 0.00 Z",
+            "type": "fill",
+            "color": "white"
+        },
+        {
+            "d": "M -2.00 0.00 A 2.00 2.00 0 1 0 2.00 0.00 A 2.00 2.00 0 1 0 -2.00 0.00 Z",
+            "type": "stroke",
+            "width": 1
+        },
+        {
+            "d": "M -2.00 -24.00 L -2.00 24.00",
+            "type": "stroke",
+            "width": 2
+        },
+        {
+            "d": "M 2.00 -24.00 L 2.00 24.00",
+            "type": "stroke",
+            "width": 2
+        }
+    ],
+    "HINGE_NORMALKRAFTGELENK": [
+        {
+            "d": "M -6.67 -6.00 L 13.33 -6.00 L 13.33 6.00 L -6.67 6.00 Z",
+            "type": "fill",
+            "color": "white"
+        },
+        {
+            "d": "M -6.67 -6.00 L 13.33 -6.00 L 13.33 6.00 L -6.67 6.00 Z",
+            "type": "stroke",
+            "width": 2
+        },
+        {
+            "d": "M -6.67 -6.00 L 13.33 -6.00",
+            "type": "stroke",
+            "width": 1
+        },
+        {
+            "d": "M -6.67 6.00 L 13.33 6.00",
+            "type": "stroke",
+            "width": 1
+        }
+    ],
+    "HINGE_BIEGESTEIFE_ECKE": []
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useStore } from '../../store/useStore'; // Adjust path if needed
+import { useStore } from '../../store/useStore';
 import { Renderer } from './Renderer';
 import { useCanvasInteraction } from './useCanvisInteraction';
 
@@ -15,21 +15,59 @@ const EditorCanvas: React.FC = () => {
     const members = useStore((state) => state.members);
     const interaction = useStore((state) => state.interaction);
     const viewport = useStore((state) => state.viewport);
-    const actions = useStore((state) => state.actions);
+    // const actions = useStore((state) => state.actions); // Not strictly needed here if handled in logic
 
-    // --- Resize Handler ---
+    // --- RESIZE HANDLER ---
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        const container = containerRef.current;
+        if (!canvas || !container) return;
 
+        const resizeObserver = new ResizeObserver(() => {
+            const { clientWidth, clientHeight } = container;
+            const dpr = window.devicePixelRatio || 1;
+
+            // Update internal resolution (Sharpness)
+            canvas.width = clientWidth * dpr;
+            canvas.height = clientHeight * dpr;
+
+            // Update CSS display size (Layout)
+            canvas.style.width = `${clientWidth}px`;
+            canvas.style.height = `${clientHeight}px`;
+
+            // Scale drawing context
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.scale(dpr, dpr);
+                // CRITICAL: Re-render immediately because changing width clears the canvas
+                Renderer.render(
+                    ctx,
+                    canvas,
+                    useStore.getState().nodes,
+                    useStore.getState().members,
+                    useStore.getState().viewport,
+                    useStore.getState().interaction
+                );
+            }
+        });
+
+        resizeObserver.observe(container);
+
+        return () => resizeObserver.disconnect();
+    }, []);
+
+    // --- 2. WHEEL / ZOOM HANDLER (Native for performance) ---
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
         const onWheel = (e: WheelEvent) => {
-            e.preventDefault(); // Now allowed because passive: false
+            e.preventDefault(); // Prevents browser page scrolling
+
             const zoomIntensity = 0.1;
             const direction = e.deltaY > 0 ? -1 : 1;
             const factor = 1 + (direction * zoomIntensity);
 
-            // Access store directly or via a ref to avoid stale closures in event listener
             const currentZoom = useStore.getState().viewport.zoom;
 
             useStore.getState().actions.setViewport({
@@ -37,6 +75,7 @@ const EditorCanvas: React.FC = () => {
             });
         };
 
+        // passive: false is required to use e.preventDefault()
         canvas.addEventListener('wheel', onWheel, { passive: false });
 
         return () => {
@@ -44,51 +83,34 @@ const EditorCanvas: React.FC = () => {
         };
     }, []);
 
-    // --- Main Render Loop (Reactive) ---
-    // Whenever the store changes, we repaint the canvas.
+    // --- 3. MAIN RENDER LOOP (Reactive) ---
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Use RequestAnimationFrame for smooth updates if dragging
-        // But for now, direct call is fine for this scale.
         requestAnimationFrame(() => {
             Renderer.render(ctx, canvas, nodes, members, viewport, interaction);
         });
 
-    }, [nodes, members, viewport, interaction]); // Dependency array ensures we only paint when needed
-
-    // --- Wheel Zoom Handler ---
-    // (Optional: You can move this to useCanvasInteraction if you prefer)
-    const handleWheel = (e: React.WheelEvent) => {
-        e.preventDefault();
-        const zoomIntensity = 0.1;
-        const direction = e.deltaY > 0 ? -1 : 1;
-        const factor = 1 + (direction * zoomIntensity);
-
-        // Simple center zoom for now
-        actions.setViewport({
-            zoom: Math.max(10, Math.min(200, viewport.zoom * factor))
-        });
-    };
+    }, [nodes, members, viewport, interaction]);
 
     return (
-        <div ref={containerRef} className="w-full h-full bg-slate-50 overflow-hidden relative">
+        // Added touch-none to container to prevent mobile scroll gestures on the background
+        <div ref={containerRef} className="w-full h-full bg-slate-50 overflow-hidden relative touch-none">
             <canvas
                 ref={canvasRef}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
-                onWheel={handleWheel}
-                className="block touch-none cursor-crosshair"
-                // Prevent default browser context menu on right click
+                // onWheel removed here (handled by useEffect above)
+                className="block cursor-crosshair"
                 onContextMenu={(e) => e.preventDefault()}
             />
 
-            {/* Overlay Debug Info (Optional) */}
-            <div className="absolute bottom-4 left-4 bg-white/90 p-2 rounded shadow text-xs font-mono text-slate-600 pointer-events-none select-none">
+            {/* Overlay Debug Info */}
+            <div className="absolute bottom-4 left-4 bg-white/90 p-2 rounded shadow text-xs font-mono text-slate-600 pointer-events-none select-none z-10">
                 <div>Pos: {interaction.mousePos.x.toFixed(2)}, {interaction.mousePos.y.toFixed(2)} m</div>
                 <div>Zoom: {viewport.zoom.toFixed(1)} px/m</div>
                 <div>Nodes: {nodes.length} | Members: {members.length}</div>

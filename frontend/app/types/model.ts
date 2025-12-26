@@ -7,6 +7,13 @@ export interface Vec2 {
   y: number;
 }
 
+export type SupportValue = boolean | number;
+export interface Release {
+  fx: boolean; // Axial release
+  fy: boolean; // Shear release
+  mz: boolean; // Moment release (Hinge)
+}
+
 export interface Node {
   id: string; // UUID
   position: Vec2; // In meters (World Coordinates)
@@ -14,9 +21,9 @@ export interface Node {
   // Boundary Conditions (Supports)
   // True = Fixed (Reaction force exists), False = Free
   supports: {
-    fixX: boolean;
-    fixY: boolean;
-    fixM: boolean; // Fixed rotation (Moment clamp)
+    fixX: SupportValue;
+    fixY: SupportValue;
+    fixM: SupportValue; // Fixed rotation (Moment clamp)
   };
 
   // Visual rotation for the support symbol (in degrees)
@@ -38,16 +45,8 @@ export interface Member {
   // Releases (Hinges) at member ends
   // True = Released (Hinge/No Moment), False = Rigid connection
   releases: {
-    start: {
-      fx: boolean; // Axial release (Slider)
-      fy: boolean; // Shear release
-      mz: boolean; // Moment release (Standard Hinge)
-    };
-    end: {
-      fx: boolean;
-      fy: boolean;
-      mz: boolean;
-    };
+    start: Release;
+    end: Release;
   };
 }
 

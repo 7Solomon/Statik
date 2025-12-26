@@ -2,92 +2,94 @@ import { useRef, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import * as Geo from '../../lib/geometry';
 import * as Coords from '../../lib/coordinates';
-import type { Vec2, Node } from '~/types/model';
+
+const SUPPORT_CONFIGS: Record<string, { fixX: boolean | number, fixY: boolean | number, fixM: boolean | number }> = {
+    'support_festlager': { fixX: true, fixY: true, fixM: false },
+    'support_loslager': { fixX: false, fixY: true, fixM: false },
+    'support_feste_einspannung': { fixX: true, fixY: true, fixM: true },
+    'support_gleitlager': { fixX: true, fixY: false, fixM: true },
+    'support_feder': { fixX: false, fixY: 10000, fixM: false },
+    'support_torsionsfeder': { fixX: true, fixY: true, fixM: 10000 },
+};
 
 export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
     const { actions, viewport, interaction, nodes, members } = useStore();
     const tool = interaction.activeTool;
 
-    // Transient state for drag operations (avoiding React re-renders for every pixel)
+    // --- REFS ---
     const isDragging = useRef(false);
     const lastMouse = useRef<{ x: number, y: number } | null>(null);
+    const dragStartNodeIdRef = useRef<string | null>(null); // <--- THE FIX
 
-    /**
-     * Helper: Get World Position from Event
-     */
-    const getWorldPos = (e: React.MouseEvent): { raw: Vec2, snapped: Vec2 } => {
-        if (!canvasRef.current) return { raw: { x: 0, y: 0 }, snapped: { x: 0, y: 0 } };
+    const getWorldPos = (e: React.MouseEvent) => {
+        if (!canvasRef.current) return { raw: { x: 0, y: 0 }, snapped: { x: 0, y: 0 }, snappedNodeId: null };
 
         const rect = canvasRef.current.getBoundingClientRect();
-        const screenX = e.clientX - rect.left;
-        const screenY = e.clientY - rect.top;
+        const raw = Coords.screenToWorld(e.clientX - rect.left, e.clientY - rect.top, viewport, canvasRef.current.height);
 
-        const raw = Coords.screenToWorld(screenX, screenY, viewport, canvasRef.current.height);
-
-        // Check for node snap first
         const snappedNodeId = Geo.getNearestNode(raw, nodes, viewport.zoom);
         let snapped = raw;
 
         if (snappedNodeId) {
-            // If we snapped to a node, use that node's exact position
             const node = nodes.find(n => n.id === snappedNodeId);
             if (node) snapped = node.position;
-
-            // Update global hover state
-            actions.setHoveredNode(snappedNodeId);
+            if (interaction.hoveredNodeId !== snappedNodeId) actions.setHoveredNode(snappedNodeId);
         } else {
-            // Otherwise, snap to grid
             snapped = Geo.snapToGrid(raw, viewport.gridSize);
-            actions.setHoveredNode(null);
+            if (interaction.hoveredNodeId !== null) actions.setHoveredNode(null);
         }
 
-        return { raw, snapped };
+        return { raw, snapped, snappedNodeId };
     };
 
-    /**
-     * MOUSE DOWN
-     */
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
         isDragging.current = true;
         lastMouse.current = { x: e.clientX, y: e.clientY };
 
-        const { snapped, raw } = getWorldPos(e);
+        const { snapped, raw, snappedNodeId } = getWorldPos(e);
 
-        // Left Click logic
         if (e.button === 0) {
+            // 1. Placing Nodes
             if (tool === 'node') {
-                actions.addNode(snapped);
-            }
-            else if (tool === 'support_fixed') {
-                // If clicked on existing node, update it. If empty, create new.
-                // For now, simpler: just create/overlap
-                actions.addNode(snapped, { fixX: true, fixY: true, fixM: true });
-            }
-            else if (tool === 'member') {
-                // Start dragging a member
-                if (interaction.hoveredNodeId) {
-                    actions.setInteraction({ dragStartNodeId: interaction.hoveredNodeId });
-                } else {
-                    // Auto-create start node if clicking in space
-                    const newNodeId = actions.addNode(snapped); // We need to update addNode to return ID!
-                    // (I updated addNode in the store above to return the ID)
-                    // But 'actions' is wrapped by Zustand, so it might not return.
-                    // Workaround: We will just rely on hovering for now for V1.
-                    // actions.setInteraction({ dragStartNodeId: newNodeId });
+                if (!snappedNodeId) {
+                    actions.addNode(snapped);
                 }
             }
+
+            // 2. Placing Supports
+            else if (tool.startsWith('support_')) {
+                const config = SUPPORT_CONFIGS[tool];
+                if (config) {
+                    if (snappedNodeId) {
+                        actions.updateNode(snappedNodeId, { supports: config });
+                    }
+                    else {
+                        actions.addNode(snapped, config);
+                    }
+                }
+            }
+
+            // 3. Member Tool
+            else if (tool === 'member') {
+                let startId = snappedNodeId;
+                if (startId) {
+                    // FIX: Set BOTH the Ref (logic) and Store (visuals)
+                    dragStartNodeIdRef.current = startId;
+                    actions.setInteraction({ dragStartNodeId: startId });
+                }
+            }
+
+            // 4. Select Tool
             else if (tool === 'select') {
-                // 1. Try Clicking a Node
-                const clickedNodeId = Geo.getNearestNode(raw, nodes, viewport.zoom);
-                if (clickedNodeId) {
-                    actions.selectObject(clickedNodeId, 'node');
+                if (snappedNodeId) {
+                    actions.selectObject(snappedNodeId, 'node');
                     return;
                 }
 
-                // 2. Try Clicking a Member
+                // Member Selection Logic
                 let clickedMemberId = null;
-                const clickThreshold = 10 / viewport.zoom; // 10 pixels tolerance
+                const clickThreshold = 10 / viewport.zoom;
 
                 for (const m of members) {
                     const start = nodes.find(n => n.id === m.startNodeId);
@@ -104,24 +106,19 @@ export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElemen
                 if (clickedMemberId) {
                     actions.selectObject(clickedMemberId, 'member');
                 } else {
-                    // Deselect if clicked empty space
                     actions.selectObject(null, null);
                 }
-
             }
         }
-    }, [tool, viewport, nodes]); // Dependencies
+    }, [tool, viewport, nodes, members, interaction.hoveredNodeId]);
 
-    /**
-     * MOUSE MOVE
-     */
+
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         const { snapped } = getWorldPos(e);
 
-        // Update "Ghost" mouse position in store for the Renderer to see
+        // This causes frequent re-renders, which is why we need Refs for logic
         actions.setInteraction({ mousePos: snapped });
 
-        // Handle Panning (if middle click or spacebar held - future todo)
         if (isDragging.current && tool === 'select') {
             const dx = e.clientX - (lastMouse.current?.x || 0);
             const dy = e.clientY - (lastMouse.current?.y || 0);
@@ -130,37 +127,30 @@ export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElemen
             });
             lastMouse.current = { x: e.clientX, y: e.clientY };
         }
-
     }, [tool, viewport, nodes]);
 
-    /**
-     * MOUSE UP
-     */
+
     const handleMouseUp = useCallback((e: React.MouseEvent) => {
         isDragging.current = false;
-        const { snapped } = getWorldPos(e);
 
-        if (tool === 'member' && interaction.dragStartNodeId) {
-            // Finish Member
-            let endNodeId = interaction.hoveredNodeId;
+        const { snappedNodeId } = getWorldPos(e);
 
-            // If let go in empty space, create a node there
-            if (!endNodeId) {
-                // For V1 let's assume we must click a node.
-                // Or trigger addNode here.
-                // const newNode = actions.addNode(snapped); 
-                // ...
+        // FIX: Check the Ref, not the Store
+        if (tool === 'member' && dragStartNodeIdRef.current) {
+
+            const startId = dragStartNodeIdRef.current;
+            const endNodeId = snappedNodeId;
+
+            if (endNodeId && endNodeId !== startId) {
+                actions.addMember(startId, endNodeId);
             }
 
-            if (endNodeId && endNodeId !== interaction.dragStartNodeId) {
-                actions.addMember(interaction.dragStartNodeId, endNodeId);
-            }
-
-            // Reset drag
+            // Reset both
+            dragStartNodeIdRef.current = null;
             actions.setInteraction({ dragStartNodeId: null });
         }
 
-    }, [tool, interaction.dragStartNodeId, nodes]);
+    }, [tool, nodes, viewport]);
 
     return {
         handleMouseDown,

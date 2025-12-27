@@ -4,3 +4,70 @@ content/
 yolov8n.pt
 stanli.sty
 .vscode/
+
+# ========================
+# GLOBAL / OS Files
+# ========================
+# Operating System files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+
+# Environment Variables
+.env
+.env.production
+.env.development
+.env.local
+.env.test
+
+# ========================
+# BACKEND (Python / FastAPI)
+# ========================
+# Byte-compiled / Optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+.venv/
+.env/
+
+# Distribution / Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing / Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ========================
+# FRONTEND (React Router v7)
+# ========================
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# React Router v7 Specific (Type definitions)
+.react-router/
+
+# Vite / Build Outputs
+.vite/
+*.tsbuildinfo
+# Note: 'build/' and 'dist/' are already handled in the Backend section,
+# but they work for frontend too.
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

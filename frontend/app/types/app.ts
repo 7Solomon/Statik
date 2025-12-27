@@ -4,12 +4,21 @@ export type ToolType =
     | 'select'
     | 'node'
     | 'member'
-    | 'support_festlager'
-    | 'support_loslager'
-    | 'support_feste_einspannung'
-    | 'support_gleitlager'
-    | 'support_feder'
-    | 'support_torsionsfeder';
+    | 'hinge'
+
+export type HingeType =
+    | 'vollgelenk'
+    | 'schubgelenk'
+    | 'normalkraftgelenk'
+    | 'biegesteife_ecke';
+
+export type SupportType =
+    | 'festlager'
+    | 'loslager'
+    | 'feste_einspannung'
+    | 'gleitlager'
+    | 'feder'
+    | 'torsionsfeder';
 
 
 export interface ViewportState {
@@ -20,6 +29,7 @@ export interface ViewportState {
 
 export interface InteractionState {
     activeTool: ToolType;
+    activeSubTypeTool: HingeType | SupportType | null
     isDragging: boolean;
 
     // Hover state for snapping

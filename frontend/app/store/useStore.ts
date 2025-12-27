@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { InteractionState, ToolType, ViewportState } from '~/types/app';
-import type { Load, Member, Vec2, Node, KinematicResult } from '~/types/model';
+import type { Load, Member, Vec2, Node, KinematicResult, Release } from '~/types/model';
 
 export type AppMode = 'EDITOR' | 'ANALYSIS';
 
@@ -14,6 +14,7 @@ const DEFAULT_VIEWPORT: ViewportState = {
 
 const DEFAULT_INTERACTION: InteractionState = {
     activeTool: 'select',
+    activeSubTypeTool: null,
     isDragging: false,
     hoveredNodeId: null,
     hoveredMemberId: null,
@@ -57,6 +58,8 @@ interface AppState {
         // Model Actions
         addNode: (pos: Vec2, supports?: Partial<Node['supports']>) => void;
         addMember: (startNodeId: string, endNodeId: string) => void;
+        addHingeAtNode: (nodeId: string, releases: Partial<Release>) => void;
+
         removeNode: (id: string) => void;
         selectObject: (id: string | null, type: 'node' | 'member' | null) => void;
         updateNode: (id: string, data: Partial<Node>) => void;
@@ -127,7 +130,31 @@ export const useStore = create<AppState>((set, get) => ({
             };
             set((state) => ({ members: [...state.members, newMember] }));
         },
+        addHingeAtNode: (nodeId, releaseConfig) => {
+            set((state) => ({
+                members: state.members.map((member) => {
+                    const newReleases = {
+                        start: { ...member.releases.start },
+                        end: { ...member.releases.end }
+                    };
+                    let modified = false;
 
+                    // If member starts at this node, merge the release config
+                    if (member.startNodeId === nodeId) {
+                        newReleases.start = { ...newReleases.start, ...releaseConfig };
+                        modified = true;
+                    }
+
+                    // If member ends at this node, merge the release config
+                    if (member.endNodeId === nodeId) {
+                        newReleases.end = { ...newReleases.end, ...releaseConfig };
+                        modified = true;
+                    }
+
+                    return modified ? { ...member, releases: newReleases } : member;
+                })
+            }));
+        },
         removeNode: (id) => {
             set((state) => ({
                 nodes: state.nodes.filter(n => n.id !== id),
@@ -223,4 +250,3 @@ export const useStore = create<AppState>((set, get) => ({
         setKinematicResult: (result) => set({ kinematicResult: result }),
     }
 }));
-3

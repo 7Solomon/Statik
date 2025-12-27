@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useStore } from '../../store/useStore';
-import { Renderer } from './Renderer';
+import { Renderer } from '../drawing/Renderer';
 import { useCanvasInteraction } from './useCanvisInteraction';
 
 const EditorCanvas: React.FC = () => {

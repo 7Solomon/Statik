@@ -2,24 +2,36 @@ import { useRef, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import * as Geo from '../../lib/geometry';
 import * as Coords from '../../lib/coordinates';
+import type { Release } from '~/types/model';
 
+// 1. Update keys to match the 'subType' from your ToolBar
 const SUPPORT_CONFIGS: Record<string, { fixX: boolean | number, fixY: boolean | number, fixM: boolean | number }> = {
-    'support_festlager': { fixX: true, fixY: true, fixM: false },
-    'support_loslager': { fixX: false, fixY: true, fixM: false },
-    'support_feste_einspannung': { fixX: true, fixY: true, fixM: true },
-    'support_gleitlager': { fixX: true, fixY: false, fixM: true },
-    'support_feder': { fixX: false, fixY: 10000, fixM: false },
-    'support_torsionsfeder': { fixX: true, fixY: true, fixM: 10000 },
+    'festlager': { fixX: true, fixY: true, fixM: false },
+    'loslager': { fixX: false, fixY: true, fixM: false },
+    'feste_einspannung': { fixX: true, fixY: true, fixM: true },
+    'gleitlager': { fixX: true, fixY: false, fixM: true },
+    'feder': { fixX: false, fixY: 10000, fixM: false },
+    'torsionsfeder': { fixX: true, fixY: true, fixM: 10000 },
 };
+
+const HINGE_CONFIGS: Record<string, Partial<Release>> = {
+    'vollgelenk': { fx: false, fy: false, mz: true },
+    'schubgelenk': { fx: false, fy: true, mz: false },
+    'normalkraftgelenk': { fx: true, fy: false, mz: false },
+    'biegesteife_ecke': { fx: false, fy: false, mz: false }, // Resets everything to rigid
+    'halbgelenk': { fx: false, fy: false, mz: true },
+};
+
 
 export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
     const { actions, viewport, interaction, nodes, members } = useStore();
     const tool = interaction.activeTool;
+    const subType = interaction.activeSubTypeTool; // <--- Grab the subTool
 
     // --- REFS ---
     const isDragging = useRef(false);
     const lastMouse = useRef<{ x: number, y: number } | null>(null);
-    const dragStartNodeIdRef = useRef<string | null>(null); // <--- THE FIX
+    const dragStartNodeIdRef = useRef<string | null>(null);
 
     const getWorldPos = (e: React.MouseEvent) => {
         if (!canvasRef.current) return { raw: { x: 0, y: 0 }, snapped: { x: 0, y: 0 }, snappedNodeId: null };
@@ -50,37 +62,52 @@ export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElemen
         const { snapped, raw, snappedNodeId } = getWorldPos(e);
 
         if (e.button === 0) {
-            // 1. Placing Nodes
-            if (tool === 'node') {
-                if (!snappedNodeId) {
-                    actions.addNode(snapped);
-                }
-            }
 
-            // 2. Placing Supports
-            else if (tool.startsWith('support_')) {
-                const config = SUPPORT_CONFIGS[tool];
-                if (config) {
+            // 1. NODE TOOLS (Includes Supports)
+            if (tool === 'node') {
+                // Case A: It is a Support Tool
+                if (subType && SUPPORT_CONFIGS[subType]) {
+                    const config = SUPPORT_CONFIGS[subType];
+
                     if (snappedNodeId) {
+                        // Update existing node
                         actions.updateNode(snappedNodeId, { supports: config });
-                    }
-                    else {
+                    } else {
+                        // Create new node with support
                         actions.addNode(snapped, config);
                     }
                 }
+                // Case B: It is a plain Node Tool
+                else {
+                    if (!snappedNodeId) {
+                        actions.addNode(snapped);
+                    }
+                }
             }
 
-            // 3. Member Tool
+            // 2. HINGE TOOLS
+            else if (tool === 'hinge') {
+                // We check if we have a valid node AND a valid subType configuration
+                if (snappedNodeId && subType && HINGE_CONFIGS[subType]) {
+
+                    // LOOKUP the config object
+                    const physicsPayload = HINGE_CONFIGS[subType];
+
+                    // PASS the object to the store (Store doesn't know about 'vollgelenk')
+                    actions.addHingeAtNode(snappedNodeId, physicsPayload);
+                }
+            }
+
+            // 3. MEMBER CREATION
             else if (tool === 'member') {
                 let startId = snappedNodeId;
                 if (startId) {
-                    // FIX: Set BOTH the Ref (logic) and Store (visuals)
                     dragStartNodeIdRef.current = startId;
                     actions.setInteraction({ dragStartNodeId: startId });
                 }
             }
 
-            // 4. Select Tool
+            // 4. SELECTION
             else if (tool === 'select') {
                 if (snappedNodeId) {
                     actions.selectObject(snappedNodeId, 'node');
@@ -110,13 +137,11 @@ export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElemen
                 }
             }
         }
-    }, [tool, viewport, nodes, members, interaction.hoveredNodeId]);
-
+    }, [tool, subType, viewport, nodes, members]);
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         const { snapped } = getWorldPos(e);
 
-        // This causes frequent re-renders, which is why we need Refs for logic
         actions.setInteraction({ mousePos: snapped });
 
         if (isDragging.current && tool === 'select') {
@@ -129,15 +154,12 @@ export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElemen
         }
     }, [tool, viewport, nodes]);
 
-
     const handleMouseUp = useCallback((e: React.MouseEvent) => {
         isDragging.current = false;
 
         const { snappedNodeId } = getWorldPos(e);
 
-        // FIX: Check the Ref, not the Store
         if (tool === 'member' && dragStartNodeIdRef.current) {
-
             const startId = dragStartNodeIdRef.current;
             const endNodeId = snappedNodeId;
 
@@ -145,7 +167,6 @@ export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElemen
                 actions.addMember(startId, endNodeId);
             }
 
-            // Reset both
             dragStartNodeIdRef.current = null;
             actions.setInteraction({ dragStartNodeId: null });
         }

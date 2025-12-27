@@ -10,6 +10,10 @@ const DEFAULT_VIEWPORT: ViewportState = {
     zoom: 50, // 50 pixels = 1 meter
     pan: { x: 400, y: 400 }, // Initial center offset
     gridSize: 1.0,
+    width: 0,
+    height: 0,
+    x: 0,
+    y: 0
 };
 
 const DEFAULT_INTERACTION: InteractionState = {
@@ -43,7 +47,7 @@ export const createEditorSlice: StateCreator<
     nodes: [],
     members: [],
     loads: [],
-    viewport: { zoom: 50, pan: { x: 400, y: 400 }, gridSize: 1.0 },
+    viewport: DEFAULT_VIEWPORT,
     interaction: DEFAULT_INTERACTION,
 
     actions: {

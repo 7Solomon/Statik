@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore } from '~/store/useStore';
 import { ChevronLeft, Play, Pause, AlertTriangle, CheckCircle, Layers, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import type { KinematicResult, Member, Node, KinematicMode } from '~/types/model';
+import { NodeRenderer } from '../drawing/NodeRenderer';
+import { RenderUtils } from '../drawing/RenderUtils';
+import type { ViewportState } from '~/types/app';
 
 
 
@@ -18,9 +21,17 @@ export default function AnalysisViewer() {
     const [isPlaying, setIsPlaying] = useState(true);
 
     // Viewport State
-    const view = useRef({ x: 0, y: 0, zoom: 40.0 }); // 40 pixels per meter default
     const isDragging = useRef(false);
     const lastPos = useRef({ x: 0, y: 0 });
+    const view = useRef<ViewportState>({
+        zoom: 50, // 50 pixels = 1 meter
+        pan: { x: 400, y: 400 }, // Initial center offset
+        gridSize: 1.0,
+        width: 0,
+        height: 0,
+        x: 0,
+        y: 0
+    });
 
     // --- 1. Animation Loop ---
     useEffect(() => {
@@ -38,31 +49,37 @@ export default function AnalysisViewer() {
             const width = canvas.parentElement?.clientWidth || 800;
             const height = canvas.parentElement?.clientHeight || 600;
 
-            // Handle DPI scaling for sharp text/lines
+            view.current.width = width;
+            view.current.height = height;
+
+            // Handle DPI scaling
             const dpr = window.devicePixelRatio || 1;
             canvas.width = width * dpr;
             canvas.height = height * dpr;
+
+            // KEEP THIS: This scales for retina displays
             ctx.scale(dpr, dpr);
             canvas.style.width = `${width}px`;
             canvas.style.height = `${height}px`;
 
+            // Clear screen
             ctx.clearRect(0, 0, width, height);
             ctx.save();
 
-            // 2. Apply Viewport Transform
-            // Center (cx, cy) is the screen center + pan offset
-            const cx = width / 2 + view.current.x;
-            const cy = height / 2 + view.current.y;
+            // 3. Draw Grid 
+            RenderUtils.drawGrid(ctx, canvas, view.current);
 
-            ctx.translate(cx, cy);
-            ctx.scale(view.current.zoom, -view.current.zoom); // Invert Y for engineering coords
 
-            // 3. Draw Grid (Optional background reference)
-            drawGrid(ctx, view.current.zoom, width, height, view.current);
+            // --- GHOST  ---
+            ctx.save();
+            ctx.globalAlpha = 0.15;
+            drawSystem(ctx, result, activeModeIndex, 0);
+            ctx.restore();
+            // -------------------------
+
 
             // 4. Calculate Animation Factor
             const time = (Date.now() - startTime) / 1000;
-            // If kinematic, oscillate. If static, stay still (or 0).
             const animFactor = (isPlaying && result.is_kinematic)
                 ? Math.sin(time * 3) * amplitude
                 : (result.is_kinematic ? amplitude : 0);
@@ -87,69 +104,65 @@ export default function AnalysisViewer() {
         modeIdx: number,
         factor: number
     ) {
-        const { system, modes, is_kinematic } = data;
-        // Safety check: if no modes exist but system is kinematic, don't crash
+        const { system, modes } = data;
         const mode = modes[modeIdx];
 
-        // A. Draw Members
-        system.members.forEach(member => {
-            const startNode = system.nodes.find(n => n.id === member.startNodeId);
-            const endNode = system.nodes.find(n => n.id === member.endNodeId);
-            if (!startNode || !endNode) return;
-
-            // Calculate Deformed Positions
-            const dStart = getDisplacement(startNode.id, mode, factor);
-            const dEnd = getDisplacement(endNode.id, mode, factor);
-
-            const x1 = startNode.position.x + dStart.x;
-            const y1 = startNode.position.y + dStart.y;
-            const x2 = endNode.position.x + dEnd.x;
-            const y2 = endNode.position.y + dEnd.y;
-
-            // 1. Draw Original (Ghost) State - Light Grey
-            ctx.beginPath();
-            ctx.moveTo(startNode.position.x, startNode.position.y);
-            ctx.lineTo(endNode.position.x, endNode.position.y);
-            ctx.strokeStyle = '#e2e8f0';
-            ctx.lineWidth = 0.05; // 5cm visual width
-            ctx.lineCap = 'round';
-            ctx.stroke();
-
-            // 2. Draw Deformed State - Color Coded
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.strokeStyle = is_kinematic ? '#ef4444' : '#22c55e'; // Red = Mechanism, Green = Stable
-            ctx.lineWidth = 0.08;
-            ctx.stroke();
-
-            // 3. Draw Releases (Hinges)
-            drawRelease(ctx, x1, y1, x2, y2, member.releases.start.mz);
-            drawRelease(ctx, x2, y2, x1, y1, member.releases.end.mz);
+        // 1. Create "Deformed" Nodes List
+        // We map the original nodes to new positions based on the animation factor
+        const deformedNodes = system.nodes.map(node => {
+            const d = getDisplacement(node.id, mode, factor);
+            return {
+                ...node,
+                position: { x: node.position.x + d.x, y: node.position.y + d.y }
+            };
         });
 
-        // B. Draw Nodes & Supports
-        system.nodes.forEach(node => {
-            const disp = getDisplacement(node.id, mode, factor);
-            const x = node.position.x + disp.x;
-            const y = node.position.y + disp.y;
+        // 2. Analyze Node States (for correct connection corners/hinges)
+        // We must pass the original members but the DEFORMED nodes
+        const nodeStates = NodeRenderer.analyzeNodeStates(deformedNodes, system.members);
 
-            ctx.save();
-            ctx.translate(x, y);
+        // 3. Draw Rigid Connections (The nice corners)
+        NodeRenderer.drawRigidConnections(ctx, deformedNodes, system.members, view.current, nodeStates);
 
-            // Draw Support Symbol if fixed
-            if (node.supports.fixX || node.supports.fixY) {
-                drawSupport(ctx, node);
+        // 4. Draw Members
+        system.members.forEach(member => {
+            const startNode = deformedNodes.find(n => n.id === member.startNodeId);
+            const endNode = deformedNodes.find(n => n.id === member.endNodeId);
+
+            if (startNode && endNode) {
+                // Use the fancy drawMember from RenderUtils
+                // It handles releases, offsets, and global hinges automatically
+                RenderUtils.drawMember(
+                    ctx,
+                    startNode,
+                    endNode,
+                    member,
+                    view.current,
+                    nodeStates.get(startNode.id),
+                    nodeStates.get(endNode.id)
+                );
             }
+        });
 
-            // Draw Node Dot
-            ctx.beginPath();
-            ctx.arc(0, 0, 0.1, 0, 2 * Math.PI); // 10cm radius
-            ctx.fillStyle = '#1e293b';
-            ctx.fill();
-            ctx.restore();
+        // 5. Draw Nodes & Supports
+        deformedNodes.forEach(node => {
+            // Check if connected (to decide if we hide the dot for rigid corners)
+            const isConnected = system.members.some(m => m.startNodeId === node.id || m.endNodeId === node.id);
+            const state = nodeStates.get(node.id);
+
+            // Use the fancy drawNodeSymbol
+            // We pass 'false' for isHovered since we aren't interacting here
+            NodeRenderer.drawNodeSymbol(
+                ctx,
+                node,
+                view.current,
+                false, // isHovered
+                state,
+                isConnected
+            );
         });
     }
+
 
     function getDisplacement(nodeId: string, mode: KinematicMode | undefined, factor: number) {
         if (!mode || !mode.velocities || !mode.velocities[nodeId]) {
@@ -272,7 +285,15 @@ export default function AnalysisViewer() {
     };
 
     const resetView = () => {
-        view.current = { x: 0, y: 0, zoom: 40.0 };
+        view.current = {
+            zoom: 50, // 50 pixels = 1 meter
+            pan: { x: 400, y: 400 }, // Initial center offset
+            gridSize: 1.0,
+            width: 0,
+            height: 0,
+            x: 0,
+            y: 0
+        }
     };
 
 

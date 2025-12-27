@@ -3,7 +3,7 @@ import type { InteractionState, ToolType, ViewportState } from '~/types/app';
 
 export type AppMode = 'EDITOR' | 'ANALYSIS';
 
-// --- EDITOR SLICE ---
+// --- EDITOR TYPES ---
 export interface EditorState {
     nodes: Node[];
     members: Member[];
@@ -26,7 +26,7 @@ export interface EditorActions {
     setHoveredNode: (id: string | null) => void;
 }
 
-// --- ANALYSIS SLICE ---
+// --- ANALYSIS TYPES ---
 export interface AnalysisState {
     kinematicResult: KinematicResult | null;
 }
@@ -45,6 +45,8 @@ export interface SharedActions {
     setMode: (mode: AppMode) => void;
 }
 
+// --- THE BIG MERGE ---
+// This is the key part: "actions" contains the union of all action types
 export interface AppStore extends EditorState, AnalysisState, SharedState {
     actions: EditorActions & AnalysisActions & SharedActions;
 }

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { InteractionState, ToolType, ViewportState } from '~/types/app';
-import type { Load, Member, Vec2, Node, AnalysisResult } from '~/types/model';
+import type { Load, Member, Vec2, Node, KinematicResult } from '~/types/model';
 
 export type AppMode = 'EDITOR' | 'ANALYSIS';
 
@@ -47,12 +47,13 @@ interface AppState {
     interaction: InteractionState;
 
     // API 
-    analysisResult: AnalysisResult | null;
+    kinematicResult: KinematicResult | null;
 
     // Actions
     actions: {
         setMode: (mode: AppMode) => void;
 
+        // EDITOR
         // Model Actions
         addNode: (pos: Vec2, supports?: Partial<Node['supports']>) => void;
         addMember: (startNodeId: string, endNodeId: string) => void;
@@ -67,9 +68,9 @@ interface AppState {
         setInteraction: (inter: Partial<InteractionState>) => void;
         setHoveredNode: (id: string | null) => void;
 
+        ///// ANALYSIATON
         analyzeSystem: (name: string) => Promise<void>;
-        setAnalysisResult: (result: AnalysisResult | null) => void;
-
+        setKinematicResult: (result: KinematicResult | null) => void;
     };
 }
 
@@ -85,7 +86,7 @@ export const useStore = create<AppState>((set, get) => ({
     viewport: DEFAULT_VIEWPORT,
     interaction: DEFAULT_INTERACTION,
 
-    analysisResult: null,
+    kinematicResult: null,
 
     actions: {
         addNode: (pos, supports) => {
@@ -198,7 +199,7 @@ export const useStore = create<AppState>((set, get) => ({
             };
 
             try {
-                const response = await fetch('http://localhost:5000/analyze/save', {
+                const response = await fetch('api/analyze/kinematics', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -219,7 +220,7 @@ export const useStore = create<AppState>((set, get) => ({
         },
 
         setMode: (mode) => set({ mode }),
-        setAnalysisResult: (result) => set({ analysisResult: result }),
+        setKinematicResult: (result) => set({ kinematicResult: result }),
     }
 }));
 3

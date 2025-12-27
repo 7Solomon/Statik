@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { X, Play, Loader2, CheckCircle, AlertTriangle, Activity } from "lucide-react";
 import { useStore } from "~/store/useStore";
-import type { AnalysisResult } from "~/types/model";
+import type { KinematicResult } from "~/types/model";
 
 interface AnalyzeSystemModalProps {
     onClose: () => void;
-    onAnalysisComplete: (result: AnalysisResult) => void;
+    onAnalysisComplete: (result: KinematicResult) => void;
 }
 
 export function AnalyzeSystemModal({ onClose, onAnalysisComplete }: AnalyzeSystemModalProps) {
@@ -13,12 +13,12 @@ export function AnalyzeSystemModal({ onClose, onAnalysisComplete }: AnalyzeSyste
     const nodes = useStore(s => s.nodes);
     const members = useStore(s => s.members);
     const loads = useStore(s => s.loads);
-    const setAnalysisResult = useStore(s => s.actions.setAnalysisResult);
+    const setKinematicResult = useStore(s => s.actions.setKinematicResult);
 
     // 2. Local State
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [result, setResult] = useState<AnalysisResult | null>(null);
+    const [result, setResult] = useState<KinematicResult | null>(null);
 
     // 3. The Analyze Function
     const handleRunAnalysis = async () => {
@@ -34,10 +34,10 @@ export function AnalyzeSystemModal({ onClose, onAnalysisComplete }: AnalyzeSyste
                 loads
             };
 
-            const response = await fetch('http://localhost:8000/analyze/system', {
+            const response = await fetch('api/analyze/kinematics', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload) // Flask uses request.get_json(force=True)
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -45,11 +45,11 @@ export function AnalyzeSystemModal({ onClose, onAnalysisComplete }: AnalyzeSyste
                 throw new Error(errData.details || "Analysis failed");
             }
 
-            const data: AnalysisResult = await response.json();
-
+            const data: KinematicResult = await response.json();
+            console.log(data)
             // Success!
             setResult(data);
-            setAnalysisResult(data); // Save to global store for visualization
+            setKinematicResult(data); // Save to global store for visualization
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Failed to connect to analysis server.");

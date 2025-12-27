@@ -79,9 +79,26 @@ export interface Load {
 }
 
 
-export interface AnalysisResult {
+export interface KinematicMode {
+  index: number;
+  velocities: Record<string, number[]>;
+  member_poles: Record<string, number[] | null>;
+  rigid_bodies: any[];
+}
+
+export interface SystemData {
+  nodes: Node[];
+  members: Member[];
+  loads: any[];
+}
+
+
+export interface KinematicResult {
   is_kinematic: boolean;
   dof: number;
-  modes: any[];
-  system: any;
+  modes: KinematicMode[];
+  system: SystemData;
+
 }
+
+

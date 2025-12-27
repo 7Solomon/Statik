@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '~/store/useStore';
 import { ChevronLeft, Trash2, ArrowDown, RotateCw, Waves } from 'lucide-react';
 import type { Load } from '~/types/model';
 
-// --- Shared Helper Components ---
+// --- HELPERS ---
 
 const EditorHeader = ({ title, type, icon, onDelete, onBack }: any) => (
     <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white sticky top-0 z-10">
@@ -45,30 +45,45 @@ const NumberInput = ({ label, value, onChange, unit, step = 1, min, max }: any) 
     </div>
 );
 
-const RangeInput = ({ label, value, onChange }: any) => (
-    <div className="space-y-2">
-        <div className="flex justify-between items-center">
-            <label className="text-xs font-bold text-slate-400 uppercase">{label}</label>
-            <span className="text-xs font-mono text-slate-600">{(value * 100).toFixed(0)}%</span>
+// --- IMPROVED RATIO INPUT ---
+// Uses direct props to ensure fast updates
+const RatioInput = ({ label, value, onChange }: { label: string, value: number, onChange: (v: number) => void }) => {
+
+    // Internal handler to prevent NaN and ensure clamping
+    const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val)) onChange(val);
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between items-center text-xs">
+                <label className="font-bold text-slate-400 uppercase">{label}</label>
+                <span className="font-mono text-slate-600">{(value * 100).toFixed(0)}%</span>
+            </div>
+            <div className="flex gap-2 items-center">
+                <input
+                    type="range"
+                    min={0} max={1} step={0.01}
+                    value={value || 0}
+                    onChange={handleSliderChange}
+                    className="flex-1 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+            </div>
         </div>
-        <input
-            type="range"
-            min={0} max={1} step={0.01}
-            value={value}
-            onChange={(e) => onChange(parseFloat(e.target.value))}
-            className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-        />
-    </div>
-);
+    );
+};
 
 // --- MAIN COMPONENT ---
 
 export const LoadEditor = ({ loadId }: { loadId: string }) => {
+    // 1. Selector: Only re-render if the specific load changes
     const load = useStore(s => s.loads.find(l => l.id === loadId));
     const actions = useStore(s => s.actions);
 
     if (!load) return null;
 
+    // 2. Direct Action Call (Fastest way to update store)
     const updateLoad = (data: Partial<Load>) => {
         actions.updateLoad(loadId, data);
     };
@@ -94,14 +109,16 @@ export const LoadEditor = ({ loadId }: { loadId: string }) => {
                 type={typeLabel}
                 icon={icon}
                 onBack={() => actions.setInteraction({ selectedId: null, selectedType: null })}
-            //onDelete={() => {
-
-            //}}
+                onDelete={() => {
+                    // Temporary delete logic
+                    useStore.setState(s => ({ loads: s.loads.filter(l => l.id !== loadId) }));
+                    actions.setInteraction({ selectedId: null, selectedType: null });
+                }}
             />
 
             <div className="p-4 space-y-6 overflow-y-auto">
 
-                {/* 1. MAGNITUDE */}
+                {/* MAGNITUDE */}
                 <div className="space-y-3">
                     <label className="text-xs font-bold text-slate-400 uppercase">Magnitude</label>
                     <NumberInput
@@ -110,7 +127,6 @@ export const LoadEditor = ({ loadId }: { loadId: string }) => {
                         onChange={(v: number) => updateLoad({ value: v })}
                         unit={unit}
                     />
-
                     {/* For trapezoidal loads */}
                     {load.type === 'DISTRIBUTED' && load.startValue !== undefined && (
                         <NumberInput
@@ -124,11 +140,11 @@ export const LoadEditor = ({ loadId }: { loadId: string }) => {
 
                 <div className="h-px bg-slate-100" />
 
-                {/* 2. GEOMETRY / POSITION */}
+                {/* GEOMETRY / POSITION */}
                 <div className="space-y-4">
                     <label className="text-xs font-bold text-slate-400 uppercase">Position & Geometry</label>
 
-                    {/* ANGLE (Point Loads Only) */}
+                    {/* ANGLE */}
                     {load.type === 'POINT' && (
                         <NumberInput
                             label="Angle"
@@ -139,33 +155,33 @@ export const LoadEditor = ({ loadId }: { loadId: string }) => {
                         />
                     )}
 
-                    {/* RATIO (Point on Member Only) */}
+                    {/* RATIO - SLIDER */}
                     {load.scope === 'MEMBER' && load.type === 'POINT' && (
-                        <RangeInput
+                        <RatioInput
                             label="Position along Beam"
-                            value={load.ratio}
+                            value={load.ratio || 0}
                             onChange={(v: number) => updateLoad({ ratio: v })}
                         />
                     )}
 
-                    {/* DISTRIBUTED RANGE */}
+                    {/* DISTRIBUTED RANGE - SLIDERS */}
                     {load.scope === 'MEMBER' && load.type === 'DISTRIBUTED' && (
                         <>
-                            <RangeInput
+                            <RatioInput
                                 label="Start Position"
-                                value={load.startRatio}
+                                value={load.startRatio || 0}
                                 onChange={(v: number) => updateLoad({ startRatio: v })}
                             />
-                            <RangeInput
+                            <RatioInput
                                 label="End Position"
-                                value={load.endRatio}
+                                value={load.endRatio || 1}
                                 onChange={(v: number) => updateLoad({ endRatio: v })}
                             />
                         </>
                     )}
                 </div>
 
-                {/* 3. INFO */}
+                {/* INFO */}
                 <div className="p-3 bg-slate-50 rounded text-xs text-slate-500">
                     <p>Attached to: <span className="font-mono font-bold text-slate-700">
                         {load.scope === 'NODE' ? 'Node' : 'Member'}

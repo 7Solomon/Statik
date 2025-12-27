@@ -16,10 +16,12 @@ export interface EditorActions {
     addNode: (pos: Vec2, supports?: Partial<Node['supports']>) => void;
     addMember: (startNodeId: string, endNodeId: string) => void;
     addHingeAtNode: (nodeId: string, releases: Partial<Release>) => void;
+    addLoad: (data: Omit<Load, 'id'>) => void;
     removeNode: (id: string) => void;
-    selectObject: (id: string | null, type: 'node' | 'member' | null) => void;
+    selectObject: (id: string | null, type: 'node' | 'member' | 'load' | null) => void;
     updateNode: (id: string, data: Partial<Node>) => void;
     updateMember: (id: string, data: Partial<Member>) => void;
+    updateLoad: (id: string, data: Partial<Load>) => void;
     setTool: (tool: ToolType) => void;
     setViewport: (view: Partial<ViewportState>) => void;
     setInteraction: (inter: Partial<InteractionState>) => void;
@@ -45,8 +47,6 @@ export interface SharedActions {
     setMode: (mode: AppMode) => void;
 }
 
-// --- THE BIG MERGE ---
-// This is the key part: "actions" contains the union of all action types
 export interface AppStore extends EditorState, AnalysisState, SharedState {
     actions: EditorActions & AnalysisActions & SharedActions;
 }

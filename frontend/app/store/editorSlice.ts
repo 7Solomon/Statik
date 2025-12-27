@@ -1,14 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { InteractionState, ViewportState } from '~/types/app';
-import type { Node } from '~/types/model';
+import type { Node, Member, Load } from '~/types/model';
 import type { AppStore, EditorState, EditorActions } from './types';
 import type { StateCreator } from 'zustand';
-import type { Member } from '~/types/model';
 
 // Constants
 const DEFAULT_VIEWPORT: ViewportState = {
-    zoom: 50, // 50 pixels = 1 meter
-    pan: { x: 400, y: 400 }, // Initial center offset
+    zoom: 50,
+    pan: { x: 400, y: 400 },
     gridSize: 1.0,
     width: 0,
     height: 0,
@@ -29,9 +28,9 @@ const DEFAULT_INTERACTION: InteractionState = {
 };
 
 const DEFAULT_MEMBER_PROPS = {
-    E: 210e9, // Steel (Pa)
-    A: 0.005, // Area (m2)
-    I: 0.0001, // Moment of Inertia (m4)
+    E: 210e9,
+    A: 0.005,
+    I: 0.0001,
 };
 
 const DEFAULT_RELEASES = {
@@ -60,15 +59,14 @@ export const createEditorSlice: StateCreator<
                     fixX: false,
                     fixY: false,
                     fixM: false,
-                    ...supports // Merge custom supports (e.g., if tool is 'support_fixed')
+                    ...supports
                 },
             };
             set((state) => ({ nodes: [...state.nodes, newNode] }));
-            return newNode.id; // Return ID in case we need to link it immediately
+            return newNode.id;
         },
 
         addMember: (startNodeId, endNodeId) => {
-            // Prevent duplicate members and self-loops
             if (startNodeId === endNodeId) return;
 
             const exists = get().members.some(m =>
@@ -89,6 +87,7 @@ export const createEditorSlice: StateCreator<
             };
             set((state) => ({ members: [...state.members, newMember] }));
         },
+
         addHingeAtNode: (nodeId, releaseConfig) => {
             set((state) => ({
                 members: state.members.map((member) => {
@@ -98,13 +97,10 @@ export const createEditorSlice: StateCreator<
                     };
                     let modified = false;
 
-                    // If member starts at this node, merge the release config
                     if (member.startNodeId === nodeId) {
                         newReleases.start = { ...newReleases.start, ...releaseConfig };
                         modified = true;
                     }
-
-                    // If member ends at this node, merge the release config
                     if (member.endNodeId === nodeId) {
                         newReleases.end = { ...newReleases.end, ...releaseConfig };
                         modified = true;
@@ -114,14 +110,31 @@ export const createEditorSlice: StateCreator<
                 })
             }));
         },
+
+        addLoad: (load) => {
+            set((state) => ({ loads: [...state.loads, load] }));
+        },
+
+        // --- UPDATED REMOVE NODE ---
         removeNode: (id) => {
-            set((state) => ({
-                nodes: state.nodes.filter(n => n.id !== id),
-                // Cascade delete: remove connected members
-                members: state.members.filter(m => m.startNodeId !== id && m.endNodeId !== id),
-                // Cascade delete: remove loads on this node
-                loads: state.loads.filter(l => !(l.target === 'node' && l.targetId === id))
-            }));
+            set((state) => {
+                const connectedMembers = state.members.filter(m => m.startNodeId === id || m.endNodeId === id);
+                const connectedMemberIds = connectedMembers.map(m => m.id);
+
+                return {
+                    nodes: state.nodes.filter(n => n.id !== id),
+                    members: state.members.filter(m => !connectedMemberIds.includes(m.id)),
+                    loads: state.loads.filter(l => {
+                        // 1. Check if it's on this Node
+                        if (l.scope === 'NODE' && l.nodeId === id) return false;
+
+                        // 2. Check if it's on a Deleted Member
+                        if (l.scope === 'MEMBER' && connectedMemberIds.includes(l.memberId)) return false;
+
+                        return true;
+                    })
+                };
+            });
         },
 
         setTool: (tool) => {
@@ -129,41 +142,38 @@ export const createEditorSlice: StateCreator<
                 interaction: { ...state.interaction, activeTool: tool }
             }));
         },
-
         setViewport: (view) => {
             set((state) => ({
                 viewport: { ...state.viewport, ...view }
             }));
         },
-
         setInteraction: (inter) => {
             set((state) => ({
                 interaction: { ...state.interaction, ...inter }
             }));
         },
-
         setHoveredNode: (id) => {
-            // Only update if changed to prevent thrashing
             if (get().interaction.hoveredNodeId !== id) {
                 set((state) => ({
                     interaction: { ...state.interaction, hoveredNodeId: id }
                 }));
             }
         },
-        selectObject: (id: string | null, type: 'node' | 'member' | null) => {
-            set(state => ({
-                interaction: { ...state.interaction, selectedId: id, selectedType: type }
-            }));
-        },
-        updateNode: (id: string, data: Partial<Node>) => {
-            set(state => ({
-                nodes: state.nodes.map(n => n.id === id ? { ...n, ...data } : n)
-            }));
-        },
-        updateMember: (id: string, data: Partial<Member>) => {
-            set(state => ({
-                members: state.members.map(m => m.id === id ? { ...m, ...data } : m)
-            }));
-        },
+        selectObject: (id, type) => set(s => ({ interaction: { ...s.interaction, selectedId: id, selectedType: type } })),
+
+        updateNode: (id, data) => set(s => ({
+            nodes: s.nodes.map(n => n.id === id ? { ...n, ...data } : n)
+        })),
+
+        updateMember: (id, data) => set(s => ({
+            members: s.members.map(m => m.id === id ? { ...m, ...data } : m)
+        })),
+
+        updateLoad: (id, data) => set(s => ({
+            loads: s.loads.map(l => {
+                if (l.id !== id) return l;
+                return { ...l, ...data } as Load;
+            })
+        })),
     }
 });

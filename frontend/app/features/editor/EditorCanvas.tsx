@@ -13,6 +13,7 @@ const EditorCanvas: React.FC = () => {
     // Connect Data (Store)
     const nodes = useStore((state) => state.nodes);
     const members = useStore((state) => state.members);
+    const loads = useStore((state) => state.loads)
     const interaction = useStore((state) => state.interaction);
     const viewport = useStore((state) => state.viewport);
     // const actions = useStore((state) => state.actions); // Not strictly needed here if handled in logic
@@ -45,6 +46,7 @@ const EditorCanvas: React.FC = () => {
                     canvas,
                     useStore.getState().nodes,
                     useStore.getState().members,
+                    useStore.getState().loads,
                     useStore.getState().viewport,
                     useStore.getState().interaction
                 );
@@ -91,7 +93,7 @@ const EditorCanvas: React.FC = () => {
         if (!ctx) return;
 
         requestAnimationFrame(() => {
-            Renderer.render(ctx, canvas, nodes, members, viewport, interaction);
+            Renderer.render(ctx, canvas, nodes, members, loads, viewport, interaction);
         });
 
     }, [nodes, members, viewport, interaction]);
@@ -113,7 +115,7 @@ const EditorCanvas: React.FC = () => {
             <div className="absolute bottom-4 left-4 bg-white/90 p-2 rounded shadow text-xs font-mono text-slate-600 pointer-events-none select-none z-10">
                 <div>Pos: {interaction.mousePos.x.toFixed(2)}, {interaction.mousePos.y.toFixed(2)} m</div>
                 <div>Zoom: {viewport.zoom.toFixed(1)} px/m</div>
-                <div>Nodes: {nodes.length} | Members: {members.length}</div>
+                <div>Nodes: {nodes.length} | Members: {members.length} | Loads {loads.length}</div>
             </div>
         </div>
     );

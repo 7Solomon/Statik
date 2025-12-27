@@ -50,33 +50,45 @@ export interface Member {
   };
 }
 
-export interface Load {
+
+export type LoadType = 'POINT' | 'MOMENT' | 'DISTRIBUTED';
+export type LoadScope = 'NODE' | 'MEMBER';
+
+interface BaseLoad {
   id: string;
-
-  // What is this load applied to?
-  target: 'node' | 'member';
-  targetId: string;
-
-  type: 'point_force' | 'distributed_force' | 'moment';
-
-  // Values
-  // For distributed: [startValue, endValue]
-  // For point/moment: [value]
-  values: number[];
-
-  // Position along member (0.0 to 1.0)
-  // Only relevant for member loads
-  t_start?: number;
-  t_end?: number;
-
-  // Coordinate System for the load direction
-  // global: x=horizontal, y=vertical (Gravity)
-  // local: x=along member, y=perpendicular (Wind/Pressure)
-  system: 'global' | 'local';
-
-  // The angle of the load vector relative to the chosen system
-  angle: number;
+  value: number;
+  isGlobal?: boolean;
 }
+
+export interface NodeLoad extends BaseLoad {
+  scope: 'NODE';
+  nodeId: string;
+  type: 'POINT' | 'MOMENT';
+  angle?: number;
+}
+
+// 2. Point Load on a Member
+export interface MemberPointLoad extends BaseLoad {
+  scope: 'MEMBER';
+  type: 'POINT';
+  memberId: string;
+  ratio: number;              // 0.0 to 1.0 (Required)
+  angle?: number;
+}
+
+// 3. Distributed Load on a Member
+export interface MemberDistLoad extends BaseLoad {
+  scope: 'MEMBER';
+  type: 'DISTRIBUTED';
+  memberId: string;
+  startRatio: number;         // Required
+  endRatio: number;           // Required
+  startValue?: number;        // Optional for trapezoids
+  endValue?: number;
+}
+
+export type Load = NodeLoad | MemberPointLoad | MemberDistLoad;
+
 
 
 export interface KinematicMode {

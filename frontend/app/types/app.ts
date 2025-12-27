@@ -5,6 +5,7 @@ export type ToolType =
     | 'node'
     | 'member'
     | 'hinge'
+    | 'load'
 
 export type HingeType =
     | 'vollgelenk'
@@ -20,6 +21,11 @@ export type SupportType =
     | 'feder'
     | 'torsionsfeder';
 
+export type LoadType =
+    | 'point'
+    | 'moment'
+    | 'distributed';
+
 
 export interface ViewportState {
     width: number;
@@ -33,7 +39,7 @@ export interface ViewportState {
 
 export interface InteractionState {
     activeTool: ToolType;
-    activeSubTypeTool: HingeType | SupportType | null
+    activeSubTypeTool: HingeType | SupportType | LoadType | null
     isDragging: boolean;
 
     // Hover state for snapping
@@ -47,5 +53,5 @@ export interface InteractionState {
     mousePos: Vec2;
 
     selectedId: string | null;
-    selectedType: 'node' | 'member' | null;
+    selectedType: 'node' | 'member' | 'load' | null;
 }

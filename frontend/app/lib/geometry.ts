@@ -70,3 +70,17 @@ export function pDistance(x: number, y: number, x1: number, y1: number, x2: numb
     var dy = y - yy;
     return Math.sqrt(dx * dx + dy * dy);
 }
+
+export const projectPointToSegment = (p: { x: number, y: number }, a: { x: number, y: number }, b: { x: number, y: number }) => {
+    const pax = p.x - a.x;
+    const pay = p.y - a.y;
+    const bax = b.x - a.x;
+    const bay = b.y - a.y;
+    const h = Math.min(1, Math.max(0, (pax * bax + pay * bay) / (bax * bax + bay * bay)));
+    return {
+        t: h,
+        x: a.x + h * bax,
+        y: a.y + h * bay,
+        dist: Math.hypot(p.x - (a.x + h * bax), p.y - (a.y + h * bay))
+    };
+};

@@ -1,7 +1,8 @@
 import type { InteractionState, ViewportState } from '~/types/app';
-import type { Member, Node, Vec2 } from '~/types/model';
+import type { Load, Member, Node, Vec2 } from '~/types/model';
 import { RenderUtils } from './RenderUtils';
 import { NodeRenderer } from './NodeRenderer';
+import { ForceRenderer } from './ForceRenderer';
 
 export class Renderer {
     static render(
@@ -9,6 +10,7 @@ export class Renderer {
         canvas: HTMLCanvasElement,
         nodes: Node[],
         members: Member[],
+        loads: Load[],
         viewport: ViewportState,
         interaction: InteractionState
     ) {
@@ -38,6 +40,10 @@ export class Renderer {
                     nodeStates.get(endNode.id)
                 );
             }
+        });
+
+        loads.forEach(load => {
+            ForceRenderer.draw(ctx, load, viewport, nodes, members);
         });
 
         // 6. Ghost Member

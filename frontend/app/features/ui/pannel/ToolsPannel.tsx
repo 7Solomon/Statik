@@ -1,9 +1,9 @@
 import React from 'react';
-import { MousePointer2, Circle, Route, Square, Hand } from 'lucide-react';
+import { MousePointer2, Circle, Route, Square, ArrowDown, RotateCw, Waves } from 'lucide-react';
 import { useStore } from '~/store/useStore';
 import supportLibraryRaw from '~/assets/support_symbols.json';
 import hingeLibraryRaw from '~/assets/hinge_symbols.json';
-import type { ToolType, SupportType, HingeType } from '~/types/app';
+import type { ToolType, SupportType, HingeType, LoadType } from '~/types/app';
 
 // Merge symbol libraries
 const UI_SYMBOL_LIBRARY = {
@@ -15,7 +15,7 @@ const UI_SYMBOL_LIBRARY = {
 type ToolItemConfig = {
     label: string;
     tool: ToolType;
-    subType: SupportType | HingeType | null;
+    subType: SupportType | HingeType | LoadType | null;
     icon?: React.ReactNode;
     symbolKey?: string;
     description?: string;
@@ -72,7 +72,33 @@ const TOOL_GROUPS: ToolGroupConfig[] = [
             { label: 'Normalkraft', tool: 'hinge', subType: 'normalkraftgelenk', symbolKey: 'NORMALKRAFTGELENK' },
             { label: 'Rigid Reset', tool: 'hinge', subType: 'biegesteife_ecke', icon: <Square size={18} className="text-slate-400 fill-slate-200" /> },
         ]
-    }
+    },
+    {
+        title: "Loads",
+        items: [
+            {
+                label: 'Point Load',
+                tool: 'load',
+                subType: 'point',
+                icon: <ArrowDown size={20} />,
+                description: "Force on a Node (10kN)"
+            },
+            {
+                label: 'Moment',
+                tool: 'load',
+                subType: 'moment',
+                icon: <RotateCw size={20} />,
+                description: "Moment on a Node (10kNm)"
+            },
+            {
+                label: 'Dist. Load',
+                tool: 'load',
+                subType: 'distributed',
+                icon: <Waves size={20} />,
+                description: "Line load on Member (5kN/m)"
+            },
+        ]
+    },
 ];
 
 export const ToolsPanel = () => {

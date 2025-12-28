@@ -31,8 +31,10 @@ export const createAnalysisSlice: StateCreator<
         viewMode: 'KINEMATIC',
         viewport: DEFAULT_VIEWPORT_ANALYSIS,
         interaction: DEFAULT_INTERACTION_ANALYSIS,
+
         kinematicResult: null,
         simplifyResult: null,
+        solutionResult: null,
 
         // 2. ACTIONS
         actions: {
@@ -64,6 +66,12 @@ export const createAnalysisSlice: StateCreator<
                     analysis: { ...state.analysis, simplifyResult: result }
                 }));
             },
+            setSolutionResult: (result) => {
+                set((state) => ({
+                    analysis: { ...state.analysis, solutionResult: result }
+                }));
+            },
+
             setViewMode: (mode) => {
                 set((state) => ({
                     analysis: { ...state.analysis, viewMode: mode }

@@ -20,21 +20,26 @@ export default function Home() {
   const setAppMode = useStore(state => state.shared.actions.setMode);
   const setKinematicResult = useStore(state => state.analysis.actions.setKinematicResult);
   const setSimplifyResult = useStore(state => state.analysis.actions.setSimplifyResult);
+  const setSolutionResult = useStore(state => state.analysis.actions.setSolutionResult);
   const setViewMode = useStore(state => state.analysis.actions.setViewMode);
 
   // Modal States
   const [modalOpen, setModalOpen] = useState<'save' | 'load' | 'analyze' | null>(null);
 
-  const handleAnalysisComplete = (result: any) => {
+  const handleAnalysisComplete = (result: any, type: any) => {
 
     setAppMode('ANALYSIS');
 
-    if (result && result.modes && Array.isArray(result.modes)) {
+    if (type === 'KINEMATIC') {
       setKinematicResult(result);
       setViewMode('KINEMATIC');
-    } else {
+    } else if (type === 'SIMPLIFIED') {
       setSimplifyResult(result);
       setViewMode('SIMPLIFIED');
+    } else if (type === 'SOLUTION') {
+      setSolutionResult(result);
+      setViewMode('SOLUTION');
+
     }
 
     setModalOpen(null);

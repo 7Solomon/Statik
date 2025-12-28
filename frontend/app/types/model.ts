@@ -114,3 +114,34 @@ export interface KinematicResult {
 }
 
 
+///////////////////////
+///////////////////////
+///////////////////////
+///////////////////////
+
+export interface StationResult {
+  x: number;      // Distance from start node (in meters)
+  N: number;      // Axial Force
+  V: number;      // Shear Force
+  M: number;      // Bending Moment
+}
+
+export interface MemberResult {
+  memberId: string;
+  stations: StationResult[]; // Array of values along the beam
+  maxM: number; // Helpers for auto-scaling visualization
+  minM: number;
+  maxN: number;
+  minN: number;
+  maxV: number;
+  minV: number;
+
+}
+
+export interface FEMResult {
+  success: boolean;
+  system: StructuralSystem;
+  displacements: Record<string, [number, number, number]>; // NodeId -> [dx, dy, rot]
+  reactions: Record<string, [number, number, number]>;     // NodeId -> [Rx, Ry, Mz]
+  memberResults: Record<string, MemberResult>;             // MemberId -> Result
+}

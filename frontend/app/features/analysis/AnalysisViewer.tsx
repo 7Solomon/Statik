@@ -2,6 +2,7 @@ import { useStore } from '~/store/useStore';
 import { Layers, GitMerge } from 'lucide-react';
 import SimplifiedViewer from './SimplifiedViewer';
 import KinematicViewer from './KinematicsViewer';
+import SolutionViewer from './SolutionViewer';
 
 export default function AnalysisViewer() {
     // 1. Get the current view mode from your store
@@ -11,6 +12,7 @@ export default function AnalysisViewer() {
     // 2. Check which results are available (to disable buttons if needed)
     const hasKinematic = useStore(s => !!s.analysis.kinematicResult);
     const hasSimplified = useStore(s => !!s.analysis.simplifyResult);
+    const hasSolution = useStore(s => !!s.analysis.solutionResult);
 
     return (
         <div className="relative w-full h-full">
@@ -18,6 +20,8 @@ export default function AnalysisViewer() {
             {/* 3. Render the correct sub-viewer */}
             {viewMode === 'KINEMATIC' && <KinematicViewer />}
             {viewMode === 'SIMPLIFIED' && <SimplifiedViewer />}
+            {viewMode === 'SOLUTION' && <SolutionViewer />}
+
 
             {/* 4. Tab Switcher Overlay */}
             {(hasKinematic || hasSimplified) && (
@@ -54,6 +58,24 @@ export default function AnalysisViewer() {
                         <GitMerge size={14} />
                         <span>Simplified</span>
                     </button>
+
+                    <div className="w-px bg-slate-200 my-1"></div>
+
+                    {/* Kinematic Tab */}
+                    <button
+                        onClick={() => setViewMode('SOLUTION')}
+                        disabled={!hasSolution}
+                        className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all
+                            ${viewMode === 'SOLUTION'
+                                ? 'bg-blue-50 text-blue-700 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
+                            ${!hasKinematic ? 'opacity-50 cursor-not-allowed' : ''}
+                        `}
+                    >
+                        <Layers size={14} />
+                        <span>Kinematic</span>
+                    </button>
+
                 </div>
             )}
         </div>

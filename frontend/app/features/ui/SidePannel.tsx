@@ -7,7 +7,7 @@ import { LoadEditor } from './pannel/LoadEditor';
 export const SidePanel = () => {
     const { selectedId, selectedType } = useStore(s => s.editor.interaction);
     const containerClass = "w-80 h-full border-l border-slate-200 bg-white flex flex-col shadow-xl z-10 shrink-0 relative";
-    console.log(selectedType)
+
     // 1. If Node Selected -> Show Node Editor
     if (selectedId && selectedType === 'node') {
         return (

@@ -1,8 +1,8 @@
-import type { Load, Member, Node, KinematicResult, Release, Vec2, StructuralSystem } from '~/types/model';
+import type { Load, Member, Node, KinematicResult, Release, Vec2, StructuralSystem, FEMResult } from '~/types/model';
 import type { AnalysisInteractionState, EditorInteractionState, ToolType, ViewportState } from '~/types/app';
 
 export type AppMode = 'EDITOR' | 'ANALYSIS';
-export type AnalysisViewMode = 'KINEMATIC' | 'SIMPLIFIED'
+export type AnalysisViewMode = 'KINEMATIC' | 'SIMPLIFIED' | 'SOLUTION'
 
 // --- EDITOR DOMAIN ---
 export interface EditorState {
@@ -37,17 +37,21 @@ export interface AnalysisState {
     viewMode: AnalysisViewMode;
     viewport: ViewportState;
     interaction: AnalysisInteractionState;
+
     kinematicResult: KinematicResult | null;
     simplifyResult: StructuralSystem | null;
+    solutionResult: FEMResult | null;  // MAYBE ADD A UNION FOR THE SOLTUION SO I CAN PASS MORE THEN FEM
 }
 
 export interface AnalysisActions {
-    setKinematicResult: (result: KinematicResult | null) => void;
-    setSimplifyResult: (result: StructuralSystem | null) => void;
+
     setViewMode: (mode: AnalysisViewMode) => void;
     setViewport: (view: Partial<ViewportState>) => void;
     setInteraction: (inter: Partial<AnalysisInteractionState>) => void;
 
+    setKinematicResult: (result: KinematicResult | null) => void;
+    setSimplifyResult: (result: StructuralSystem | null) => void;
+    setSolutionResult: (result: FEMResult | null) => void;
 }
 
 // --- SHARED DOMAIN ---

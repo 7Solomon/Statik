@@ -189,4 +189,9 @@ export class RenderUtils {
     static hasRelease(r: { fx: boolean, fy: boolean, mz: boolean }): boolean {
         return !!(r.fx || r.fy || r.mz);
     }
+
+    // FOR SIMLIEFIED SOKUTION REDNERER MAYBE USE ALSO IN THE REST
+    static project(pos: Vec2, viewport: ViewportState): Vec2 {
+        return Coords.worldToScreen(pos.x, pos.y, viewport);
+    }
 }

@@ -298,3 +298,78 @@ class KinematicResult:
             "modes": [m.to_dict() for m in self.modes],            
             "system": self.system.to_dict() if hasattr(self.system, 'to_dict') else None 
         }
+    
+
+################################
+##############   FEM   ##########
+################################
+
+@dataclass
+class ElementContext:
+    L: float
+    c: float  # cos(theta)
+    s: float  # sin(theta)
+    T: np.ndarray  # Transformation Matrix (6x6)
+    k_local: np.ndarray # Local Stiffness (6x6)
+    k_global: np.ndarray # Global Stiffness (6x6)
+    f_fixed_local: np.ndarray # Fixed End Forces (Local 6x1)
+
+    
+@dataclass
+class StationResult:
+    x: float
+    N: float
+    V: float
+    M: float
+
+    def to_dict(self):
+        return {
+            "x": float(self.x),
+            "N": float(self.N),
+            "V": float(self.V),
+            "M": float(self.M)
+        }
+
+@dataclass
+class MemberResult:
+    memberId: str
+    stations: List[StationResult]
+    maxM: float
+    minM: float
+    maxV: float
+    minV: float
+    maxN: float
+    minN: float
+
+    def to_dict(self):
+        return {
+            "memberId": self.memberId,
+            "stations": [s.to_dict() for s in self.stations],
+            "maxM": float(self.maxM),
+            "minM": float(self.minM),
+            "maxV": float(self.maxV),
+            "minV": float(self.minV),
+            "maxN": float(self.maxN),
+            "minN": float(self.minN),
+        }
+
+@dataclass
+class FEMResult:
+    success: bool
+    system: StructuralSystem
+    displacements: Dict[str, List[float]] # NodeId -> [dx, dy, rot]
+    reactions: Dict[str, List[float]]     # NodeId -> [Rx, Ry, Mz]
+    memberResults: Dict[str, MemberResult]
+
+    def to_dict(self):
+        # Helper to convert numpy arrays in dict values to list of floats
+        def convert_vec(v):
+            return [float(x) for x in v]
+
+        return {
+            "success": self.success,
+            "system": self.system.to_dict(),
+            "displacements": {k: convert_vec(v) for k, v in self.displacements.items()},
+            "reactions": {k: convert_vec(v) for k, v in self.reactions.items()},
+            "memberResults": {k: v.to_dict() for k, v in self.memberResults.items()}
+        }

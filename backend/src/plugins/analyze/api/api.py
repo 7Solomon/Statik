@@ -1,3 +1,4 @@
+from src.plugins.analyze.fem import calculate_complex_fem
 from src.plugins.analyze.simplify import prune_cantilevers
 from flask import current_app, request, jsonify, Blueprint
 from src.plugins.analyze.kinematics import solve_kinematics
@@ -60,3 +61,18 @@ def simplify():
         return jsonify(simplified_system.to_dict()), 200 
     except Exception as e:
         print(e)
+
+@bp.route("/solution", methods=["POST"])
+def solution():
+    payload = request.get_json(force=True)
+    try:
+        system = StructuralSystem.create(
+            payload.get("nodes", []), 
+            payload.get("members", []),
+            payload.get("loads", [])
+        )
+        fem_solution = calculate_complex_fem(system)
+        return jsonify(fem_solution.to_dict()), 200 
+    except Exception as e:
+        print(e)
+

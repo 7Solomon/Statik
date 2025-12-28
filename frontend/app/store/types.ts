@@ -3,7 +3,7 @@ import type { InteractionState, ToolType, ViewportState } from '~/types/app';
 
 export type AppMode = 'EDITOR' | 'ANALYSIS';
 
-// --- EDITOR TYPES ---
+// --- EDITOR DOMAIN ---
 export interface EditorState {
     nodes: Node[];
     members: Member[];
@@ -13,10 +13,10 @@ export interface EditorState {
 }
 
 export interface EditorActions {
-    addNode: (pos: Vec2, supports?: Partial<Node['supports']>) => void;
+    addNode: (pos: Vec2, supports?: Partial<Node['supports']>) => string;
     addMember: (startNodeId: string, endNodeId: string) => void;
     addHingeAtNode: (nodeId: string, releases: Partial<Release>) => void;
-    addLoad: (data: Omit<Load, 'id'>) => void;
+    addLoad: (data: Load) => void;
     removeNode: (id: string) => void;
     selectObject: (id: string | null, type: 'node' | 'member' | 'load' | null) => void;
     updateNode: (id: string, data: Partial<Node>) => void;
@@ -28,7 +28,7 @@ export interface EditorActions {
     setHoveredNode: (id: string | null) => void;
 }
 
-// --- ANALYSIS TYPES ---
+// --- ANALYSIS DOMAIN ---
 export interface AnalysisState {
     kinematicResult: KinematicResult | null;
 }
@@ -38,7 +38,7 @@ export interface AnalysisActions {
     setKinematicResult: (result: KinematicResult | null) => void;
 }
 
-// --- SHARED TYPES ---
+// --- SHARED DOMAIN ---
 export interface SharedState {
     mode: AppMode;
 }
@@ -47,6 +47,9 @@ export interface SharedActions {
     setMode: (mode: AppMode) => void;
 }
 
-export interface AppStore extends EditorState, AnalysisState, SharedState {
-    actions: EditorActions & AnalysisActions & SharedActions;
+// --- THE ROOT STORE ---
+export interface AppStore {
+    editor: EditorState & { actions: EditorActions };
+    analysis: AnalysisState & { actions: AnalysisActions };
+    shared: SharedState & { actions: SharedActions };
 }

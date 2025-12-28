@@ -11,8 +11,8 @@ import type { ViewportState } from '~/types/app';
 export default function AnalysisViewer() {
     // Global State
     // We cast the result to our defined type for safety
-    const result = useStore(s => s.kinematicResult) as KinematicResult | null;
-    const setMode = useStore(s => s.actions.setMode);
+    const result = useStore(s => s.analysis.kinematicResult) as KinematicResult | null;
+    const setMode = useStore(s => s.shared.actions.setMode);
 
     // Local State
     const canvasRef = useRef<HTMLCanvasElement>(null);

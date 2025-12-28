@@ -12,11 +12,13 @@ bp = Blueprint('analyze', __name__, url_prefix='/analyze')
 @bp.route("/kinematics", methods=["POST"])
 def analyze_system():
     payload = request.get_json(force=True)
+    print(payload)
     try:
         system = StructuralSystem.create(
             payload.get("nodes", []), 
             payload.get("members", []),
-            payload.get("loads", [])
+            []
+            #payload.get("loads", [])
         )
 
         modes_objects, dof = solve_kinematics(system) 

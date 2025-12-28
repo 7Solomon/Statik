@@ -10,10 +10,10 @@ interface AnalyzeSystemModalProps {
 
 export function AnalyzeSystemModal({ onClose, onAnalysisComplete }: AnalyzeSystemModalProps) {
     // 1. Get Data from Store
-    const nodes = useStore(s => s.nodes);
-    const members = useStore(s => s.members);
-    const loads = useStore(s => s.loads);
-    const setKinematicResult = useStore(s => s.actions.setKinematicResult);
+    const nodes = useStore(s => s.editor.nodes);
+    const members = useStore(s => s.editor.members);
+    const loads = useStore(s => s.editor.loads);
+    const setKinematicResult = useStore(s => s.analysis.actions.setKinematicResult);
 
     // 2. Local State
     const [isLoading, setIsLoading] = useState(false);

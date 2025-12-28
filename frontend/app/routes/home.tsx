@@ -15,8 +15,8 @@ export function meta() {
 }
 
 export default function Home() {
-  const mode = useStore(state => state.mode);
-  const setMode = useStore(state => state.actions.setMode);
+  const mode = useStore(state => state.shared.mode);
+  const setMode = useStore(state => state.shared.actions.setMode);
 
   // Modal States
   const [modalOpen, setModalOpen] = useState<'save' | 'load' | 'analyze' | null>(null);

@@ -59,8 +59,8 @@ const NumberInput = ({ label, value, onChange, unit, step = 0.1 }: any) => (
 // --- NODE EDITOR ---
 
 export const NodeEditor = ({ nodeId }: { nodeId: string }) => {
-    const node = useStore(s => s.nodes.find(n => n.id === nodeId));
-    const actions = useStore(s => s.actions);
+    const node = useStore(s => s.editor.nodes.find(n => n.id === nodeId));
+    const actions = useStore(s => s.editor.actions);
 
     if (!node) return null;
 
@@ -135,8 +135,8 @@ export const NodeEditor = ({ nodeId }: { nodeId: string }) => {
 // --- MEMBER EDITOR ---
 
 export const MemberEditor = ({ memberId }: { memberId: string }) => {
-    const member = useStore(s => s.members.find(m => m.id === memberId));
-    const actions = useStore(s => s.actions);
+    const member = useStore(s => s.editor.members.find(m => m.id === memberId));
+    const actions = useStore(s => s.editor.actions);
 
     if (!member) return null;
 

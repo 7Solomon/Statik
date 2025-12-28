@@ -11,12 +11,12 @@ const EditorCanvas: React.FC = () => {
     const { handleMouseDown, handleMouseMove, handleMouseUp } = useCanvasInteraction(canvasRef as React.RefObject<HTMLCanvasElement>);
 
     // Connect Data (Store)
-    const nodes = useStore((state) => state.nodes);
-    const members = useStore((state) => state.members);
-    const loads = useStore((state) => state.loads)
-    const interaction = useStore((state) => state.interaction);
-    const viewport = useStore((state) => state.viewport);
-    // const actions = useStore((state) => state.actions); // Not strictly needed here if handled in logic
+    const nodes = useStore((state) => state.editor.nodes);
+    const members = useStore((state) => state.editor.members);
+    const loads = useStore((state) => state.editor.loads)
+    const interaction = useStore((state) => state.editor.interaction);
+    const viewport = useStore((state) => state.editor.viewport);
+    // const actions = useStore((state) => state.editor.actions); // Not strictly needed here if handled in logic
 
     // --- RESIZE HANDLER ---
     useEffect(() => {
@@ -44,11 +44,11 @@ const EditorCanvas: React.FC = () => {
                 Renderer.render(
                     ctx,
                     canvas,
-                    useStore.getState().nodes,
-                    useStore.getState().members,
-                    useStore.getState().loads,
-                    useStore.getState().viewport,
-                    useStore.getState().interaction
+                    useStore.getState().editor.nodes,
+                    useStore.getState().editor.members,
+                    useStore.getState().editor.loads,
+                    useStore.getState().editor.viewport,
+                    useStore.getState().editor.interaction
                 );
             }
         });
@@ -70,9 +70,9 @@ const EditorCanvas: React.FC = () => {
             const direction = e.deltaY > 0 ? -1 : 1;
             const factor = 1 + (direction * zoomIntensity);
 
-            const currentZoom = useStore.getState().viewport.zoom;
+            const currentZoom = useStore.getState().editor.viewport.zoom;
 
-            useStore.getState().actions.setViewport({
+            useStore.getState().editor.actions.setViewport({
                 zoom: Math.max(10, Math.min(200, currentZoom * factor))
             });
         };

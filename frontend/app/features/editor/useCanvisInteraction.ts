@@ -28,7 +28,7 @@ const LOAD_CONFIGS: Record<string, { type: LoadType, value: number, angle?: numb
 };
 
 export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
-    const { actions, viewport, interaction, nodes, members, loads } = useStore();
+    const { actions, viewport, interaction, nodes, members, loads } = useStore((state) => state.editor);
     const tool = interaction.activeTool;
     const subType = interaction.activeSubTypeTool;
 

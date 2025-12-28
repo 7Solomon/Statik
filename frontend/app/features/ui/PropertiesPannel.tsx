@@ -4,10 +4,10 @@ import { RotateCcw, RotateCw, Move, Anchor, Sliders } from 'lucide-react';
 import type { Node, SupportValue } from '~/types/model';
 
 export const PropertiesPanel = () => {
-    const { selectedId, selectedType } = useStore(s => s.interaction);
-    const nodes = useStore(s => s.nodes);
-    const members = useStore(s => s.members);
-    const actions = useStore(s => s.actions);
+    const { selectedId, selectedType } = useStore(s => s.editor.interaction);
+    const nodes = useStore(s => s.editor.nodes);
+    const members = useStore(s => s.editor.members);
+    const actions = useStore(s => s.editor.actions);
 
     if (!selectedId || !selectedType) {
         return (

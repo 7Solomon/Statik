@@ -78,8 +78,8 @@ const RatioInput = ({ label, value, onChange }: { label: string, value: number, 
 
 export const LoadEditor = ({ loadId }: { loadId: string }) => {
     // 1. Selector: Only re-render if the specific load changes
-    const load = useStore(s => s.loads.find(l => l.id === loadId));
-    const actions = useStore(s => s.actions);
+    const load = useStore(s => s.editor.loads.find(l => l.id === loadId));
+    const actions = useStore(s => s.editor.actions);
 
     if (!load) return null;
 
@@ -111,8 +111,8 @@ export const LoadEditor = ({ loadId }: { loadId: string }) => {
                 onBack={() => actions.setInteraction({ selectedId: null, selectedType: null })}
                 onDelete={() => {
                     // Temporary delete logic
-                    useStore.setState(s => ({ loads: s.loads.filter(l => l.id !== loadId) }));
-                    actions.setInteraction({ selectedId: null, selectedType: null });
+                    //useStore.setState(s => ({ loads: s..loads.filter(l => l.id !== loadId) }));
+                    //actions.setInteraction({ selectedId: null, selectedType: null });
                 }}
             />
 

@@ -102,9 +102,9 @@ const TOOL_GROUPS: ToolGroupConfig[] = [
 ];
 
 export const ToolsPanel = () => {
-    const activeTool = useStore(state => state.interaction.activeTool);
-    const activeSubType = useStore(state => state.interaction.activeSubTypeTool);
-    const actions = useStore(state => state.actions);
+    const activeTool = useStore(state => state.editor.interaction.activeTool);
+    const activeSubType = useStore(state => state.editor.interaction.activeSubTypeTool);
+    const actions = useStore(state => state.editor.actions);
 
     const handleToolClick = (item: ToolItemConfig) => {
         // 1. Set the main tool (e.g., 'node' or 'member')

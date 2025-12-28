@@ -23,7 +23,9 @@ def create_app(content_dir=Path("content")):
     #from src._api.register import register_blueprints
     #register_blueprints(app)
     from src.plugins.analyze.api import api
+    from src.plugins.management.api import systems
     app.register_blueprint(api.bp)
+    app.register_blueprint(systems.bp)
 
     
     from flask import send_from_directory

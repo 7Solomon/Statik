@@ -254,7 +254,6 @@ export const createEditorSlice: StateCreator<
                     }
                 }));
             },
-
             exportStructuralSystem: () => {
                 const { nodes, members, loads } = get().editor;
                 return {

@@ -72,7 +72,11 @@ def solution():
             payload.get("loads", [])
         )
         fem_solution_dict = calculate_complex_fem(system)
-        return jsonify(fem_solution_dict), 200 
+        if fem_solution_dict.get("success"):
+            return jsonify(fem_solution_dict), 200
+        else:
+            error_message = fem_solution_dict.get("error", "Unknown calculation error")
+            return jsonify({"error": error_message}), 400
     except Exception as e:
         print(e)
 

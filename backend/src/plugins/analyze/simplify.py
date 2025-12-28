@@ -1,106 +1,151 @@
 import copy
+import uuid
+from src.models.analyze_models import StructuralSystem, Load, Node, Member
 import numpy as np
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Tuple, Optional
+import sys
 
-from src.models.analyze_models import StructuralSystem, Node, Member
-
-class SystemSimplifier:
+def get_node_loads_vector(system: StructuralSystem, node_id: str) -> np.ndarray:
     """
-    Analyzes a StructuralSystem and simplifies statically determinate appendages.
-    [Systemvereinfachung]
+    Sums up all Nodal loads (Fx, Fy, M) currently acting on a specific node.
+    Returns: np.array([Fx, Fy, M])
     """
+    res = np.zeros(3)
+    
+    for load in system.loads:
+        if load.scope == 'NODE' and load.node_id == node_id:
+            if load.type == 'POINT':
+                # Convert Angle to Components
+                angle_rad = np.radians(load.angle)
+                fx = load.value * np.cos(angle_rad)
+                fy = load.value * np.sin(angle_rad)
+                res[0] += fx
+                res[1] += fy
+            elif load.type == 'MOMENT':
+                res[2] += load.value
+                
+    return res
 
-    def __init__(self, system: StructuralSystem):
-        # Work on a copy to avoid modifying the original system
-        self.system = copy.deepcopy(system)
+def add_equivalent_load(system: StructuralSystem, node_id: str, force_vec: np.ndarray) -> None:
+    """
+    Creates and appends new Load objects to the system for the given force vector.
+    """
+    # 1. Force X
+    if abs(force_vec[0]) > 1e-9:
+        system.loads.append(Load(
+            id=str(uuid.uuid4()),
+            scope='NODE',
+            type='POINT',
+            node_id=node_id,
+            value=force_vec[0],
+            angle=0.0
+        ))
         
-        # Helper maps
-        self.node_map = {n.id: n for n in self.system.nodes}
-        self.member_map = {m.id: m for m in self.system.members}
+    # 2. Force Y
+    if abs(force_vec[1]) > 1e-9:
+        system.loads.append(Load(
+            id=str(uuid.uuid4()),
+            scope='NODE',
+            type='POINT',
+            node_id=node_id,
+            value=force_vec[1],
+            angle=90.0
+        ))
         
-        # Adjacency List: node_id -> list of member_ids
-        self.adjacency: Dict[int, List[int]] = {n.id: [] for n in self.system.nodes}
-        for m in self.system.members:
-            self.adjacency[m.start_node.id].append(m.id)
-            self.adjacency[m.end_node.id].append(m.id)
+    # 3. Moment
+    if abs(force_vec[2]) > 1e-9:
+        system.loads.append(Load(
+            id=str(uuid.uuid4()),
+            scope='NODE',
+            type='MOMENT',
+            node_id=node_id,
+            value=force_vec[2]
+        ))
 
-    def get_load_at_node(self, node_id: int) -> np.ndarray:
-        """Sums up all loads (Fx, Fy, M) currently acting on a node."""
-        res = np.zeros(3) # [Fx, Fy, M]
-        for load in self.system.loads:
-            if load.node_id == node_id:
-                res += load.to_vector()
-        return res
+def build_adjacency_map(nodes: List[Node], members: List[Member]) -> Dict[str, List[str]]:
+    """Helper to build { node_id: [member_id, ...] } map."""
+    adj = {n.id: [] for n in nodes}
+    for m in members:
+        if m.start_node_id in adj: adj[m.start_node_id].append(m.id)
+        if m.end_node_id in adj: adj[m.end_node_id].append(m.id)
+    return adj
 
-    def add_load(self, node_id: int, force_vec: np.ndarray):
-        """Adds a new equivalent load to a node."""
-        new_id = len(self.system.loads)
-        self.system.loads.append(NodalLoad(new_id, node_id, force_vec[0], force_vec[1], force_vec[2]))
+def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
+    """
+    Iteratively removes statically determinate 'leaves' (cantilevers) from the system.
+    Returns a NEW simplified StructuralSystem.
+    """
+    # Work on a deep copy to keep original safe
+    system = copy.deepcopy(system_in)
+    
+    # Helper lookups (we rebuild these if we delete stuff, or maintain them)
+    # Since we are mutating lists, rebuilding maps inside the loop is safer but slower.
+    # For small structures, it's fine.
+    
+    changed = True
+    while changed:
+        changed = False
+        
+        # 1. Rebuild lookup maps (State is mutating)
+        node_map = {n.id: n for n in system.nodes}
+        member_map = {m.id: m for m in system.members}
+        adjacency = build_adjacency_map(system.nodes, system.members)
+        
+        # 2. Find candidate nodes (Degree 1 and No Support)
+        nodes_to_prune = []
+        for n_id, connected_m_ids in adjacency.items():
+            if len(connected_m_ids) == 1:
+                node = node_map[n_id]
+                # If it has any fixity, it is NOT a free end
+                has_support = node.supports.fix_x or node.supports.fix_y or node.supports.fix_m
+                if not has_support:
+                    nodes_to_prune.append(n_id)
 
-    def simplify(self) -> Tuple[StructuralSystem, List[NodalLoad]]:
-        """
-        Iteratively prunes 'Cantilevers' (Kragarme).
-        Returns the simplified system and the new equivalent loads.
-        """
-        changed = True
-        while changed:
-            changed = False
+        # 3. Process Pruning
+        for tip_node_id in nodes_to_prune:
+            # --- A. Identify Geometry ---
+            member_id = adjacency[tip_node_id][0]
+            member = member_map[member_id]
             
-            # Find candidate nodes for pruning
-            # Condition: Connected to exactly 1 member AND has no rigid supports
-            nodes_to_prune = []
-            for n_id, member_ids in self.adjacency.items():
-                if len(member_ids) == 1:
-                    node = self.node_map[n_id]
-                    # Check if it is a true "Free End" (no supports)
-                    if not (node.fix_x_local or node.fix_y_local or node.fix_m):
-                        nodes_to_prune.append(n_id)
-
-            for tip_node_id in nodes_to_prune:
-                # 1. Identify Geometry
-                member_id = self.adjacency[tip_node_id][0]
-                member = self.member_map[member_id]
-                
-                # Find the "Root" node (the one we keep)
-                if member.start_node.id == tip_node_id:
-                    root_node = member.end_node
-                else:
-                    root_node = member.start_node
-                
-                # 2. Calculate Equilibrium / Transfer Forces
-                # Get loads on the tip
-                F_tip = self.get_load_at_node(tip_node_id) # [Fx, Fy, M]
-                
-                # Distance vector from Root to Tip
-                r = self.node_map[tip_node_id].coordinates - root_node.coordinates
-                
-                # Forces are simply transferred (Action = Reaction)
-                F_root_x = F_tip[0]
-                F_root_y = F_tip[1]
-                
-                # Moment at root = Moment at tip + (r x F)
-                # 2D Cross product: r_x * F_y - r_y * F_x
-                M_transport = r[0] * F_tip[1] - r[1] * F_tip[0]
-                M_root = F_tip[2] + M_transport
-                
-                # 3. Apply Equivalent Load to Root
-                self.add_load(root_node.id, np.array([F_root_x, F_root_y, M_root]))
-                
-                # 4. Prune (Remove Member and Tip Node)
-                # Remove member from system list
-                self.system.members = [m for m in self.system.members if m.id != member_id]
-                del self.member_map[member_id]
-                
-                # Remove tip node from system list
-                self.system.nodes = [n for n in self.system.nodes if n.id != tip_node_id]
-                del self.node_map[tip_node_id]
-                
-                # Update Adjacency
-                self.adjacency[root_node.id].remove(member_id)
-                del self.adjacency[tip_node_id]
-                
-                print(f" -> Pruned Member {member_id} (Node {tip_node_id} -> Node {root_node.id})")
-                changed = True # System changed, re-scan for new leaves (recursive chains)
-                
-        return self.system, self.system.loads
-
+            # Identify Root
+            if member.start_node_id == tip_node_id:
+                root_node = node_map[member.end_node_id]
+            else:
+                root_node = node_map[member.start_node_id]
+            
+            # --- B. Transfer Forces ---
+            F_tip = get_node_loads_vector(system, tip_node_id) # [Fx, Fy, M]
+            
+            tip_node = node_map[tip_node_id]
+            r = tip_node.coordinates - root_node.coordinates # Vector from Root to Tip
+            
+            F_root_x = F_tip[0]
+            F_root_y = F_tip[1]
+            
+            # Moment Transfer: M_root = M_tip + (r x F)
+            # 2D Cross Product: r_x * F_y - r_y * F_x
+            M_transport = r[0] * F_tip[1] - r[1] * F_tip[0]
+            M_root = F_tip[2] + M_transport
+            
+            add_equivalent_load(system, root_node.id, np.array([F_root_x, F_root_y, M_root]))
+            
+            # --- C. Delete Elements ---
+            # Remove Member
+            system.members = [m for m in system.members if m.id != member_id]
+            
+            # Remove Node
+            system.nodes = [n for n in system.nodes if n.id != tip_node_id]
+            
+            # Remove Loads on the deleted Tip Node
+            system.loads = [
+                l for l in system.loads 
+                if not (l.scope == 'NODE' and l.node_id == tip_node_id)
+            ]
+            
+            # Flag to run another pass (chains of members)
+            changed = True
+            
+            # Break inner loop to rebuild maps safely
+            break 
+    print(system)
+    return system

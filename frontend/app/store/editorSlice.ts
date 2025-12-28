@@ -237,6 +237,32 @@ export const createEditorSlice: StateCreator<
                     }
                 }));
             },
+            loadStructuralSystem: (system) => {
+                set((state) => ({
+                    editor: {
+                        ...state.editor,
+                        nodes: system.nodes,
+                        members: system.members,
+                        loads: system.loads,
+                        interaction: {
+                            ...state.editor.interaction,
+                            selectedId: null,
+                            selectedType: null,
+                            hoveredNodeId: null,
+                            hoveredMemberId: null
+                        }
+                    }
+                }));
+            },
+
+            exportStructuralSystem: () => {
+                const { nodes, members, loads } = get().editor;
+                return {
+                    nodes,
+                    members,
+                    loads
+                };
+            }
         }
     }
 });

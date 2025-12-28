@@ -4,8 +4,9 @@ import { useStore } from "../store/useStore";
 import { Save, FileDown, FolderOpen } from 'lucide-react';
 import { AnalyzeSystemModal } from "~/features/modals/AnalyzeSystemModal";
 import { LoadSystemModal } from "~/features/modals/LoadSystemModal";
-import AnalysisViewer from "~/features/analysis/AnalysisViewer";
 import { SidePanel } from "~/features/ui/SidePannel";
+import AnalysisCanvas from "~/features/analysis/AnalysisCanvas";
+import AnalysisViewer from "~/features/analysis/AnalysisViewer";
 
 export function meta() {
   return [
@@ -16,13 +17,26 @@ export function meta() {
 
 export default function Home() {
   const mode = useStore(state => state.shared.mode);
-  const setMode = useStore(state => state.shared.actions.setMode);
+  const setAppMode = useStore(state => state.shared.actions.setMode);
+  const setKinematicResult = useStore(state => state.analysis.actions.setKinematicResult);
+  const setSimplifyResult = useStore(state => state.analysis.actions.setSimplifyResult);
+  const setViewMode = useStore(state => state.analysis.actions.setViewMode);
 
   // Modal States
   const [modalOpen, setModalOpen] = useState<'save' | 'load' | 'analyze' | null>(null);
 
   const handleAnalysisComplete = (result: any) => {
-    setMode('ANALYSIS');
+
+    setAppMode('ANALYSIS');
+
+    if (result && result.modes && Array.isArray(result.modes)) {
+      setKinematicResult(result);
+      setViewMode('KINEMATIC');
+    } else {
+      setSimplifyResult(result);
+      setViewMode('SIMPLIFIED');
+    }
+
     setModalOpen(null);
   };
 

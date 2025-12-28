@@ -1,5 +1,23 @@
 import type { StateCreator } from "zustand";
-import type { AppStore } from "./types";
+import type { AppStore } from "./types"; // Adjust path as needed
+import type { ViewportState } from "~/types/app";
+
+const DEFAULT_VIEWPORT_ANALYSIS: ViewportState = {
+    zoom: 50,           // Pixels per meter
+    pan: { x: 400, y: 300 },
+    gridSize: 1.0,
+    width: 0,
+    height: 0,
+    x: 0,
+    y: 0
+};
+
+const DEFAULT_INTERACTION_ANALYSIS = {
+    isDragging: false,
+    mousePos: { x: 0, y: 0 },
+    hoveredNodeId: null,
+    hoveredMemberId: null
+};
 
 export const createAnalysisSlice: StateCreator<
     AppStore,
@@ -10,63 +28,47 @@ export const createAnalysisSlice: StateCreator<
 
     analysis: {
         // 1. STATE
+        viewMode: 'KINEMATIC',
+        viewport: DEFAULT_VIEWPORT_ANALYSIS,
+        interaction: DEFAULT_INTERACTION_ANALYSIS,
         kinematicResult: null,
+        simplifyResult: null,
 
         // 2. ACTIONS
         actions: {
-            analyzeSystem: async (name: string) => {
-                // Access the root state
-                const state = get();
-
-                // DATA SOURCE: Now we pull from 'state.editor'
-                const { nodes, members, loads, viewport } = state.editor;
-
-                const payload = {
-                    name: name,
-                    system: {
-                        nodes: nodes,
-                        members: members,
-                        loads: loads,
-                        meta: {
-                            gridSize: viewport.gridSize,
-                            zoom: viewport.zoom,
-                            pan: viewport.pan
-                        }
+            // --- NEW ACTION ---
+            setViewport: (partialViewport) => {
+                set((state) => ({
+                    analysis: {
+                        ...state.analysis,
+                        viewport: { ...state.analysis.viewport, ...partialViewport }
                     }
-                };
-
-                try {
-                    const response = await fetch('api/analyze/kinematics', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(payload),
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Export failed: ${response.statusText}`);
+                }));
+            },
+            setInteraction: (partialInteraction) => {
+                set((state) => ({
+                    analysis: {
+                        ...state.analysis,
+                        viewport: { ...state.analysis.viewport, ...partialInteraction }
                     }
-
-                    const result = await response.json();
-                    console.log('System saved successfully:', result.slug);
-
-                    // Optional: You might want to auto-set the result here if the API returns analysis data immediately
-                    // get().analysis.actions.setKinematicResult(result.data);
-
-                } catch (error) {
-                    console.error('Failed to export system:', error);
-                }
+                }));
             },
 
             setKinematicResult: (result) => {
                 set((state) => ({
-                    analysis: {
-                        ...state.analysis, // Keep actions intact
-                        kinematicResult: result
-                    }
+                    analysis: { ...state.analysis, kinematicResult: result }
                 }));
             },
+            setSimplifyResult: (result) => {
+                set((state) => ({
+                    analysis: { ...state.analysis, simplifyResult: result }
+                }));
+            },
+            setViewMode: (mode) => {
+                set((state) => ({
+                    analysis: { ...state.analysis, viewMode: mode }
+                }));
+            }
         }
     }
 });

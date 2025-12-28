@@ -1,3 +1,4 @@
+from src.plugins.analyze.simplify import prune_cantilevers
 from flask import current_app, request, jsonify, Blueprint
 from src.plugins.analyze.kinematics import solve_kinematics
 from src.plugins.analyze.system import calculate_poles, group_into_subsystems
@@ -17,8 +18,7 @@ def analyze_system():
         system = StructuralSystem.create(
             payload.get("nodes", []), 
             payload.get("members", []),
-            []
-            #payload.get("loads", [])
+            payload.get("loads", [])
         )
 
         modes_objects, dof = solve_kinematics(system) 
@@ -46,3 +46,17 @@ def analyze_system():
     except Exception as e:
         traceback.print_exc() 
         return jsonify({"error": str(e)}), 500
+
+@bp.route("/simplify", methods=["POST"])
+def simplify():
+    payload = request.get_json(force=True)
+    try:
+        system = StructuralSystem.create(
+            payload.get("nodes", []), 
+            payload.get("members", []),
+            payload.get("loads", [])
+        )
+        simplified_system = prune_cantilevers(system)
+        return jsonify(simplified_system.to_dict()), 200 
+    except Exception as e:
+        print(e)

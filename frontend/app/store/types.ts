@@ -1,7 +1,8 @@
-import type { Load, Member, Node, KinematicResult, Release, Vec2 } from '~/types/model';
-import type { InteractionState, ToolType, ViewportState } from '~/types/app';
+import type { Load, Member, Node, KinematicResult, Release, Vec2, StructuralSystem } from '~/types/model';
+import type { AnalysisInteractionState, EditorInteractionState, ToolType, ViewportState } from '~/types/app';
 
 export type AppMode = 'EDITOR' | 'ANALYSIS';
+export type AnalysisViewMode = 'KINEMATIC' | 'SIMPLIFIED'
 
 // --- EDITOR DOMAIN ---
 export interface EditorState {
@@ -9,7 +10,7 @@ export interface EditorState {
     members: Member[];
     loads: Load[];
     viewport: ViewportState;
-    interaction: InteractionState;
+    interaction: EditorInteractionState;
 }
 
 export interface EditorActions {
@@ -24,18 +25,29 @@ export interface EditorActions {
     updateLoad: (id: string, data: Partial<Load>) => void;
     setTool: (tool: ToolType) => void;
     setViewport: (view: Partial<ViewportState>) => void;
-    setInteraction: (inter: Partial<InteractionState>) => void;
+    setInteraction: (inter: Partial<EditorInteractionState>) => void;
     setHoveredNode: (id: string | null) => void;
+    loadStructuralSystem: (system: StructuralSystem) => void;
+    exportStructuralSystem: () => StructuralSystem;
 }
 
 // --- ANALYSIS DOMAIN ---
+
 export interface AnalysisState {
+    viewMode: AnalysisViewMode;
+    viewport: ViewportState;
+    interaction: AnalysisInteractionState;
     kinematicResult: KinematicResult | null;
+    simplifyResult: StructuralSystem | null;
 }
 
 export interface AnalysisActions {
-    analyzeSystem: (name: string) => Promise<void>;
     setKinematicResult: (result: KinematicResult | null) => void;
+    setSimplifyResult: (result: StructuralSystem | null) => void;
+    setViewMode: (mode: AnalysisViewMode) => void;
+    setViewport: (view: Partial<ViewportState>) => void;
+    setInteraction: (inter: Partial<AnalysisInteractionState>) => void;
+
 }
 
 // --- SHARED DOMAIN ---

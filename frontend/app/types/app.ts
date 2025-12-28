@@ -37,21 +37,29 @@ export interface ViewportState {
     gridSize: number; // In meters (e.g., 1.0m)
 }
 
-export interface InteractionState {
+export interface EditorInteractionState {
     activeTool: ToolType;
-    activeSubTypeTool: HingeType | SupportType | LoadType | null
-    isDragging: boolean;
+    activeSubTypeTool: HingeType | SupportType | LoadType | null;
 
-    // Hover state for snapping
+    isDragging: boolean;
+    mousePos: Vec2; // World coordinates
+
+    // Snapping & Hovering
     hoveredNodeId: string | null;
     hoveredMemberId: string | null;
 
-    // For creating members (drag from A to B)
+    // Creation State
     dragStartNodeId: string | null;
 
-    // Current mouse position (snapped) in World Coords
-    mousePos: Vec2;
-
+    // Selection
     selectedId: string | null;
     selectedType: 'node' | 'member' | 'load' | null;
+}
+
+export interface AnalysisInteractionState {
+    isDragging: boolean;
+    mousePos: Vec2;
+
+    hoveredNodeId: string | null;
+    hoveredMemberId: string | null;
 }

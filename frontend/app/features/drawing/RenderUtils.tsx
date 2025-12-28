@@ -1,4 +1,4 @@
-import type { InteractionState, ViewportState } from '~/types/app';
+import type { ViewportState } from '~/types/app';
 import type { Member, Node, Vec2 } from '~/types/model';
 import * as Coords from '../../lib/coordinates';
 import { SymbolRenderer } from './SymbolRenderer';

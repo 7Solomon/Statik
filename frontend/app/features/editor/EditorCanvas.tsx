@@ -41,7 +41,7 @@ const EditorCanvas: React.FC = () => {
             if (ctx) {
                 ctx.scale(dpr, dpr);
                 // CRITICAL: Re-render immediately because changing width clears the canvas
-                Renderer.render(
+                Renderer.renderEditor(
                     ctx,
                     canvas,
                     useStore.getState().editor.nodes,
@@ -93,7 +93,7 @@ const EditorCanvas: React.FC = () => {
         if (!ctx) return;
 
         requestAnimationFrame(() => {
-            Renderer.render(ctx, canvas, nodes, members, loads, viewport, interaction);
+            Renderer.renderEditor(ctx, canvas, nodes, members, loads, viewport, interaction);
         });
 
     }, [nodes, members, viewport, interaction]);

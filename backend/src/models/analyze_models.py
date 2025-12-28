@@ -92,35 +92,55 @@ class Member:
 @dataclass
 class Load:
     id: str
+    scope: Literal['NODE', 'MEMBER']
+    type: Literal['POINT', 'MOMENT', 'DISTRIBUTED']
+    value: float
     
-    target: Literal['node', 'member']
-    target_id: str
+    # -- Linkage (Optional based on scope) --
+    node_id: Optional[str] = None
+    member_id: Optional[str] = None
     
-    type: Literal['point_force', 'distributed_force', 'moment']
+    # -- Geometry / Physics --
+    angle: float = 0.0           # For Point Loads
+    is_global: bool = True       # For Distributed
     
-    # [val] or [start, end]
-    values: List[float]
+    # -- Member Positioning --
+    ratio: Optional[float] = None       # Point on Member (0.0 - 1.0)
     
-    system: Literal['global', 'local'] = 'global'
-    angle: float = 0.0
-    
-    # Optional positioning
-    t_start: Optional[float] = None
-    t_end: Optional[float] = None
+    # -- Distributed Params --
+    start_ratio: Optional[float] = None
+    end_ratio: Optional[float] = None
+    start_value: Optional[float] = None # Trapezoid support
+    end_value: Optional[float] = None
 
     def to_dict(self):
-        return {
+        # Construct dict based on TypeScript interfaces
+        base = {
             "id": self.id,
-            "target": self.target,
-            "target_id": self.target_id, # Ensure camelCase if frontend expects it (targetId)
+            "scope": self.scope,
             "type": self.type,
-            "values": self.values,
-            "system": self.system,
-            "angle": self.angle,
-            "t_start": self.t_start,
-            "t_end": self.t_end
+            "value": self.value,
+            "isGlobal": self.is_global
         }
-# --- System & Factory ---
+
+        if self.scope == 'NODE':
+            base["nodeId"] = self.node_id
+            base["angle"] = self.angle
+        
+        elif self.scope == 'MEMBER':
+            base["memberId"] = self.member_id
+            
+            if self.type == 'POINT':
+                base["ratio"] = self.ratio
+                base["angle"] = self.angle
+            
+            elif self.type == 'DISTRIBUTED':
+                base["startRatio"] = self.start_ratio
+                base["endRatio"] = self.end_ratio
+                if self.start_value is not None: base["startValue"] = self.start_value
+                if self.end_value is not None: base["endValue"] = self.end_value
+
+        return base
 
 @dataclass
 class StructuralSystem:
@@ -187,19 +207,39 @@ class StructuralSystem:
             )
             system.members.append(member)
 
-        # 3. Parse Loads
+         # 3. Parse Loads
         for l_data in loads_data:
+            # Safely get optional fields
+            scope = l_data.get("scope", "NODE")
+            
             load = Load(
                 id=str(l_data["id"]),
-                target=l_data["target"],
-                target_id=str(l_data["targetId"]),
-                type=l_data["type"],
-                values=[float(v) for v in l_data.get("values", [])],
-                system=l_data.get("system", "global"),
+                scope=scope,
+                type=l_data.get("type", "POINT"),
+                value=float(l_data.get("value", 0.0)),
+                
+                # Linkage
+                node_id=l_data.get("nodeId"),
+                member_id=l_data.get("memberId"),
+                
+                # Params
                 angle=float(l_data.get("angle", 0.0)),
-                t_start=l_data.get("t_start"),
-                t_end=l_data.get("t_end")
+                is_global=l_data.get("isGlobal", True),
+                
+                # Member Point
+                ratio=l_data.get("ratio") if l_data.get("ratio") is not None else None,
+                
+                # Member Distributed
+                start_ratio=l_data.get("startRatio"),
+                end_ratio=l_data.get("endRatio"),
+                start_value=l_data.get("startValue"),
+                end_value=l_data.get("endValue")
             )
+            
+            # Simple validation to skip invalid loads
+            if scope == "NODE" and not load.node_id: continue
+            if scope == "MEMBER" and not load.member_id: continue
+            
             system.loads.append(load)
 
         return system

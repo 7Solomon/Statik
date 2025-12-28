@@ -98,7 +98,7 @@ export interface KinematicMode {
   rigid_bodies: any[];
 }
 
-export interface SystemData {
+export interface StructuralSystem {
   nodes: Node[];
   members: Member[];
   loads: any[];
@@ -109,7 +109,7 @@ export interface KinematicResult {
   is_kinematic: boolean;
   dof: number;
   modes: KinematicMode[];
-  system: SystemData;
+  system: StructuralSystem;
 
 }
 

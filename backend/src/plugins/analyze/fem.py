@@ -155,7 +155,7 @@ def calculate_complex_fem(system: StructuralSystem) -> FEMResult:
             memberResults=final_member_results # Use the populated dict
         )
 
-        return fem_result
+        return fem_result.to_dict()
 
 # --- HELPER FUNCTIONS ---
 

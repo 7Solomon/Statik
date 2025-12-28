@@ -71,8 +71,8 @@ def solution():
             payload.get("members", []),
             payload.get("loads", [])
         )
-        fem_solution = calculate_complex_fem(system)
-        return jsonify(fem_solution.to_dict()), 200 
+        fem_solution_dict = calculate_complex_fem(system)
+        return jsonify(fem_solution_dict), 200 
     except Exception as e:
         print(e)
 

@@ -128,41 +128,51 @@ export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElemen
             else if (load.scope === 'MEMBER' && load.type === 'DISTRIBUTED') {
                 const m = members.find(mem => mem.id === load.memberId);
                 if (!m) continue;
+
                 const s = nodes.find(n => n.id === m.startNodeId);
                 const e = nodes.find(n => n.id === m.endNodeId);
 
                 if (s && e) {
-                    // Check if mouse is "near" the beam segment covered by the load
-                    // This is the simplest robust way. Checking the "polygon" of the arrows is complex.
-                    // Usually, clicking the beam under the load is enough.
-
+                    // 1. Check if we are within the start/end ratio (Longitudinal check)
                     const proj = Geo.projectPointToSegment(rawPos, s.position, e.position);
                     const start = Math.min(load.startRatio, load.endRatio);
                     const end = Math.max(load.startRatio, load.endRatio);
 
-                    // 1. Must be within the start/end ratio
                     if (proj.t >= start && proj.t <= end) {
-                        // 2. Must be close to the beam line (World Units)
-                        // OR close to the "Load Height" (Screen Units)
 
-                        // Simple Check: Distance to beam < Threshold
-                        if (proj.dist < threshold) return load;
+                        // --- UPDATED LOGIC STARTS HERE ---
 
-                        // Advanced Check: Check if mouse is "above" the beam in the load area
-                        // This requires knowing the load direction and height. 
-                        // If you want to click the "arrows" floating above the beam:
-
-                        // Convert everything to Screen
+                        // Convert World points to Screen (Pixels)
                         const p1 = Coords.worldToScreen(s.position.x, s.position.y, viewport);
                         const p2 = Coords.worldToScreen(e.position.x, e.position.y, viewport);
                         const mouseS = Coords.worldToScreen(rawPos.x, rawPos.y, viewport);
 
-                        // Project mouse onto screen line
-                        const projS = Geo.projectPointToSegment(mouseS, p1, p2);
+                        // Calculate vector components
+                        const dx = p2.x - p1.x;
+                        const dy = p2.y - p1.y;
+                        const len = Math.hypot(dx, dy);
 
-                        // If we are "above" the beam (distance > 0), check if we are within max load height (e.g. 40px)
-                        // We check the "perpendicular distance"
-                        if (projS.dist < 45) return load; // 45px covers the beam + the arrows
+                        if (len === 0) continue; // Safety check
+
+                        // Calculate Signed Distance via Cross Product (2D)
+                        // This tells us "how far" and "which side" (positive or negative)
+                        // Formula: ( (x2-x1)*(y-y1) - (y2-y1)*(x-x1) ) / length
+                        const crossProduct = dx * (mouseS.y - p1.y) - dy * (mouseS.x - p1.x);
+                        const signedDist = crossProduct / len;
+                        const absDist = Math.abs(signedDist);
+
+                        // --- CONFIGURATION ---
+                        const MEMBER_THICKNESS_BUFFER = 12; // Radius around member line to IGNORE (let Member capture this)
+                        const LOAD_HEIGHT_LIMIT = 50;       // Max height of the load arrows/block
+
+                        // 2. The "Dead Zone" Check
+                        // We only pick the load if the mouse is FARTHER than the member thickness
+                        // but CLOSER than the max load height.
+                        if (absDist > MEMBER_THICKNESS_BUFFER && absDist < LOAD_HEIGHT_LIMIT) {
+                            //  HERE COULD ADD THAT WHEN NEGATIV THEN NOT TAKE POSSITIV SPACE AND VIES VERSA BUT DONT KNOW HOW
+                            // JUST NOW HAS DEADZONE 
+                            return load;
+                        }
                     }
                 }
             }

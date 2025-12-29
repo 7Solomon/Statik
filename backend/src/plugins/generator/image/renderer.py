@@ -1,127 +1,151 @@
 from PIL import Image, ImageDraw
-import numpy as np
-from typing import Optional, Tuple, List
+from typing import Tuple
 import matplotlib.pyplot as plt
 
-from src.models.generator_class import Structure
-from src.plugins.generator.image.stanli_symbols import BeamType, HingeType, LoadType, StanliBeam, StanliHinge, StanliLoad, StanliSupport, SupportType
+from src.models.image_models import ImageSystem, ImageNode, ImageMember, ImageLoad
+
+from src.plugins.generator.image.stanli_symbols import (
+    BeamType,
+    HingeType,
+    LoadType,
+    StanliBeam,
+    StanliHinge,
+    StanliLoad,
+    StanliSupport,
+    SupportType,
+)
+
 
 class StanliRenderer:
-    """Main renderer for stanli symbols"""
-    
+    """Renderer for ImageSystem (pixel-space)."""
+
     def __init__(self, config):
-        self.config = config
         self.image_size = config.image_size
         self.background_color = config.background_color
         self.symbols = {
             'beams': {},
             'supports': {},
             'hinges': {},
-            'loads': {}
+            'loads': {},
         }
-    
+
     def create_image(self) -> Image.Image:
-        """Create new image for drawing"""
         return Image.new('RGB', self.image_size, self.background_color)
-    
-    def render_structure(self, structure: Structure) -> Image.Image:
-        """Main method expected by the pipeline - renders complete structure"""
+
+    def render_structure(self, system: ImageSystem) -> Image.Image:
         img = self.create_image()
         draw = ImageDraw.Draw(img)
-        
-        # Draw beams first
-        for beam in structure.beams:
-            node1 = structure.get_node_by_id(beam.node1_id)
-            node2 = structure.get_node_by_id(beam.node2_id)
-            
-            if node1 and node2:
-                self.draw_beam(
-                    draw, beam.beam_type, 
-                    node1.position, node2.position,
-                    beam.rounded_start, beam.rounded_end,
-                )
 
-        # Draw hinges
-        for hinge in structure.hinges:
-            node = structure.get_node_by_id(hinge.node_id)
-            if node:
-                start_node = None
-                end_node = None
-                
-                if hinge.start_node_id is not None:
-                    start_node_obj = structure.get_node_by_id(hinge.start_node_id)
-                    start_node = start_node_obj.position if start_node_obj else None
-                
-                if hinge.end_node_id is not None:
-                    end_node_obj = structure.get_node_by_id(hinge.end_node_id)
-                    end_node = end_node_obj.position if end_node_obj else None
-                
-                self.draw_hinge(
-                    draw, hinge.hinge_type, node.position, 
-                    hinge.rotation,
-                )
-        
-        # Draw supports
-        for node in structure.nodes:
-            if node.support_type:
-                support_rotation = getattr(node, 'rotation', 0) or 0
+        # 1. BEAMS (safe)
+        for member in getattr(system, 'members', []):
+            try:
+                n1 = next((n for n in getattr(system, 'nodes', []) if n.id == member.start_node_id), None)
+                n2 = next((n for n in getattr(system, 'nodes', []) if n.id == member.end_node_id), None)
+                if n1 and n2:
+                    self.draw_beam(draw, BeamType.FACHWERK, 
+                                (n1.pixel_x, n1.pixel_y), 
+                                (n2.pixel_x, n2.pixel_y))
+            except:
+                continue
 
-                self.draw_support(
-                    draw, node.support_type, node.position, 
-                    support_rotation,
-                )
-        
-        
-        # Draw loads
-        for load in structure.loads:
-            node = structure.get_node_by_id(load.node_id)
-            if node:
-                self.draw_load(
-                    draw, load.load_type, node.position, 
-                    load.rotation, 40.0 * load.magnitude
-                )
-        
+        # 2. SUPPORTS (bulletproof enum mapping)
+        for node in getattr(system, 'nodes', []):
+            support_type = getattr(node, "support_type", "free")
+            if support_type and support_type != "free":
+                try:
+                    stype = self._safe_support_enum(support_type)
+                    self.draw_support(draw, stype, (node.pixel_x, node.pixel_y))
+                except:
+                    pass  # Skip bad supports
+
+        # 3. LOADS (bulletproof enum mapping)
+        for load in getattr(system, 'loads', []):
+            try:
+                node = next((n for n in getattr(system, 'nodes', []) if n.id == load.node_id), None) if load.node_id else None
+                pos = (node.pixel_x, node.pixel_y) if node else (load.pixel_x, load.pixel_y)
+                
+                ltype = self._safe_load_enum(getattr(load, "load_type", "EINZELLAST"))
+                angle = getattr(load, "angle_deg", 270.0)
+                
+                self.draw_load(draw, ltype, pos, angle)
+            except:
+                pass  # Skip bad loads
+
         return img
 
-    def draw_beam(self, draw: ImageDraw.Draw, beam_type: BeamType,
-                  start_pos: Tuple[float, float], end_pos: Tuple[float, float],
-                  rounded_start: bool = False, rounded_end: bool = False,
-                  #width: float = 4.0
-                  ):
-        """Draw beam of specified type"""
+    def _safe_support_enum(self, support_str: str) -> SupportType:
+        """Convert ANY support string → valid SupportType."""
+        mapping = {
+            'fixed': SupportType.FESTE_EINSPANNUNG,
+            'pinned': SupportType.FESTLAGER,
+            'roller': SupportType.LOSLAGER,
+            'festlager': SupportType.FESTLAGER,
+            'loslager': SupportType.LOSLAGER,
+            'feste_einspannung': SupportType.FESTE_EINSPANNUNG,
+            'gleitlager': SupportType.GLEITLAGER,
+        }
+        key = support_str.lower()
+        return mapping.get(key, SupportType.FESTLAGER)  # FESTLAGER as default
+
+    def _safe_load_enum(self, load_str: str) -> LoadType:
+        """Convert ANY load string → valid LoadType."""
+        mapping = {
+            'force_point': LoadType.EINZELLAST,
+            'force': LoadType.EINZELLAST,
+            'moment': LoadType.MOMENT_UHRZEIGER,
+            'einzelLast': LoadType.EINZELLAST,
+        }
+        key = load_str.lower()
+        return mapping.get(key, LoadType.EINZELLAST)  # EINZELLAST as default
+
+
+    # --------- Primitive wrappers around Stanli symbols ----------
+
+    def draw_beam(
+        self,
+        draw: ImageDraw.Draw,
+        beam_type: BeamType,
+        start_pos: Tuple[float, float],
+        end_pos: Tuple[float, float],
+        rounded_start: bool = False,
+        rounded_end: bool = False,
+    ):
         beam = StanliBeam(beam_type)
         beam.draw(draw, start_pos, end_pos, rounded_start, rounded_end)
-    
-    def draw_support(self, draw: ImageDraw.Draw, support_type: SupportType,
-                position: Tuple[float, float], rotation: float = 0,
-                #size: float = 25.0
-                ):
-        """Draw support of specified type"""
+
+    def draw_support(
+        self,
+        draw: ImageDraw.Draw,
+        support_type: SupportType,
+        position: Tuple[float, float],
+        rotation: float = 0.0,
+    ):
         support = StanliSupport(support_type)
         support.draw(draw, position, rotation)
-    
-    def draw_hinge(self, draw: ImageDraw.Draw, hinge_type: HingeType,
-                   position: Tuple[float, float], rotation: float = 0,
-                   #start_point: Optional[Tuple[float, float]] = None,
-                   #end_point: Optional[Tuple[float, float]] = None,
-                   #orientation: int = 0, size: float = 15.0
-                   ):
-        """Draw hinge/joint of specified type"""
+
+    def draw_hinge(
+        self,
+        draw: ImageDraw.Draw,
+        hinge_type: HingeType,
+        position: Tuple[float, float],
+        rotation: float = 0.0,
+    ):
         hinge = StanliHinge(hinge_type)
         hinge.draw(draw, position)
-    
-    def draw_load(self, draw: ImageDraw.Draw, load_type: LoadType,
-                  position: Tuple[float, float], rotation: float = 0,
-                  length: float = 40.0, distance: float = 0
-                  ):
-        """Draw load of specified type"""
+
+    def draw_load(
+        self,
+        draw: ImageDraw.Draw,
+        load_type: LoadType,
+        position: Tuple[float, float],
+        rotation: float = 0.0,
+        length: float = 40.0,
+        distance: float = 0.0,
+    ):
         load = StanliLoad(load_type)
         load.draw(draw, position, rotation, length, distance)
-    
-    ####
-    ## DEBUG
-    ####
 
+  
     def show_symbol_galleries(self):
         """Interactive single-window gallery to switch categories."""
 
@@ -222,14 +246,9 @@ class StanliRenderer:
         plt.show()
 
 
-
-###
-# For debug
-###
-
-def render_structure_to_image(structure: Structure, 
-                            image_size: Tuple[int, int] = (800, 600)) -> Image.Image:
-    """Render a structure to PIL Image using StanliRenderer"""
+def render_structure_to_image(system: ImageSystem,
+                              image_size: Tuple[int, int] = (800, 600)) -> Image.Image:
+    """Render an ImageSystem to PIL Image using StanliRenderer."""
     class SimpleConfig:
         def __init__(self):
             self.image_size = image_size
@@ -238,7 +257,7 @@ def render_structure_to_image(structure: Structure,
             self.support_size = 25
             self.node_radius = 8
             self.node_color = (50, 50, 200)
-    
+
     config = SimpleConfig()
     renderer = StanliRenderer(config)
-    return renderer.render_structure(structure)
+    return renderer.render_structure(system)

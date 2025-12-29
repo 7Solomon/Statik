@@ -1,21 +1,34 @@
 import os
 import json
-from typing import List, Dict, Tuple
+import time
+from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 import random
+import uuid
 import yaml
 from PIL import Image
 
+from src.models.image_models import ImageSystem
 from src.plugins.generator.image.stanli_symbols import StanliSupport, StanliHinge, StanliLoad, SupportType
 
 class YOLODatasetManager:
     """Manages YOLO format dataset creation"""
     
-    def __init__(self, config):
-        self.config = config
-        dirs = os.listdir(config.output_dir)
-        self.output_dir = config.output_dir / str(len(dirs))
+    def __init__(self, datasets_dir: Path, classes: List[str], dataset_id:str):
+        self.classes = classes
+        self.datasets_dir = datasets_dir
 
+        self.dataset_id = dataset_id
+
+        self.output_dir = self.datasets_dir / self.dataset_id
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        print(f"[DATASET] Created dataset folder: {self.output_dir}")
+
+    def get_output_dir(self) -> Path:
+        """Return the unique dataset path."""
+        return self.output_dir
+    
     @classmethod
     def from_dataset_yaml(cls, dataset_yaml: str):
         """Create a manager by loading dataset.yaml."""
@@ -51,27 +64,50 @@ class YOLODatasetManager:
             'train': 'train/images',
             'val': 'val/images',
             'test': 'test/images',
-            'names': list(self.config.classes)
+            'names': list(self.classes)
         }
         
         with open(self.output_dir / 'dataset.yaml', 'w') as f:
             yaml.dump(dataset_info, f, default_flow_style=False)
     
-    def save_sample(self, image: Image.Image, structure: Structure, 
-                   filename: str, split: str = 'train'):
-        """Save image and labels in YOLO format"""
-        # Save image
-        image_path = self.output_dir / split / 'images' / f'{filename}.jpg'
-        image.save(image_path, 'JPEG', quality=95)
+    def save_sample(self, image: Image.Image, system: ImageSystem,
+                filename: str, split: str = 'train'):
+        """Save image and labels - CREATE DIRECTORIES IF MISSING."""
         
-        # Create YOLO format labels
-        labels = self._structure_to_yolo_labels(structure, image.size)
+        # CREATE DIRECTORIES if they don't exist
+        images_dir = self.output_dir / split / 'images'
+        labels_dir = self.output_dir / split / 'labels'
+        
+        images_dir.mkdir(parents=True, exist_ok=True)
+        labels_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save image
+        image_path = images_dir / f'{filename}.jpg'
+        try:
+            image.save(image_path, 'JPEG', quality=95)
+        except Exception as e:
+            print(f"[SAVE ERROR] Image {image_path}: {e}")
+            return False
+        
+        # Create YOLO labels
+        try:
+            labels = self._structure_to_yolo_labels(system, image.size)
+        except Exception as e:
+            print(f"[LABELS ERROR] {e}")
+            labels = []
         
         # Save labels
-        label_path = self.output_dir / split / 'labels' / f'{filename}.txt'
-        with open(label_path, 'w') as f:
-            for label in labels:
-                f.write(' '.join(map(str, label)) + '\n')
+        label_path = labels_dir / f'{filename}.txt'
+        try:
+            with open(label_path, 'w') as f:
+                for label in labels:
+                    f.write(' '.join(map(str, label)) + '\n')
+        except Exception as e:
+            print(f"[SAVE ERROR] Labels {label_path}: {e}")
+            return False
+        
+        return True  # Success!
+
     
     def _normalize_class_name(self, obj) -> str:
         """Return uniform name (e.g. FESTE_EINSPANNUNG, VOLLGELENK)."""
@@ -83,7 +119,7 @@ class YOLODatasetManager:
         return s
 
     def _class_id(self, name: str) -> int:
-        names = list(self.config.classes)
+        names = list(self.classes)
         if name not in names:
             # Instead of silently producing -1 somewhere else, fail loud & early
             raise ValueError(
@@ -93,118 +129,54 @@ class YOLODatasetManager:
         return names.index(name)
 
 
-    def _structure_to_yolo_labels(self, structure: Structure, 
-                                 image_size: Tuple[int, int]) -> List[List[float]]:
-        """Convert structure to YOLO format labels with geometry-based bounding boxes."""
+    def _structure_to_yolo_labels(self, system: ImageSystem, image_size: Tuple[int, int]) -> List[List[float]]:
+        """Simple bounding boxes - NO CRASHES."""
         labels = []
         w, h = image_size
-
-        # Process nodes (supports only)
-        for node in structure.nodes:
-            if not getattr(node, "support_type", None):
-                continue
-            
-            subtype = self._normalize_class_name(node.support_type)
-            try:
-                class_id = self._class_id(subtype)
-            except ValueError:
-                continue
-            
-            # Get actual geometry-based bbox
-            support_symbol = StanliSupport(node.support_type)
-            rotation = getattr(node, "rotation", 0.0)
-            min_x, min_y, max_x, max_y = support_symbol.get_bbox(node.position, rotation)
-            
-            # Convert to YOLO format (normalized center + width/height)
-            cx = ((min_x + max_x) / 2) / w
-            cy = ((min_y + max_y) / 2) / h
-            bw = (max_x - min_x) / w
-            bh = (max_y - min_y) / h
-            
-            # Clamp to valid range and skip if degenerate
-            if bw <= 0 or bh <= 0:
-                continue
-            cx = max(0, min(1, cx))
-            cy = max(0, min(1, cy))
-            bw = max(0, min(1, bw))
-            bh = max(0, min(1, bh))
-            
-            labels.append([class_id, cx, cy, bw, bh])
-
-        # Process hinges (separate from nodes)
-        for hinge in getattr(structure, "hinges", []):
-            node = structure.get_node_by_id(hinge.node_id)
-            if not node:
-                continue
-            
-            subtype = self._normalize_class_name(hinge.hinge_type)
-            try:
-                class_id = self._class_id(subtype)
-            except ValueError:
-                continue
-            
-            # Get actual geometry-based bbox
-            hinge_symbol = StanliHinge(hinge.hinge_type)
-            rotation = getattr(hinge, "rotation", 0.0)
-            
-            # Get connected node positions for context-aware hinges
-            p_init = None
-            p_end = None
-            if hinge.start_node_id is not None:
-                start_node = structure.get_node_by_id(hinge.start_node_id)
-                if start_node:
-                    p_init = start_node.position
-            if hinge.end_node_id is not None:
-                end_node = structure.get_node_by_id(hinge.end_node_id)
-                if end_node:
-                    p_end = end_node.position
-            
-            min_x, min_y, max_x, max_y = hinge_symbol.get_bbox(
-                node.position, rotation, p_init, p_end
-            )
-            
-            # Convert to YOLO format
-            cx = ((min_x + max_x) / 2) / w
-            cy = ((min_y + max_y) / 2) / h
-            bw = (max_x - min_x) / w
-            bh = (max_y - min_y) / h
-            
-            # Clamp and validate
-            if bw <= 0 or bh <= 0:
-                continue
-            cx = max(0, min(1, cx))
-            cy = max(0, min(1, cy))
-            bw = max(0, min(1, bw))
-            bh = max(0, min(1, bh))
-            
-            labels.append([class_id, cx, cy, bw, bh])
-
-        # Optional: Process loads
-        # Uncomment if you want to label loads as objects
-        # for load in getattr(structure, "loads", []):
-        #     node = structure.get_node_by_id(load.node_id)
-        #     if not node:
-        #         continue
-        #     
-        #     subtype = self._normalize_class_name(load.load_type)
-        #     try:
-        #         class_id = self._class_id(subtype)
-        #     except ValueError:
-        #         continue
-        #     
-        #     load_symbol = StanliLoad(load.load_type)
-        #     rotation = getattr(load, "rotation", 0.0)
-        #     min_x, min_y, max_x, max_y = load_symbol.get_bbox(node.position, rotation)
-        #     
-        #     cx = ((min_x + max_x) / 2) / w
-        #     cy = ((min_y + max_y) / 2) / h
-        #     bw = (max_x - min_x) / w
-        #     bh = (max_y - min_y) / h
-        #     
-        #     if bw > 0 and bh > 0:
-        #         labels.append([class_id, cx, cy, bw, bh])
-
+        
+        # Supports
+        for node in getattr(system, 'nodes', []):
+            support_type = getattr(node, 'support_type', None)
+            if support_type and support_type != 'free':
+                subtype = self._normalize_class_name(support_type)
+                if subtype in self.classes:
+                    class_id = self.classes.index(subtype)
+                    
+                    # FIXED 16x16 box around node center
+                    x, y = node.pixel_x, node.pixel_y
+                    half = 8.0
+                    cx = (x / w)
+                    cy = (y / h) 
+                    bw = (16.0 / w)
+                    bh = (16.0 / h)
+                    
+                    labels.append([class_id, cx, cy, bw, bh])
+        
+        # Loads  
+        for load in getattr(system, 'loads', []):
+            ltype = self._normalize_class_name(getattr(load, 'load_type', ''))
+            if ltype in self.classes:
+                class_id = self.classes.index(ltype)
+                
+                # Use node position or load position
+                x = getattr(load, 'pixel_x', 320.0)
+                y = getattr(load, 'pixel_y', 320.0)
+                if hasattr(load, 'node_id') and load.node_id:
+                    node = next((n for n in getattr(system, 'nodes', []) if n.id == load.node_id), None)
+                    if node:
+                        x, y = node.pixel_x, node.pixel_y
+                
+                # FIXED 24x24 box
+                half = 12.0
+                cx = (x / w)
+                cy = (y / h)
+                bw = (24.0 / w)
+                bh = (24.0 / h)
+                
+                labels.append([class_id, cx, cy, bw, bh])
+        
         return labels
+
 
 
     def get_image_list(self, split: str = "train") -> List[Dict]:
@@ -243,8 +215,8 @@ class YOLODatasetManager:
                         class_id = int(float(parts[0]))
                         cx, cy, w, h = map(float, parts[1:])
                         class_name = (
-                            list(self.config.classes)[class_id] 
-                            if 0 <= class_id < len(self.config.classes) 
+                            list(self.classes)[class_id] 
+                            if 0 <= class_id < len(self.classes) 
                             else f"class_{class_id}"
                         )
                         labels.append({
@@ -264,7 +236,7 @@ class YOLODatasetManager:
         import matplotlib.pyplot as plt
         cmap = plt.get_cmap("tab20")
         colors = {}
-        for i in range(len(self.config.classes)):
+        for i in range(len(self.classes)):
             rgba = cmap(i % 20)
             # Convert to hex
             hex_color = "#{:02x}{:02x}{:02x}".format(

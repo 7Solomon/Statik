@@ -1,11 +1,13 @@
 import { useState } from "react";
 import EditorCanvas from "../features/editor/EditorCanvas";
 import { useStore } from "../store/useStore";
-import { Save, FolderOpen, LayoutDashboard, Calculator } from 'lucide-react';
+// Import Database icon
+import { Save, FolderOpen, LayoutDashboard, Calculator, Database } from 'lucide-react';
 import { SaveSystemModal } from "~/features/modals/SaveSystemModal";
 import { LoadSystemModal } from "~/features/modals/LoadSystemModal";
 import { SidePanel } from "~/features/ui/SidePannel";
 import AnalysisViewer from "~/features/analysis/AnalysisViewer";
+import DatasetManager from "~/features/datasets/DataSetManager";
 
 export default function Home() {
   const mode = useStore(state => state.shared.mode);
@@ -21,16 +23,16 @@ export default function Home() {
 
   const [modalOpen, setModalOpen] = useState<'save' | 'load' | null>(null);
 
-  const handleToggleMode = () => {
-    if (mode === 'EDITOR') {
+  const handleToggleMode = (targetMode: 'EDITOR' | 'ANALYSIS' | 'DATASET') => {
+    if (targetMode === 'ANALYSIS') {
       // 1. Initialize Analysis Session with current Editor System
-
       startAnalysis({ nodes, members, loads });
-      // 2. Mode switch is handled automatically by startAnalysis in your store, 
-      // but if not, you can call setMode('ANALYSIS') here.
     } else {
-      // Switch back to Editor
-      clearAnalysis(); // This should set mode to EDITOR
+      // Clear analysis if leaving analysis mode
+      if (mode === 'ANALYSIS') {
+        clearAnalysis();
+      }
+      setMode(targetMode);
     }
   };
 
@@ -50,31 +52,35 @@ export default function Home() {
           <HeaderButton icon={<Save size={16} />} label="Save" onClick={() => setModalOpen('save')} />
         </div>
 
-        {/* Center Mode Switcher */}
+        {/* Center Mode Switcher - NOW WITH 3 BUTTONS */}
         <div className="absolute left-1/2 -translate-x-1/2 bg-slate-100 p-1 rounded-lg flex gap-1 border border-slate-200">
-          <button
-            onClick={() => mode === 'ANALYSIS' && handleToggleMode()}
-            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${mode === 'EDITOR' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            <LayoutDashboard size={14} />
-            <span>Editor</span>
-          </button>
-          <button
-            onClick={() => mode === 'EDITOR' && handleToggleMode()}
-            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${mode === 'ANALYSIS' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            <Calculator size={14} />
-            <span>Analysis</span>
-          </button>
+          <ModeButton
+            active={mode === 'EDITOR'}
+            onClick={() => handleToggleMode('EDITOR')}
+            icon={<LayoutDashboard size={14} />}
+            label="Editor"
+          />
+          <ModeButton
+            active={mode === 'ANALYSIS'}
+            onClick={() => handleToggleMode('ANALYSIS')}
+            icon={<Calculator size={14} />}
+            label="Analysis"
+          />
+          <div className="w-px bg-slate-200 my-1 mx-1"></div>
+          <ModeButton
+            active={mode === 'DATASET'}
+            onClick={() => handleToggleMode('DATASET')}
+            icon={<Database size={14} />}
+            label="Datasets"
+          />
         </div>
-
       </header>
 
       <div className="flex flex-1 relative overflow-hidden">
         <main className="flex-1 relative bg-slate-100/50">
-          {mode === 'EDITOR' ? <EditorCanvas /> : <AnalysisViewer />}
+          {mode === 'EDITOR' && <EditorCanvas />}
+          {mode === 'ANALYSIS' && <AnalysisViewer />}
+          {mode === 'DATASET' && <DatasetManager />}
         </main>
         {mode === 'EDITOR' && <SidePanel />}
       </div>
@@ -86,6 +92,7 @@ export default function Home() {
   );
 }
 
+// Helper components for cleaner JSX
 function HeaderButton({ icon, label, onClick }: any) {
   return (
     <button
@@ -95,4 +102,19 @@ function HeaderButton({ icon, label, onClick }: any) {
       {icon} <span>{label}</span>
     </button>
   )
+}
+
+function ModeButton({ active, onClick, icon, label }: any) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${active
+          ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
+          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+        }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
 }

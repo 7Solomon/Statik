@@ -1,8 +1,9 @@
 import type { Load, Member, Node, KinematicResult, Release, Vec2, StructuralSystem, FEMResult } from '~/types/model';
 import type { AnalysisInteractionState, EditorInteractionState, ToolType, ViewportState } from '~/types/app';
 
-export type AppMode = 'EDITOR' | 'ANALYSIS';
-export type AnalysisViewMode = 'KINEMATIC' | 'SIMPLIFIED' | 'SOLUTION'
+// --- SHARED DOMAIN ---
+export type AppMode = 'EDITOR' | 'ANALYSIS' | 'DATASET';
+export type AnalysisViewMode = 'KINEMATIC' | 'SIMPLIFIED' | 'SOLUTION';
 
 // --- EDITOR DOMAIN ---
 export interface EditorState {
@@ -32,13 +33,11 @@ export interface EditorActions {
 }
 
 // --- ANALYSIS DOMAIN ---
-
 export interface AnalysisSession {
     system: StructuralSystem;
     viewMode: AnalysisViewMode;
     viewport: ViewportState;
     interaction: AnalysisInteractionState;
-
     kinematicResult: KinematicResult | null;
     simplifyResult: StructuralSystem | null;
     solutionResult: FEMResult | null;
@@ -51,25 +50,35 @@ export interface AnalysisState {
 export interface AnalysisActions {
     startAnalysis: (system: StructuralSystem) => void;
     clearAnalysisSession: () => void;
-
     setViewMode: (mode: AnalysisViewMode) => void;
     setViewport: (view: Partial<ViewportState>) => void;
     setInteraction: (inter: Partial<AnalysisInteractionState>) => void;
-
     setKinematicResult: (result: KinematicResult | null) => void;
     setSimplifyResult: (result: StructuralSystem | null) => void;
     setSolutionResult: (result: FEMResult | null) => void;
 }
 
-export interface AnalysisActions {
+// --- DATASET DOMAIN ---
+export interface Dataset {
+    path: string;
+    yaml: string;
+    created: number;
+}
 
-    setViewMode: (mode: AnalysisViewMode) => void;
-    setViewport: (view: Partial<ViewportState>) => void;
-    setInteraction: (inter: Partial<AnalysisInteractionState>) => void;
+export interface DatasetState {
+    datasets: Dataset[];
+    isLoading: boolean;
+    currentPreviewConfig: any | null;
+}
 
-    setKinematicResult: (result: KinematicResult | null) => void;
-    setSimplifyResult: (result: StructuralSystem | null) => void;
-    setSolutionResult: (result: FEMResult | null) => void;
+export interface DatasetActions {
+    fetchDatasets: () => Promise<void>;
+    generateDataset: (numSamples: number, forceRecreate?: boolean) => Promise<void>;
+    previewSymbols: () => Promise<void>;
+
+    getDatasetInfo: (datasetPath: string) => Promise<any>;
+    getSplitImages: (datasetPath: string, split: 'train' | 'val' | 'test') => Promise<any[]>;
+    getImageLabels: (datasetPath: string, split: string, stem: string) => Promise<any[]>;
 }
 
 // --- SHARED DOMAIN ---
@@ -85,5 +94,6 @@ export interface SharedActions {
 export interface AppStore {
     editor: EditorState & { actions: EditorActions };
     analysis: AnalysisState & { actions: AnalysisActions };
+    dataset: DatasetState & { actions: DatasetActions };
     shared: SharedState & { actions: SharedActions };
 }

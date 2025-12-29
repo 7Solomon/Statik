@@ -5,10 +5,6 @@ from pathlib import Path
 @dataclass
 class DatasetConfig:
     """Configuration for dataset generation - paths coordinated by AppState"""
-    folder_name: str = "datasets"
-    root_dir: Optional[Path] = field(default=None, repr=False)
-    output_dir: Path = field(init=False)
-
     # --- Generation Settings---
     train_ratio: float = 0.8
     val_ratio: float = 0.15
@@ -54,11 +50,12 @@ class DatasetConfig:
     classes: List[str] = field(default_factory=lambda: [
         "FESTLAGER", "LOSLAGER", "FESTE_EINSPANNUNG", "GLEITLAGER", 
         "FEDER", "TORSIONSFEDER",
-        "VOLLGELENK", "HALBGELENK", "SCHUBGELENK", "NORMALKRAFTGELENK", "BIEGESTEIFE_ECKE"
+        "EINZELLAST", "MOMENT_UHRZEIGER"
     ])
+
 
     def __post_init__(self):
         """Initialize directory structure"""
-        self.base_dir = self.root_dir / self.folder_name
-        self.base_dir.mkdir(parents=True, exist_ok=True)
-        self.output_dir = self.base_dir  # JUST FOR COMPATABILITY BUT THIS NEEDS TO BE LOOKED AFTER IF NESECARRY AND WHAT IT DO
+        #self.base_dir = self.root_dir / self.folder_name
+        #self.base_dir.mkdir(parents=True, exist_ok=True)
+        #self.output_dir = self.base_dir  # JUST FOR COMPATABILITY BUT THIS NEEDS TO BE LOOKED AFTER IF NESECARRY AND WHAT IT DO

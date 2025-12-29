@@ -33,14 +33,32 @@ export interface EditorActions {
 
 // --- ANALYSIS DOMAIN ---
 
-export interface AnalysisState {
+export interface AnalysisSession {
+    system: StructuralSystem;
     viewMode: AnalysisViewMode;
     viewport: ViewportState;
     interaction: AnalysisInteractionState;
 
     kinematicResult: KinematicResult | null;
     simplifyResult: StructuralSystem | null;
-    solutionResult: FEMResult | null;  // MAYBE ADD A UNION FOR THE SOLTUION SO I CAN PASS MORE THEN FEM
+    solutionResult: FEMResult | null;
+}
+
+export interface AnalysisState {
+    analysisSession: AnalysisSession | null;
+}
+
+export interface AnalysisActions {
+    startAnalysis: (system: StructuralSystem) => void;
+    clearAnalysisSession: () => void;
+
+    setViewMode: (mode: AnalysisViewMode) => void;
+    setViewport: (view: Partial<ViewportState>) => void;
+    setInteraction: (inter: Partial<AnalysisInteractionState>) => void;
+
+    setKinematicResult: (result: KinematicResult | null) => void;
+    setSimplifyResult: (result: StructuralSystem | null) => void;
+    setSolutionResult: (result: FEMResult | null) => void;
 }
 
 export interface AnalysisActions {

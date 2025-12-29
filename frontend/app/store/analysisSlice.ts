@@ -1,10 +1,11 @@
 import type { StateCreator } from "zustand";
-import type { AppStore } from "./types"; // Adjust path as needed
-import type { ViewportState } from "~/types/app";
+import type { AppStore } from "./types";
+import type { ViewportState, AnalysisInteractionState } from "~/types/app";
+import type { StructuralSystem } from "~/types/model";
 
 const DEFAULT_VIEWPORT_ANALYSIS: ViewportState = {
-    zoom: 50,           // Pixels per meter
-    pan: { x: 400, y: 300 },
+    zoom: 50,
+    pan: { x: 400, y: 300 }, // Legacy field often unused if x/y used directly, but keeping for type safety
     gridSize: 1.0,
     width: 0,
     height: 0,
@@ -12,7 +13,7 @@ const DEFAULT_VIEWPORT_ANALYSIS: ViewportState = {
     y: 0
 };
 
-const DEFAULT_INTERACTION_ANALYSIS = {
+const DEFAULT_INTERACTION_ANALYSIS: AnalysisInteractionState = {
     isDragging: false,
     mousePos: { x: 0, y: 0 },
     hoveredNodeId: null,
@@ -27,55 +28,117 @@ export const createAnalysisSlice: StateCreator<
 > = (set, get) => ({
 
     analysis: {
-        // 1. STATE
-        viewMode: 'KINEMATIC',
-        viewport: DEFAULT_VIEWPORT_ANALYSIS,
-        interaction: DEFAULT_INTERACTION_ANALYSIS,
+        analysisSession: null, // Start with no active analysis session
 
-        kinematicResult: null,
-        simplifyResult: null,
-        solutionResult: null,
-
-        // 2. ACTIONS
         actions: {
-            // --- NEW ACTION ---
-            setViewport: (partialViewport) => {
+            // Initialize a new analysis session
+            startAnalysis: (system: StructuralSystem) => {
                 set((state) => ({
                     analysis: {
                         ...state.analysis,
-                        viewport: { ...state.analysis.viewport, ...partialViewport }
-                    }
+                        analysisSession: {
+                            system, // MANDATORY SYSTEM
+                            viewMode: 'KINEMATIC',
+                            viewport: DEFAULT_VIEWPORT_ANALYSIS,
+                            interaction: DEFAULT_INTERACTION_ANALYSIS,
+                            kinematicResult: null,
+                            simplifyResult: null,
+                            solutionResult: null,
+                        }
+                    },
+                    // Automatically switch app mode when analysis starts
+                    shared: { ...state.shared, mode: 'ANALYSIS' }
                 }));
             },
-            setInteraction: (partialInteraction) => {
+
+            clearAnalysisSession: () => {
                 set((state) => ({
                     analysis: {
                         ...state.analysis,
-                        viewport: { ...state.analysis.viewport, ...partialInteraction }
-                    }
+                        analysisSession: null
+                    },
+                    shared: { ...state.shared, mode: 'EDITOR' }
                 }));
+            },
+
+            setViewport: (partialViewport) => {
+                set((state) => {
+                    if (!state.analysis.analysisSession) return state;
+                    return {
+                        analysis: {
+                            ...state.analysis,
+                            analysisSession: {
+                                ...state.analysis.analysisSession,
+                                viewport: { ...state.analysis.analysisSession.viewport, ...partialViewport }
+                            }
+                        }
+                    };
+                });
+            },
+
+            setInteraction: (partialInteraction) => {
+                set((state) => {
+                    if (!state.analysis.analysisSession) return state;
+                    return {
+                        analysis: {
+                            ...state.analysis,
+                            analysisSession: {
+                                ...state.analysis.analysisSession,
+                                interaction: { ...state.analysis.analysisSession.interaction, ...partialInteraction }
+                            }
+                        }
+                    };
+                });
             },
 
             setKinematicResult: (result) => {
-                set((state) => ({
-                    analysis: { ...state.analysis, kinematicResult: result }
-                }));
+                set((state) => {
+                    if (!state.analysis.analysisSession) return state;
+                    return {
+                        analysis: {
+                            ...state.analysis,
+                            analysisSession: { ...state.analysis.analysisSession, kinematicResult: result }
+                        }
+                    };
+                });
             },
+
             setSimplifyResult: (result) => {
-                set((state) => ({
-                    analysis: { ...state.analysis, simplifyResult: result }
-                }));
+                set((state) => {
+                    if (!state.analysis.analysisSession) return state;
+                    return {
+                        analysis: {
+                            ...state.analysis,
+                            analysisSession: { ...state.analysis.analysisSession, simplifyResult: result }
+                        }
+                    };
+                });
             },
+
             setSolutionResult: (result) => {
-                set((state) => ({
-                    analysis: { ...state.analysis, solutionResult: result }
-                }));
+                set((state) => {
+                    if (!state.analysis.analysisSession) return state;
+                    return {
+                        analysis: {
+                            ...state.analysis,
+                            analysisSession: { ...state.analysis.analysisSession, solutionResult: result }
+                        }
+                    };
+                });
             },
 
             setViewMode: (mode) => {
-                set((state) => ({
-                    analysis: { ...state.analysis, viewMode: mode }
-                }));
+                set((state) => {
+                    console.log("SETVIEWMODE")
+                    console.log(state.analysis.analysisSession)
+                    if (!state.analysis.analysisSession) return state;
+                    return {
+                        analysis: {
+                            ...state.analysis,
+                            analysisSession: { ...state.analysis.analysisSession, viewMode: mode }
+                        }
+                    };
+                });
             }
         }
     }

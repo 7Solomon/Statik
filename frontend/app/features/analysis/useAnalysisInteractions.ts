@@ -1,12 +1,26 @@
 import { useRef, useCallback, useEffect } from 'react';
-import { useStore } from '~/store/useStore'; // Adjust path to your store hook
+import { useStore } from '~/store/useStore';
 import type { ViewportState } from '~/types/app';
 
+// Default viewport fallback in case hook is called too early
+const DEFAULT_VIEWPORT: ViewportState = {
+    zoom: 50,
+    pan: { x: 0, y: 0 },
+    gridSize: 1.0,
+    width: 0,
+    height: 0,
+    x: 0,
+    y: 0
+};
+
 export function useAnalysisInteractions() {
-    // 1. Access Store Actions (without subscribing to state changes to avoid re-renders)
+    // 1. Access Store Actions
     const setViewport = useStore((state) => state.analysis.actions.setViewport);
 
-    const initialViewport = useStore.getState().analysis.viewport;
+    // 2. Access Initial State safely
+    // We check if analysisSession exists; if not, fall back to defaults to prevent crashes
+    const initialSession = useStore.getState().analysis.analysisSession;
+    const initialViewport = initialSession?.viewport || DEFAULT_VIEWPORT;
 
     const view = useRef<ViewportState>({ ...initialViewport });
     const isDragging = useRef(false);
@@ -17,7 +31,6 @@ export function useAnalysisInteractions() {
         const scale = e.deltaY > 0 ? 0.9 : 1.1;
         view.current.zoom = Math.max(5, Math.min(200, view.current.zoom * scale));
 
-        // Sync to store immediately for wheel (or debounce if you prefer)
         setViewport({ zoom: view.current.zoom });
     }, [setViewport]);
 
@@ -32,7 +45,6 @@ export function useAnalysisInteractions() {
         const dx = e.clientX - lastPos.current.x;
         const dy = e.clientY - lastPos.current.y;
 
-        // Update Ref strictly for the Animation Loop (Fast)
         view.current.x += dx;
         view.current.y += dy;
 
@@ -42,20 +54,16 @@ export function useAnalysisInteractions() {
     const handleMouseUp = useCallback(() => {
         if (isDragging.current) {
             isDragging.current = false;
-
-            // Sync final position to Store (Persistence)
             setViewport({ x: view.current.x, y: view.current.y });
         }
     }, [setViewport]);
 
     // 4. Utilities
     const resetView = useCallback(() => {
-        // Reset Ref
         view.current.zoom = 50;
         view.current.x = 0;
         view.current.y = 0;
 
-        // Reset Store
         setViewport({ zoom: 50, x: 0, y: 0 });
     }, [setViewport]);
 
@@ -64,7 +72,6 @@ export function useAnalysisInteractions() {
         const height = canvas.parentElement?.clientHeight || 600;
         const dpr = window.devicePixelRatio || 1;
 
-        // Only resize if dimensions actually changed to avoid thrashing
         if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
             canvas.width = width * dpr;
             canvas.height = height * dpr;
@@ -74,22 +81,20 @@ export function useAnalysisInteractions() {
 
             view.current.width = width;
             view.current.height = height;
-
-            // Optional: Update store with new dimensions
-            // setViewport({ width, height }); 
         }
 
         return { width, height };
     }, []);
 
-    // 5. Sync on Mount/Unmount (Optional safety)
+    // 5. Sync on Mount/Unmount
     useEffect(() => {
-        // Ensure ref matches store when component mounts (in case store changed elsewhere)
-        const currentStoreState = useStore.getState().analysis.viewport;
-        view.current = { ...currentStoreState };
+        // Safe access with optional chaining
+        const currentSession = useStore.getState().analysis.analysisSession;
+        if (currentSession?.viewport) {
+            view.current = { ...currentSession.viewport };
+        }
 
         return () => {
-            // Save state on unmount
             setViewport(view.current);
         };
     }, [setViewport]);

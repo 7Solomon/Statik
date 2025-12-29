@@ -109,7 +109,6 @@ export interface KinematicResult {
   is_kinematic: boolean;
   dof: number;
   modes: KinematicMode[];
-  system: StructuralSystem;
 
 }
 
@@ -140,8 +139,7 @@ export interface MemberResult {
 
 export interface FEMResult {
   success: boolean;
-  system: StructuralSystem;
-  displacements: Record<string, [number, number, number]>; // NodeId -> [dx, dy, rot]
-  reactions: Record<string, [number, number, number]>;     // NodeId -> [Rx, Ry, Mz]
-  memberResults: Record<string, MemberResult>;             // MemberId -> Result
+  displacements: Record<string, [number, number, number]>;
+  reactions: Record<string, [number, number, number]>;
+  memberResults: Record<string, MemberResult>;
 }

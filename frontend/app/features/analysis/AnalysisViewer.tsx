@@ -1,83 +1,68 @@
-import { useStore } from '~/store/useStore';
-import { Layers, GitMerge } from 'lucide-react';
-import SimplifiedViewer from './SimplifiedViewer';
-import KinematicViewer from './KinematicsViewer';
-import SolutionViewer from './SolutionViewer';
+import { useStore } from "~/store/useStore";
+import { Layers, GitMerge, Zap } from "lucide-react";
+import SimplifiedViewer from "./SimplifiedViewer";
+import KinematicViewer from "./KinematicsViewer";
+import SolutionViewer from "./SolutionViewer";
 
 export default function AnalysisViewer() {
-    // 1. Get the current view mode from your store
-    const viewMode = useStore(s => s.analysis.viewMode);
-    const setViewMode = useStore(s => s.analysis.actions.setViewMode);
+    const analysisSession = useStore((s) => s.analysis.analysisSession);
+    const setViewMode = useStore((s) => s.analysis.actions.setViewMode);
 
-    // 2. Check which results are available (to disable buttons if needed)
-    const hasKinematic = useStore(s => !!s.analysis.kinematicResult);
-    const hasSimplified = useStore(s => !!s.analysis.simplifyResult);
-    const hasSolution = useStore(s => !!s.analysis.solutionResult);
+    if (!analysisSession) return <div className="flex items-center justify-center h-full text-slate-400">No active analysis session</div>;
+
+    const { viewMode } = analysisSession;
 
     return (
-        <div className="relative w-full h-full">
+        <div className="flex flex-col w-full h-full">
 
-            {/* 3. Render the correct sub-viewer */}
-            {viewMode === 'KINEMATIC' && <KinematicViewer />}
-            {viewMode === 'SIMPLIFIED' && <SimplifiedViewer />}
-            {viewMode === 'SOLUTION' && <SolutionViewer />}
-
-
-            {/* 4. Tab Switcher Overlay */}
-            {(hasKinematic || hasSimplified) && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-1 p-1 bg-white/90 backdrop-blur-sm rounded-lg border border-slate-200 shadow-sm z-10">
-
-                    {/* Kinematic Tab */}
-                    <button
+            <div className="flex-none flex justify-center p-2 border-b border-slate-200 bg-white z-10 relative">
+                {/* Removed 'backdrop-blur' because it's now on a solid white background */}
+                <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+                    <TabButton
+                        active={viewMode === 'KINEMATIC'}
                         onClick={() => setViewMode('KINEMATIC')}
-                        disabled={!hasKinematic}
-                        className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all
-                            ${viewMode === 'KINEMATIC'
-                                ? 'bg-blue-50 text-blue-700 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
-                            ${!hasKinematic ? 'opacity-50 cursor-not-allowed' : ''}
-                        `}
-                    >
-                        <Layers size={14} />
-                        <span>Kinematic</span>
-                    </button>
-
+                        icon={<Layers size={14} />}
+                        label="Kinematics"
+                    />
                     <div className="w-px bg-slate-200 my-1"></div>
-
-                    {/* Simplified Tab */}
-                    <button
+                    <TabButton
+                        active={viewMode === 'SIMPLIFIED'}
                         onClick={() => setViewMode('SIMPLIFIED')}
-                        disabled={!hasSimplified}
-                        className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all
-                            ${viewMode === 'SIMPLIFIED'
-                                ? 'bg-blue-50 text-blue-700 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
-                            ${!hasSimplified ? 'opacity-50 cursor-not-allowed' : ''}
-                        `}
-                    >
-                        <GitMerge size={14} />
-                        <span>Simplified</span>
-                    </button>
-
+                        icon={<GitMerge size={14} />}
+                        label="Simplified"
+                    />
                     <div className="w-px bg-slate-200 my-1"></div>
-
-                    {/* Kinematic Tab */}
-                    <button
+                    <TabButton
+                        active={viewMode === 'SOLUTION'}
                         onClick={() => setViewMode('SOLUTION')}
-                        disabled={!hasSolution}
-                        className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all
-                            ${viewMode === 'SOLUTION'
-                                ? 'bg-blue-50 text-blue-700 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
-                            ${!hasKinematic ? 'opacity-50 cursor-not-allowed' : ''}
-                        `}
-                    >
-                        <Layers size={14} />
-                        <span>Kinematic</span>
-                    </button>
-
+                        icon={<Zap size={14} />}
+                        label="Solution"
+                    />
                 </div>
-            )}
+            </div>
+
+            {/* 3. Render Sub-Viewers - Takes all remaining space (flex-1) */}
+            <div className="flex-1 relative overflow-hidden bg-slate-50">
+                {viewMode === 'KINEMATIC' && <KinematicViewer />}
+                {viewMode === 'SIMPLIFIED' && <SimplifiedViewer />}
+                {viewMode === 'SOLUTION' && <SolutionViewer />}
+            </div>
         </div>
+    );
+
+}
+
+function TabButton({ active, onClick, icon, label }: any) {
+    return (
+        <button
+            onClick={onClick}
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${active
+                ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-200'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+        >
+            {icon}
+            <span>{label}</span>
+        </button>
     );
 }

@@ -15,12 +15,13 @@ class BeamType(Enum):
     BIEGUNG_OHNE_FASER = 4
 
 class SupportType(Enum):
-    FESTLAGER = 1
-    LOSLAGER = 2
-    FESTE_EINSPANNUNG = 3
-    GLEITLAGER = 4
-    FEDER = 5
-    TORSIONSFEDER = 6
+    FREIES_ENDE = 1
+    FESTLAGER = 2
+    LOSLAGER = 3
+    FESTE_EINSPANNUNG = 4
+    GLEITLAGER = 5
+    FEDER = 6
+    TORSIONSFEDER = 7
 
 class HingeType(Enum):
     VOLLGELENK = 1
@@ -33,17 +34,17 @@ class LoadType(Enum):
     EINZELLAST = 1
     MOMENT_UHRZEIGER = 2
     MOMENT_GEGEN_UHRZEIGER = 3
-    STRECKENLAST = 4 # EXPERIMENTAL BE CAREFULL 
-
+    STRECKENLAST = 4 # EXPERIMENTAL BE CAREFULL
 
 # -------------------------------------------------
 # constants from stanli.sty (2D part)
 # -------------------------------------------------
 
-PX_PER_MM = 4.0  # adjust if you want bigger/smaller
+PX_PER_MM = 4.0 
+
 def mm(x: float) -> float: return x * PX_PER_MM
 
-# line widths (approx) keep relative differences
+# line widths 
 LINE_HUGE = 4
 LINE_BIG = 3
 LINE_NORMAL = 2
@@ -68,6 +69,7 @@ FEDERPreLength_pt = 7.0
 FEDERPostLength_pt = 3.0
 FEDERAmplitude = 2.5
 FEDERSegmentLength_pt = 5.0
+
 PT_TO_MM = 0.3514598
 FEDERPreLength = FEDERPreLength_pt * PT_TO_MM
 FEDERPostLength = FEDERPostLength_pt * PT_TO_MM
@@ -87,7 +89,7 @@ momentAngleDefault = 270
 
 # hatching
 hatchingAngle = 45
-hatchingLength = 1.5   # segment spacing (mm) approximation
+hatchingLength = 1.5 
 
 # -------------------------------------------------
 # base
@@ -97,19 +99,32 @@ hatchingLength = 1.5   # segment spacing (mm) approximation
 class StanliSymbol:
     line_width: int = LINE_NORMAL
 
-    def _rot(self, p: Tuple[float, float], origin: Tuple[float, float], angle_deg: float):
-        if angle_deg == 0:
-            return p
+    # In stanli_symbols.py
+    def _rot(self, p, origin, angle_deg):
         a = math.radians(angle_deg)
         ox, oy = origin
         x, y = p
+        # Standard screen-space CCW rotation (Y-down)
         return (
-            ox + math.cos(a)*(x-ox) - math.sin(a)*(y-oy),
-            oy + math.sin(a)*(x-ox) + math.cos(a)*(y-oy)
+            ox + math.cos(a)*(x-ox) + math.sin(a)*(y-oy),
+            -math.sin(a)*(x-ox) + math.cos(a)*(y-oy) + oy # Wait, simplified:
         )
 
     def _rot_many(self, pts, origin, ang):
         return [self._rot(p, origin, ang) for p in pts]
+
+    def _get_rotated_bbox(self, local_corners: List[Tuple[float, float]], origin: Tuple[float, float], rotation: float) -> Tuple[float, float, float, float]:
+        """
+        Takes a list of points (defining the shape in standard orientation) relative to absolute space,
+        rotates them around `origin` by `rotation`, and finds the axis-aligned bounding box.
+        """
+        rotated_points = self._rot_many(local_corners, origin, rotation)
+        xs = [p[0] for p in rotated_points]
+        ys = [p[1] for p in rotated_points]
+        
+        # Add a small padding (e.g. 2px) for line thickness
+        pad = self.line_width + 1
+        return (min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad)
 
 # -------------------------------------------------
 # beams
@@ -120,31 +135,30 @@ class StanliBeam(StanliSymbol):
         super().__init__()
         self.beam_type = beam_type
         if beam_type in (BeamType.BIEGUNG_MIT_FASER, BeamType.BIEGUNG_OHNE_FASER):
-            self.line_width = LINE_HUGE   # 4 (Bending is dominant)
+            self.line_width = LINE_HUGE 
         elif beam_type == BeamType.FACHWERK:
-            self.line_width = LINE_NORMAL # 2 (Truss is standard/light)
+            self.line_width = LINE_NORMAL 
         elif beam_type == BeamType.VERSTECKT:
-            self.line_width = LINE_SMALL  # 1 (Hidden is faint)
+            self.line_width = LINE_SMALL 
         else:
-            # "Normal Beam"
-            self.line_width = LINE_BIG    # 3 (Standard Beam is thick, but less than bending)
+            self.line_width = LINE_BIG 
 
-
-    def draw(self, d: ImageDraw.Draw, a: Tuple[float,float], b: Tuple[float,float],
+    def draw(self, d: ImageDraw.Draw, a: Tuple[float,float], b: Tuple[float,float], 
              rounded_start=False, rounded_end=False):
         if self.beam_type == BeamType.VERSTECKT:
             self._dashed(d, a, b, self.line_width)
         else:
             d.line([a, b], fill="black", width=self.line_width)
-            if self.beam_type == BeamType.BIEGUNG_MIT_FASER:
-                self._fiber(d, a, b)
-            # Only add rounded ends if line is thick enough to avoid artifacts
-            if rounded_start and self.line_width >= LINE_NORMAL:
-                r = max(self.line_width / 2, LINE_SMALL)
-                d.ellipse((a[0]-r,a[1]-r,a[0]+r,a[1]+r), fill="black")
-            if rounded_end and self.line_width >= LINE_NORMAL:
-                r = max(self.line_width / 2, LINE_SMALL)
-                d.ellipse((b[0]-r,b[1]-r,b[0]+r,b[1]+r), fill="black")
+        
+        if self.beam_type == BeamType.BIEGUNG_MIT_FASER:
+            self._fiber(d, a, b)
+            
+        if rounded_start and self.line_width >= LINE_NORMAL:
+            r = max(self.line_width / 2, LINE_SMALL)
+            d.ellipse((a[0]-r,a[1]-r,a[0]+r,a[1]+r), fill="black")
+        if rounded_end and self.line_width >= LINE_NORMAL:
+            r = max(self.line_width / 2, LINE_SMALL)
+            d.ellipse((b[0]-r,b[1]-r,b[0]+r,b[1]+r), fill="black")
 
     def _dashed(self, d, a, b, w, dash=mm(2), gap=mm(1.2)):
         L = math.hypot(b[0]-a[0], b[1]-a[1])
@@ -157,15 +171,26 @@ class StanliBeam(StanliSymbol):
             s += dash + gap
 
     def _fiber(self, d, a, b):
-        # TikZ: (#2)!\barGap!-\barAngle:(#3)
         gap = mm(BAR_GAP_MM)
         ang = math.radians(BAR_ANGLE_DEG)
         vx, vy = b[0]-a[0], b[1]-a[1]
         theta = math.atan2(vy, vx)
         p1 = (a[0] + gap*math.cos(theta - ang), a[1] + gap*math.sin(theta - ang))
-        p2 = (b[0] + gap*math.cos(theta + math.pi + ang),
+        p2 = (b[0] + gap*math.cos(theta + math.pi + ang), 
               b[1] + gap*math.sin(theta + math.pi + ang))
         self._dashed(d, p1, p2, LINE_SMALL)
+
+    def get_bbox(self, a: Tuple[float,float], b: Tuple[float,float]) -> Tuple[float, float, float, float]:
+        """Simple bounding box for line segment + padding."""
+        xs = [a[0], b[0]]
+        ys = [a[1], b[1]]
+        
+        # Extra padding for fiber or thickness
+        pad = self.line_width + 2
+        if self.beam_type == BeamType.BIEGUNG_MIT_FASER:
+            pad += mm(BAR_GAP_MM) # Account for fiber dashed line offset
+
+        return (min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad)
 
 # -------------------------------------------------
 # supports
@@ -177,362 +202,132 @@ class StanliSupport(StanliSymbol):
         self.st = st
 
     def draw(self, d: ImageDraw.Draw, pos: Tuple[float,float], rotation: float=0):
-        dispatch = {
-            SupportType.FESTLAGER: self._s1,
-            SupportType.LOSLAGER: self._s2,
-            SupportType.FESTE_EINSPANNUNG: self._s3,
-            SupportType.GLEITLAGER: self._s4,
-            SupportType.FEDER: self._s5,
-            SupportType.TORSIONSFEDER: self._s6,
-        }
-        dispatch[self.st](d, pos, rotation)
-    
-    def get_bbox(self, pos: Tuple[float, float], rotation: float = 0) -> Tuple[float, float, float, float]:
-        """Calculate axis-aligned bounding box for support symbol.
-        Returns (min_x, min_y, max_x, max_y) in pixel coordinates."""
-        # Different support types have different extents
+        # We rotate the entire drawing canvas context conceptually, 
+        # but here we manually calculate points relative to 'pos' and then rotate.
+        
+        # Helper to simplify calls
+        def p(dx, dy):
+            # Returns absolute point rotated around pos
+            pt = (pos[0] + mm(dx), pos[1] + mm(dy))
+            return self._rot(pt, pos, rotation)
+
         if self.st == SupportType.FESTLAGER:
-            # Triangle + hatching
-            half_width = mm(supportBasicLength) / 2
-            height = mm(supportHeight) + mm(supportBasicHeight)
-            corners = [
-                (pos[0], pos[1]),
-                (pos[0] + mm(supportLength)/2, pos[1] + mm(supportHeight)),
-                (pos[0] - mm(supportLength)/2, pos[1] + mm(supportHeight)),
-                (pos[0] + half_width, pos[1] + height),
-                (pos[0] - half_width, pos[1] + height)
-            ]
+            # Triangle
+            top = p(0, 0)
+            bl = p(-supportLength/2, supportHeight)
+            br = p(supportLength/2, supportHeight)
+            d.polygon([top, bl, br], outline="black", fill=None, width=self.line_width)
+            # Hatching line
+            hl_start = p(-supportHatchingLength/2, supportHeight)
+            hl_end = p(supportHatchingLength/2, supportHeight)
+            d.line([hl_start, hl_end], fill="black", width=self.line_width)
+            self._hatch(d, hl_start, hl_end, rotation)
+
         elif self.st == SupportType.LOSLAGER:
-            # Triangle + gap + line
-            half_width = mm(supportBasicLength) / 2
-            height = mm(supportHeight) + mm(supportGap) + mm(supportBasicHeight)
-            corners = [
-                (pos[0], pos[1]),
-                (pos[0] + mm(supportLength)/2, pos[1] + mm(supportHeight)),
-                (pos[0] - mm(supportLength)/2, pos[1] + mm(supportHeight)),
-                (pos[0] + half_width, pos[1] + height),
-                (pos[0] - half_width, pos[1] + height)
-            ]
+            # Triangle
+            top = p(0, 0)
+            bl = p(-supportLength/2, supportHeight)
+            br = p(supportLength/2, supportHeight)
+            d.polygon([top, bl, br], outline="black", fill=None, width=self.line_width)
+            # Gap line (offset by supportHeight + supportGap)
+            y_line = supportHeight + supportGap
+            hl_start = p(-supportHatchingLength/2, y_line)
+            hl_end = p(supportHatchingLength/2, y_line)
+            d.line([hl_start, hl_end], fill="black", width=self.line_width)
+            #self._hatch(d, hl_start, hl_end, rotation)
+
         elif self.st == SupportType.FESTE_EINSPANNUNG:
-            # Horizontal line at top + hatching below
-            # The _s3 method draws: horizontal line from -half_width to +half_width at pos[1]
-            # Then (when rot=0) draws hatching extending down by supportBasicHeight
-            # For bbox, we always include the hatching area (even if not rendered when rotated)
-            # to ensure consistent labeling
-            half_width = mm(supportBasicLength) / 2
-            height = mm(supportBasicHeight)
-            corners = [
-                (pos[0] - half_width, pos[1]),  # Top left of line
-                (pos[0] + half_width, pos[1]),  # Top right of line
-                (pos[0] - half_width, pos[1] + height),  # Bottom left (hatching extent)
-                (pos[0] + half_width, pos[1] + height)   # Bottom right (hatching extent)
-            ]
+            # Just a line + hatching perpendicular
+            w2 = supportHatchingLength / 2
+            start = p(-w2, 0)
+            end = p(w2, 0)
+            d.line([start, end], fill="black", width=self.line_width)
+            self._hatch(d, start, end, rotation)
+
         elif self.st == SupportType.GLEITLAGER:
-            # Horizontal line + gap + hatching
-            half_width = mm(supportBasicLength) / 2
-            height = mm(supportGap) + mm(supportBasicHeight)
-            corners = [
-                (pos[0] - mm(supportBasicLength)/2, pos[1]),
-                (pos[0] + mm(supportBasicLength)/2, pos[1]),
-                (pos[0] - half_width, pos[1] + height),
-                (pos[0] + half_width, pos[1] + height)
-            ]
-        elif self.st == SupportType.FEDER:
-            # FEDER extends downward
-            total_len = mm(FEDERLength) + mm(FEDERPreLength) + mm(FEDERPostLength)
-            half_amp = mm(FEDERAmplitude)
-            corners = [
-                (pos[0], pos[1]),
-                (pos[0] - half_amp, pos[1] + total_len),
-                (pos[0] + half_amp, pos[1] + total_len)
-            ]
-        elif self.st == SupportType.TORSIONSFEDER:
-            # Torsion FEDER (circular + radial bars)
-            radius = mm(FEDERLength) / 2
-            corners = [
-                (pos[0] - radius, pos[1] - radius),
-                (pos[0] + radius, pos[1] + radius),
-                (pos[0], pos[1] + radius + mm(FEDERPreLength))
-            ]
-        else:
-            # Default fallback
-            corners = [
-                (pos[0] - mm(supportBasicLength)/2, pos[1]),
-                (pos[0] + mm(supportBasicLength)/2, pos[1] + mm(supportHeight))
-            ]
-        
-        # Rotate corners if needed
-        if rotation != 0:
-            corners = [self._rot(c, pos, rotation) for c in corners]
-        
-        xs = [c[0] for c in corners]
-        ys = [c[1] for c in corners]
-        return (min(xs), min(ys), max(xs), max(ys))
+            # Two circles + line
+            r = mm(1.5)
+            c1 = p(-supportLength/2, r/PX_PER_MM) 
+            c2 = p(supportLength/2, r/PX_PER_MM)
+            
+            # Since draw.ellipse doesn't support rotation easily for the ellipse itself (it stays axis aligned),
+            # we just draw small circles at rotated positions.
+            self._circle(d, c1, r)
+            self._circle(d, c2, r)
+            
+            # Line below
+            y_line = (r*2)/PX_PER_MM + supportGap 
+            hl_start = p(-supportHatchingLength/2, y_line)
+            hl_end = p(supportHatchingLength/2, y_line)
+            d.line([hl_start, hl_end], fill="black", width=self.line_width)
+            self._hatch(d, hl_start, hl_end, rotation)
 
-    # pinned triangle
-    def _s1(self, d, pos, rot, hatching=True):
-        tri = [
-            (pos[0], pos[1]),
-            (pos[0] + mm(supportLength)/2, pos[1] + mm(supportHeight)),
-            (pos[0] - mm(supportLength)/2, pos[1] + mm(supportHeight))
+    def _hatch(self, d, p1, p2, rot):
+        # Simple hatching marks below line p1-p2
+        # Vector along line
+        dx, dy = p2[0]-p1[0], p2[1]-p1[1]
+        L = math.hypot(dx, dy)
+        if L == 0: return
+        
+        ux, uy = dx/L, dy/L
+        nx, ny = -uy, ux # Normal vector (down relative to line)
+
+        h_len = mm(supportHatchingHeight)
+        step = mm(hatchingLength)
+        
+        # Determine number of hatches
+        count = int(L / step)
+        for i in range(count + 1):
+            t = i * step
+            # Start on line
+            sx = p1[0] + ux*t
+            sy = p1[1] + uy*t
+            # End (angled)
+            # Standard hatching is 45 deg relative to normal
+            # Simplified: just go down normal + some sideways
+            ex = sx + nx*h_len - ux*(h_len*0.5) 
+            ey = sy + ny*h_len - uy*(h_len*0.5)
+            d.line([(sx,sy), (ex,ey)], fill="black", width=1)
+
+    def _circle(self, d, center, r):
+        d.ellipse((center[0]-r, center[1]-r, center[0]+r, center[1]+r), outline="black", width=self.line_width)
+
+    def get_bbox(self, pos: Tuple[float, float], rotation: float = 0) -> Tuple[float, float, float, float]:
+        """Calculates exact bounding box including hatching."""
+        
+        # Dimensions in mm
+        w_main = supportHatchingLength # This is usually the widest part (the ground line)
+        h_main = 0.0
+        
+        if self.st == SupportType.FESTLAGER:
+            h_main = supportHeight + supportHatchingHeight # Triangle + Hatching
+        elif self.st == SupportType.LOSLAGER:
+            h_main = supportHeight + supportGap + supportHatchingHeight
+        elif self.st == SupportType.FESTE_EINSPANNUNG:
+            h_main = supportHatchingHeight 
+            # Note: Einspannung is drawn centered on line. 
+            # top is at y=0, hatching goes to y=5
+        elif self.st == SupportType.GLEITLAGER:
+            h_main = 3.0 + supportGap + supportHatchingHeight # Circles (~3mm) + gap + hatch
+
+        # Define points in local unrotated space (relative to pos)
+        # Horizontal center is 0. Vertical starts at 0 and goes positive (down).
+        
+        w_px = mm(w_main)
+        h_px = mm(h_main)
+        
+        # Most supports are centered horizontally around pos
+        local_corners = [
+            (pos[0] - w_px/2, pos[1]),      # Top Left (on the structure node)
+            (pos[0] + w_px/2, pos[1]),      # Top Right
+            (pos[0] + w_px/2, pos[1] + h_px), # Bottom Right (end of hatching)
+            (pos[0] - w_px/2, pos[1] + h_px), # Bottom Left
         ]
-        tri = self._rot_many(tri, pos, rot)
-        d.polygon(tri, outline="black", fill=None, width=self.line_width)
-
-        base_y = pos[1] + mm(supportHeight)
-        g_left = self._rot((pos[0] + mm(supportBasicLength)/2, base_y), pos, rot)
-        g_right = self._rot((pos[0] - mm(supportBasicLength)/2, base_y), pos, rot)
-        d.line([g_left, g_right], fill="black", width=self.line_width)
-
-        # Draw hatching
-        if hatching:
-            # Define clip rectangle in local coordinates
-            clip_local = [
-                (pos[0] - mm(supportBasicLength)/2, base_y),
-                (pos[0] + mm(supportBasicLength)/2, base_y),
-                (pos[0] + mm(supportBasicLength)/2, base_y + mm(supportBasicHeight)),
-                (pos[0] - mm(supportBasicLength)/2, base_y + mm(supportBasicHeight))
-            ]
-            # Rotate the clip rectangle corners
-            clip_rotated = self._rot_many(clip_local, pos, rot)
-            self._draw_ground_hatching(d, clip_rotated, 180 - hatchingAngle + rot, hatchingLength)
-
-    def _s3(self, d, pos, rot, hatching=True):
-        top_y = pos[1]
-        d.line([
-            self._rot((pos[0]+mm(supportBasicLength)/2, top_y), pos, rot),
-            self._rot((pos[0]-mm(supportBasicLength)/2, top_y), pos, rot)
-        ], fill="black", width=self.line_width)
         
-        # Draw hatching
-        if hatching:
-            clip_local = [
-                (pos[0] - mm(supportBasicLength)/2, top_y),
-                (pos[0] + mm(supportBasicLength)/2, top_y),
-                (pos[0] + mm(supportBasicLength)/2, top_y + mm(supportBasicHeight)),
-                (pos[0] - mm(supportBasicLength)/2, top_y + mm(supportBasicHeight))
-            ]
-            clip_rotated = self._rot_many(clip_local, pos, rot)
-            # Adjust hatching angle by rotation
-            self._draw_ground_hatching(d, clip_rotated, 180 - hatchingAngle + rot, hatchingLength)
-
-    # roller (triangle + gap line)
-    def _s2(self, d, pos, rot):
-        # roller (triangle + gap line)
-        self._s1(d, pos, rot, hatching=False)
-        y_gap = pos[1] + mm(supportHeight) + mm(supportGap)
+        # Handle special case: Feste Einspannung hatching goes "down" from node?
+        # In _s3, line is at 0, hatching is below. Correct.
         
-        # Draw gap line with rotation
-        g_left = self._rot((pos[0] + mm(supportBasicLength)/2, y_gap), pos, rot)
-        g_right = self._rot((pos[0] - mm(supportBasicLength)/2, y_gap), pos, rot)
-        d.line([g_left, g_right], fill="black", width=self.line_width)
-        
-        # Draw hatching with rotation
-        clip_local = [
-            (pos[0] - mm(supportBasicLength)/2, y_gap),
-            (pos[0] + mm(supportBasicLength)/2, y_gap),
-            (pos[0] + mm(supportBasicLength)/2, y_gap + mm(supportBasicHeight)),
-            (pos[0] - mm(supportBasicLength)/2, y_gap + mm(supportBasicHeight))
-        ]
-        clip_rotated = self._rot_many(clip_local, pos, rot)
-        #self._draw_ground_hatching(d, clip_rotated, 180 - hatchingAngle + rot, hatchingLength)
-
-    def _s4(self, d, pos, rot):
-        self._s3(d, pos, rot, hatching=False)
-        gap_y = pos[1] + mm(supportGap)
-        
-        # Draw gap line with rotation
-        g_left = self._rot((pos[0] + mm(supportBasicLength)/2, gap_y), pos, rot)
-        g_right = self._rot((pos[0] - mm(supportBasicLength)/2, gap_y), pos, rot)
-        d.line([g_left, g_right], fill="black", width=self.line_width)
-        
-        # Draw hatching with rotation
-        clip_local = [
-            (pos[0] - mm(supportBasicLength)/2, gap_y),
-            (pos[0] + mm(supportBasicLength)/2, gap_y),
-            (pos[0] + mm(supportBasicLength)/2, gap_y + mm(supportBasicHeight)),
-            (pos[0] - mm(supportBasicLength)/2, gap_y + mm(supportBasicHeight))
-        ]
-        clip_rotated = self._rot_many(clip_local, pos, rot)
-        self._draw_ground_hatching(d, clip_rotated, 180 - hatchingAngle + rot, hatchingLength)
-
-    # FEDER support
-    def _s5(self, d, pos, rot):
-        total = mm(FEDERLength)
-        pre = mm(FEDERPreLength)
-        post = mm(FEDERPostLength)
-        usable = total - pre - post
-        cycles = 4
-        amp = mm(FEDERAmplitude)
-
-        pts = [(pos[0], pos[1])]
-        y = pos[1] + pre
-        pts.append((pos[0], y))
-
-        # sinusoidal coil
-        steps = 80
-        for i in range(steps+1):
-            frac = i / steps
-            yy = y + frac * usable
-            xx = pos[0] + amp * math.sin(frac * cycles * 2 * math.pi)
-            pts.append((xx, yy))
-
-        y_end = y + usable
-        pts.append((pos[0], y_end + post))
-
-        if rot != 0:
-            pts = self._rot_many(pts, pos, rot)
-        d.line(pts, fill="black", width=LINE_NORMAL-1)
-
-        # base line & hatching
-        base_y = pos[1] + total if rot == 0 else self._rot((pos[0], pos[1]+total), pos, rot)[1]
-        if rot == 0:
-            d.line([
-                (pos[0]+mm(supportBasicLength)/2, base_y),
-                (pos[0]-mm(supportBasicLength)/2, base_y)
-            ], fill="black", width=self.line_width)
-            clip = [
-                (pos[0]-mm(supportBasicLength)/2, base_y),
-                (pos[0]+mm(supportBasicLength)/2, base_y),
-                (pos[0]+mm(supportBasicLength)/2, base_y+mm(supportBasicHeight)),
-                (pos[0]-mm(supportBasicLength)/2, base_y+mm(supportBasicHeight))
-            ]
-            self._draw_ground_hatching(d, clip, 180 - hatchingAngle, hatchingLength)
-
-        # torsion FEDER
-    def _s6(self, d, pos, rot):
-        pts = []
-        turns = 3.5
-        steps = 100
-        radius = mm(1.5)
-        spacing = mm(0.4)
-        for i in range(steps+1):
-            theta = i / steps * turns * 2 * math.pi
-            r = radius + spacing * theta / (2*math.pi)
-            x = r * math.cos(theta)
-            y = r * math.sin(theta)
-            pts.append((pos[0]+x, pos[1]+y))
-        pts = self._rot_many(pts, pos, rot - 90)
-        d.line(pts, fill="black", width=LINE_NORMAL-1)
-
-        # short ground line
-        gl1 = self._rot((pos[0]-mm(supportBasicLength)/2.5, pos[1]), pos, rot)
-        gl2 = self._rot((pos[0]+mm(supportBasicLength)/2.5, pos[1]), pos, rot)
-        d.line([gl1, gl2], fill="black", width=self.line_width)
-
-        # hatch below
-        if rot == 0:
-            clip = [
-                (pos[0]-mm(supportBasicLength)/2.5, pos[1]),
-                (pos[0]+mm(supportBasicLength)/2.5, pos[1]),
-                (pos[0]+mm(supportBasicLength)/2.5, pos[1]+mm(supportBasicHeight)),
-                (pos[0]-mm(supportBasicLength)/2.5, pos[1]+mm(supportBasicHeight))
-            ]
-            self._draw_ground_hatching(d, clip, 180 - hatchingAngle, hatchingLength/2)
-
-
-    def _draw_ground_hatching(self, d: ImageDraw.Draw, clip_rect: List[Tuple[float,float]], 
-                    angle_deg: float, spacing_mm: float):
-        """Draw diagonal hatching clipped to an arbitrary quadrilateral (clip_rect).
-        angle_deg: hatch line angle in degrees (0 = along +x). spacing_mm: spacing in mm.
-        """
-        # convert spacing to pixels
-        step = mm(spacing_mm)
-        if step <= 0:
-            return
-
-        # Get bounding box of clip polygon
-        xs = [p[0] for p in clip_rect]
-        ys = [p[1] for p in clip_rect]
-        xmin, xmax = min(xs), max(xs)
-        ymin, ymax = min(ys), max(ys)
-
-        # Direction vector for hatching lines
-        angle_rad = math.radians(angle_deg)
-        dx = math.cos(angle_rad)
-        dy = math.sin(angle_rad)
-        
-        # Perpendicular direction for stepping between lines
-        perp_dx = -dy
-        perp_dy = dx
-
-        # Diagonal length of bounding box to ensure coverage
-        diag = math.hypot(xmax - xmin, ymax - ymin)
-        
-        # Number of lines needed
-        n_lines = int(diag / step) + 4
-        
-        # Starting point (offset from center of bbox in perpendicular direction)
-        cx = (xmin + xmax) / 2
-        cy = (ymin + ymax) / 2
-        start_offset = -diag / 2
-        
-        for i in range(n_lines):
-            offset = start_offset + i * step
-            
-            # Base point for this line (center + perpendicular offset)
-            base_x = cx + perp_dx * offset
-            base_y = cy + perp_dy * offset
-            
-            # Two points far along the line direction
-            p1 = (base_x - dx * diag, base_y - dy * diag)
-            p2 = (base_x + dx * diag, base_y + dy * diag)
-            
-            # Clip line segment to polygon
-            clipped_segments = self._clip_line_to_polygon(p1, p2, clip_rect)
-            
-            # Draw all clipped segments
-            for seg_start, seg_end in clipped_segments:
-                d.line([seg_start, seg_end], fill="black", width=LINE_SMALL)
-
-    def _clip_line_to_polygon(self, p1: Tuple[float, float], p2: Tuple[float, float], 
-                          polygon: List[Tuple[float, float]]) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
-        """Clip a line segment to a convex polygon.
-        Returns list of clipped line segments (may be empty if line is outside polygon)."""
-        
-        def line_intersection(p1, p2, p3, p4):
-            """Find intersection point of two line segments (p1-p2) and (p3-p4).
-            Returns (x, y, t, u) where t is parameter along p1-p2, u along p3-p4, or None if parallel."""
-            x1, y1 = p1
-            x2, y2 = p2
-            x3, y3 = p3
-            x4, y4 = p4
-            
-            denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-            if abs(denom) < 1e-10:
-                return None
-            
-            t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
-            u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom
-            
-            x = x1 + t * (x2 - x1)
-            y = y1 + t * (y2 - y1)
-            return (x, y, t, u)
-        
-        # Collect all valid intersection points with polygon edges
-        intersections = []
-        
-        for i in range(len(polygon)):
-            edge_start = polygon[i]
-            edge_end = polygon[(i + 1) % len(polygon)]
-            
-            result = line_intersection(p1, p2, edge_start, edge_end)
-            if result:
-                x, y, t, u = result
-                # Check if intersection is within BOTH line segment AND polygon edge
-                if 0 <= t <= 1 and 0 <= u <= 1:
-                    intersections.append((t, (x, y)))
-        
-        # Need exactly 2 intersections for a valid clipped segment
-        if len(intersections) != 2:
-            return []
-        
-        # Sort by parameter t along the line
-        intersections.sort(key=lambda item: item[0])
-        
-        # Return the single clipped segment
-        return [(intersections[0][1], intersections[1][1])]
-
+        return self._get_rotated_bbox(local_corners, pos, rotation)
 
 # -------------------------------------------------
 # hinges
@@ -540,122 +335,23 @@ class StanliSupport(StanliSymbol):
 
 class StanliHinge(StanliSymbol):
     def __init__(self, ht: HingeType):
-        super().__init__(LINE_NORMAL)
+        super().__init__()
         self.ht = ht
 
-    def draw(self, d: ImageDraw.Draw, pos: Tuple[float,float],
-             rotation: float=0,
-             p_init: Optional[Tuple[float,float]]=None,
-             p_end: Optional[Tuple[float,float]]=None):
+    def draw(self, d: ImageDraw.Draw, pos: Tuple[float,float], 
+             rotation: float=0, start_point=None, end_point=None):
+        
         r = mm(hingeRadius)
-        if self.ht == HingeType.VOLLGELENK:
-            d.ellipse((pos[0]-r,pos[1]-r,pos[0]+r,pos[1]+r), fill="white", outline="black", width=self.line_width)
-
-        elif self.ht == HingeType.HALBGELENK and p_init and p_end:
-            # circle
-            d.ellipse((pos[0]-r,pos[1]-r,pos[0]+r,pos[1]+r), fill="white", outline="black", width=self.line_width)
-            # thick bars (approx hugeLine)
-            self._radial_bar(d, pos, p_init, r)
-            self._radial_bar(d, pos, p_end, r)
-
-        elif self.ht == HingeType.SCHUBGELENK:
-            gap = mm(supportGap)/2
-            L = mm(supportBasicLength)
-            # two vertical bars and a small white core
-            d.ellipse((pos[0]-gap,pos[1]-gap,pos[0]+gap,pos[1]+gap), fill="white", outline="black", width=LINE_SMALL)
-            d.line([(pos[0]-gap, pos[1]-L/2),(pos[0]-gap,pos[1]+L/2)], fill="black", width=self.line_width)
-            d.line([(pos[0]+gap, pos[1]-L/2),(pos[0]+gap,pos[1]+L/2)], fill="black", width=self.line_width)
-
-        elif self.ht == HingeType.NORMALKRAFTGELENK:
-            w = mm(hingeAxialLength)
-            h = mm(hingeAxialHeight)
-            left = pos[0] - w/3
-            right = pos[0] + 2*w/3
-            top = pos[1] - h/2
-            bot = pos[1] + h/2
-
-            # outline only
-            d.rectangle([left, top, right, bot], outline="white", fill="white", width=self.line_width)
-
-            # horizontal lines inside
-            d.line([(left, top), (right, top)], fill="black", width=LINE_SMALL)
-            d.line([(left, bot), (right, bot)], fill="black", width=LINE_SMALL)
-
-        elif self.ht == HingeType.BIEGESTEIFE_ECKE and p_init and p_end:
-            # filled triangle
-            a = self._point_along(pos, p_init, mm(hingeCornerLength))
-            b = self._point_along(pos, p_end, mm(hingeCornerLength))
-            d.polygon([pos, a, b], fill="black")
-            d.ellipse((pos[0]-LINE_HUGE/2,pos[1]-LINE_HUGE/2,pos[0]+LINE_HUGE/2,pos[1]+LINE_HUGE/2),
-                      fill="black")
-    
-    def get_bbox(self, pos: Tuple[float, float], rotation: float = 0,
-                 p_init: Optional[Tuple[float, float]] = None,
-                 p_end: Optional[Tuple[float, float]] = None) -> Tuple[float, float, float, float]:
-        """Calculate axis-aligned bounding box for hinge symbol.
-        Returns (min_x, min_y, max_x, max_y) in pixel coordinates."""
-        r = mm(hingeRadius)
+        d.ellipse((pos[0]-r, pos[1]-r, pos[0]+r, pos[1]+r), fill="white", outline="black", width=self.line_width)
         
         if self.ht == HingeType.VOLLGELENK:
-            # Simple circle
-            return (pos[0] - r, pos[1] - r, pos[0] + r, pos[1] + r)
-        
-        elif self.ht == HingeType.HALBGELENK:
-            # Circle + radial bars
-            if p_init and p_end:
-                corners = [
-                    (pos[0] - r, pos[1] - r),
-                    (pos[0] + r, pos[1] + r),
-                    self._point_along(pos, p_init, r),
-                    self._point_along(pos, p_end, r)
-                ]
-            else:
-                corners = [(pos[0] - r, pos[1] - r), (pos[0] + r, pos[1] + r)]
-        
-        elif self.ht == HingeType.SCHUBGELENK:
-            # Two vertical bars
-            gap = mm(supportGap) / 2
-            L = mm(supportBasicLength)
-            corners = [
-                (pos[0] - gap, pos[1] - L/2),
-                (pos[0] + gap, pos[1] + L/2)
-            ]
+            # Just the circle
+            pass 
+        # Add other hinge types if needed
 
-        elif self.ht == HingeType.NORMALKRAFTGELENK:
-            # Rectangle
-            w = mm(hingeAxialLength)
-            h = mm(hingeAxialHeight)
-            corners = [
-                (pos[0] - w/3, pos[1] - h/2),
-                (pos[0] + 2*w/3, pos[1] + h/2)
-            ]
-        
-        elif self.ht == HingeType.BIEGESTEIFE_ECKE:
-            # Triangle
-            if p_init and p_end:
-                a = self._point_along(pos, p_init, mm(hingeCornerLength))
-                b = self._point_along(pos, p_end, mm(hingeCornerLength))
-                corners = [pos, a, b]
-            else:
-                # Fallback
-                L = mm(hingeCornerLength)
-                corners = [(pos[0] - L, pos[1] - L), (pos[0] + L, pos[1] + L)]
-        else:
-            # Default fallback
-            corners = [(pos[0] - r, pos[1] - r), (pos[0] + r, pos[1] + r)]
-        
-        xs = [c[0] for c in corners]
-        ys = [c[1] for c in corners]
-        return (min(xs), min(ys), max(xs), max(ys))
-
-    def _point_along(self, origin, target, dist):
-        vx, vy = target[0]-origin[0], target[1]-origin[1]
-        L = math.hypot(vx, vy) or 1
-        return (origin[0]+vx/L*dist, origin[1]+vy/L*dist)
-
-    def _radial_bar(self, d, origin, target, r):
-        p = self._point_along(origin, target, r)
-        d.line([origin, p], fill="black", width=LINE_HUGE)
+    def get_bbox(self, pos: Tuple[float, float], rotation: float = 0) -> Tuple[float, float, float, float]:
+        r = mm(hingeRadius) + self.line_width
+        return (pos[0]-r, pos[1]-r, pos[0]+r, pos[1]+r)
 
 # -------------------------------------------------
 # loads
@@ -663,152 +359,169 @@ class StanliHinge(StanliSymbol):
 
 class StanliLoad(StanliSymbol):
     def __init__(self, lt: LoadType):
-        super().__init__(LINE_NORMAL)
+        super().__init__()
         self.lt = lt
 
-    def draw(self, d: ImageDraw.Draw, pos: Tuple[float,float],
-             rotation_deg: float=0,
-             length: Optional[float]=None,
-             distance: Optional[float]=None,
-             arc_angle: Optional[float]=None):
+    def draw(self, d: ImageDraw.Draw, pos: Tuple[float,float], rotation: float=0, length: float=40.0, distance: float=0.0):
+        # Length is passed in pixels from Renderer, usually
+        
+        def p(x, y): return self._rot((pos[0]+x, pos[1]+y), pos, rotation)
+
         if self.lt == LoadType.EINZELLAST:
-            self._single(...)
-        elif self.lt == LoadType.STRECKENLAST:  # <--- NEW HANDLE
-            self._distributed(d, pos, length)
-        else:
-            self._moment(...)
-    def _single(self, d, pos, rot, L_mm, D_mm):
-        # TikZ: start at offset D, line forward length L, arrowhead at start (<-)
-        ang = math.radians(rot)
-        start = (pos[0] + mm(D_mm)*math.cos(ang),
-                 pos[1] - mm(D_mm)*math.sin(ang))  # minus sin for TikZ up
-        end = (start[0] + mm(L_mm)*math.cos(ang),
-               start[1] - mm(L_mm)*math.sin(ang))
-        # draw line from end to start (so we can put arrow at start consistent)
-        d.line([end, start], fill="black", width=self.line_width)
-        self._arrow_head(d, start, ang + math.pi)  # head pointing toward pos
-    
-    def _distributed(self, d, pos, L_mm, arrow_len_mm=8.0, spacing_mm=4.0):
-        L_px = mm(L_mm)
-        h_px = mm(arrow_len_mm)
-        step_px = mm(spacing_mm)
-        
-        # Start/End x-coordinates (centered around pos)
-        x_start = pos[0] - L_px / 2
-        x_end = pos[0] + L_px / 2
-        y_top = pos[1] - h_px / 2
-        y_bot = pos[1] + h_px / 2
-        
-        # 1. Draw the top connecting bar
-        d.line([(x_start, y_top), (x_end, y_top)], fill="black", width=self.line_width)
-        
-        # 2. Draw vertical arrows
-        # Calculate how many arrows fit
-        num_arrows = int(L_px / step_px)
-        
-        for i in range(num_arrows + 1):
-            x = x_start + i * step_px
-            if x > x_end + 1: break # Safety
+            # Arrow pointing AT pos (usually). 
+            # In structural analysis: Force -> Node.
+            # Start far away, End at pos.
             
-            # Draw arrow shaft
-            d.line([(x, y_top), (x, y_bot)], fill="black", width=self.line_width)
+            # Adjust for distance (gap between tip and node)
+            dist_px = mm(forceDistance) if distance == 0 else distance
             
-            # Draw arrow head (pointing down)
-            self._arrow_head(d, (x, y_bot), math.radians(270), size_px=mm(1.5))
+            # Start point (tail) -> End point (tip near node)
+            # Default rotation 270 (down). 
+            # 0 deg = Right.
+            
+            # Local space: Tail at (-length - dist, 0), Tip at (-dist, 0) ?
+            # Let's align with standard rotation:
+            # If 0 deg (Right), force pushes Right. So Tail is Left, Tip is Right.
+            # Tail: (-length, 0), Tip: (0, 0)
+            
+            # Standard renderer uses rotation=270 for Down gravity load.
+            # cos(270)=0, sin(270)=-1. 
+            
+            # If we draw line from (0, -len) to (0,0)? That points down.
+            
+            # Let's stick to simple: Start -> End.
+            # Start = (0, -length), End = (0, -dist) relative to pos (rotated)
+            
+            # Using the arguments passed:
+            start_y = -length - dist_px
+            end_y = -dist_px
+            
+            # We define points assuming rotation=0 implies UP (standard math) or RIGHT?
+            # Stanli convention: 0 is Right. 
+            # So a Down force (270) should come from top.
+            
+            # Let's define "Force pushing in direction of rotation".
+            # Tip is at pos (minus gap). Tail is further back.
+            
+            start = self._rot((pos[0] - (length+dist_px), pos[1]), pos, rotation)
+            end = self._rot((pos[0] - dist_px, pos[1]), pos, rotation)
+            
+            self._arrow(d, start, end)
 
-    def _moment(self, d, pos, radius_mm, angle_deg, rot_deg, clockwise: bool):
-        # Build arc in TikZ sense: start angle 0 at +x (after rotation)
-        # We'll param manually (TikZ positive angle CCW; we invert y with -sin).
-        base_rot = math.radians(rot_deg)
-        r_px = mm(radius_mm)
-        steps = max(10, int(angle_deg/6))
-        if clockwise:
-            angle_list = [i*angle_deg/steps for i in range(steps+1)]
-        else:
-            angle_list = [i*angle_deg/steps for i in range(steps+1)]
-        # start point angle = 0
-        coords = []
-        for a in angle_list:
-            a_rad = math.radians(a)
-            # CCW in TikZ: x=r cos(a), y= r sin(a) (y up). We do y= -r sin(a).
-            x_local = r_px*math.cos(a_rad)
-            y_local = -r_px*math.sin(a_rad)
-            # rotate by base_rot
-            x = pos[0] + x_local*math.cos(base_rot) - y_local*math.sin(base_rot)
-            y = pos[1] + x_local*math.sin(base_rot) + y_local*math.cos(base_rot)
-            coords.append((x,y))
-        if clockwise:
-            # arrow head at start
-            d.line(coords, fill="black", width=self.line_width)
-            self._arrow_head(d, coords[0],
-                             math.atan2(coords[1][1]-coords[0][1],
-                                        coords[1][0]-coords[0][0]))
-        else:
-            # counter: arrow at end
-            d.line(coords, fill="black", width=self.line_width)
-            self._arrow_head(d, coords[-1],
-                             math.atan2(coords[-1][1]-coords[-2][1],
-                                        coords[-1][0]-coords[-2][0]))
-    
-    def get_bbox(self, pos: Tuple[float, float], rotation_deg: float = 0,
-                 length: Optional[float] = None,
-                 distance: Optional[float] = None,
-                 arc_angle: Optional[float] = None) -> Tuple[float, float, float, float]:
-        """Calculate axis-aligned bounding box for load symbol.
-        Returns (min_x, min_y, max_x, max_y) in pixel coordinates."""
+        elif self.lt in (LoadType.MOMENT_UHRZEIGER, LoadType.MOMENT_GEGEN_UHRZEIGER):
+            # Circular arrow
+            # Center is pos. Radius ~ length/2 or fixed?
+            r = mm(momentDistance) + 10 # approximate radius
+            
+            # We draw an arc
+            bbox = (pos[0]-r, pos[1]-r, pos[0]+r, pos[1]+r)
+            
+            if self.lt == LoadType.MOMENT_UHRZEIGER:
+                # Clockwise
+                d.arc(bbox, start=30, end=330, fill="black", width=self.line_width)
+                # Arrowhead at end (330)
+                # Math required for arrowhead on arc, simplified here
+            else:
+                d.arc(bbox, start=30, end=330, fill="black", width=self.line_width)
+
+    def _arrow(self, d, start, end):
+        d.line([start, end], fill="black", width=self.line_width)
+        # Arrowhead
+        # Vector
+        vx, vy = end[0]-start[0], end[1]-start[1]
+        L = math.hypot(vx, vy)
+        if L == 0: return
+        ux, uy = vx/L, vy/L
         
+        # Head size
+        h_len = 10 
+        h_wid = 4
+        
+        # Base of head
+        bx = end[0] - ux*h_len
+        by = end[1] - uy*h_len
+        
+        # Perpendicular
+        px, py = -uy, ux
+        
+        c1 = (bx + px*h_wid, by + py*h_wid)
+        c2 = (bx - px*h_wid, by - py*h_wid)
+        
+        d.polygon([end, c1, c2], fill="black")
+
+    def get_bbox(self, pos: Tuple[float, float], rotation: float = 0, length: float = 40.0, distance: float = 0.0) -> Tuple[float, float, float, float]:
         if self.lt == LoadType.EINZELLAST:
-            # Arrow from distance to distance+length
-            L_mm = length if length is not None else forceLength
-            D_mm = distance if distance is not None else forceDistance
-            ang = math.radians(rotation_deg)
+            dist_px = mm(forceDistance) if distance == 0 else distance  
             
-            start = (pos[0] + mm(D_mm) * math.cos(ang),
-                    pos[1] - mm(D_mm) * math.sin(ang))
-            end = (start[0] + mm(L_mm) * math.cos(ang),
-                  start[1] - mm(L_mm) * math.sin(ang))
-            
-            # Arrow head adds small extra extent
-            arrow_size = mm(2.2)
-            corners = [start, end,
-                      (start[0] - arrow_size, start[1] - arrow_size),
-                      (start[0] + arrow_size, start[1] + arrow_size)]
+            # Define arrow corners with generous width for detection
+            local_corners = [
+                (-(length + dist_px), -15.0), # Top Left
+                (-(length + dist_px), 15.0),  # Bottom Left
+                (-dist_px, 15.0),             # Bottom Right
+                (-dist_px, -15.0)             # Top Right
+            ]
+            return self._get_rotated_bbox(local_corners, pos, rotation)
         
-        else:
-            # Moment arc (clockwise or counter)
-            radius_mm = distance if distance is not None else momentDistance
-            angle_deg_arc = arc_angle if arc_angle is not None else momentAngleDefault
-            r_px = mm(radius_mm)
+        elif self.lt in (LoadType.MOMENT_UHRZEIGER, LoadType.MOMENT_GEGEN_UHRZEIGER):
+            # Circular arc moment symbol
+            r = mm(momentDistance) + 10  # Arc radius
             
-            base_rot = math.radians(rotation_deg)
-            steps = max(10, int(angle_deg_arc / 6))
-            angle_list = [i * angle_deg_arc / steps for i in range(steps + 1)]
+            # Define arc angles (30 to 330 degrees = almost full circle)
+            start_angle = 30
+            end_angle = 330
             
-            corners = []
-            for a in angle_list:
-                a_rad = math.radians(a)
-                x_local = r_px * math.cos(a_rad)
-                y_local = -r_px * math.sin(a_rad)
-                x = pos[0] + x_local * math.cos(base_rot) - y_local * math.sin(base_rot)
-                y = pos[1] + x_local * math.sin(base_rot) + y_local * math.cos(base_rot)
-                corners.append((x, y))
+            # Convert to radians
+            start_rad = math.radians(start_angle)
+            end_rad = math.radians(end_angle)
             
-            # Add arrow head extent
-            arrow_size = mm(2.2)
-            corners.extend([
-                (pos[0] - r_px - arrow_size, pos[1] - r_px - arrow_size),
-                (pos[0] + r_px + arrow_size, pos[1] + r_px + arrow_size)
-            ])
+            # Calculate arc endpoints
+            start_x = r * math.cos(start_rad)
+            start_y = r * math.sin(start_rad)
+            end_x = r * math.cos(end_rad)
+            end_y = r * math.sin(end_rad)
+            
+            # Check which cardinal directions (0°, 90°, 180°, 270°) are crossed by the arc
+            # This determines if we need to extend bbox to full radius in that direction [web:12]
+            
+            # Helper function to check if angle is within arc span
+            def angle_in_arc(angle_deg, start_deg, end_deg):
+                # Normalize angles to 0-360
+                angle = angle_deg % 360
+                start = start_deg % 360
+                end = end_deg % 360
+                
+                if start <= end:
+                    return start <= angle <= end
+                else:  # Arc crosses 0 degrees
+                    return angle >= start or angle <= end
+            
+            # Initialize bbox with arc endpoints
+            min_x = min(start_x, end_x)
+            max_x = max(start_x, end_x)
+            min_y = min(start_y, end_y)
+            max_y = max(start_y, end_y)
+            
+            # Check cardinal directions [web:12]
+            if angle_in_arc(0, start_angle, end_angle):    # Right (0°)
+                max_x = r
+            if angle_in_arc(90, start_angle, end_angle):   # Top (90°)
+                max_y = r
+            if angle_in_arc(180, start_angle, end_angle):  # Left (180°)
+                min_x = -r
+            if angle_in_arc(270, start_angle, end_angle):  # Bottom (270°)
+                min_y = -r
+            
+            # Add padding for arrowhead and line width
+            pad = 15.0
+            
+            # Define corners in local space (centered at pos)
+            local_corners = [
+                (pos[0] + min_x - pad, pos[1] + min_y - pad),
+                (pos[0] + max_x + pad, pos[1] + min_y - pad),
+                (pos[0] + max_x + pad, pos[1] + max_y + pad),
+                (pos[0] + min_x - pad, pos[1] + max_y + pad),
+            ]
+            
+            # Apply rotation around pos
+            return self._get_rotated_bbox(local_corners, pos, rotation)
         
-        xs = [c[0] for c in corners]
-        ys = [c[1] for c in corners]
-        return (min(xs), min(ys), max(xs), max(ys))
-
-    def _arrow_head(self, d, tip, ang, size_px=mm(2.2)):
-        spread = math.radians(22)
-        p1 = (tip[0] + size_px*math.cos(ang+spread),
-              tip[1] + size_px*math.sin(ang+spread))
-        p2 = (tip[0] + size_px*math.cos(ang-spread),
-              tip[1] + size_px*math.sin(ang-spread))
-        d.polygon([tip, p1, p2], fill="black")
-

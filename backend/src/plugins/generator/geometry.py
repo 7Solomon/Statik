@@ -15,81 +15,70 @@ MAX_LOAD_EXTENT_MM = 15.0
 MAX_HINGE_EXTENT_MM = 8.0     
 PX_PER_MM = 4.0
 
-class GeometryProcessor:
-    """
-    Handles coordinate transformations and geometric operations on ImageSystem objects.
-    Now operates directly on pixel coordinates (pixel_x, pixel_y).
-    """
+from typing import Tuple
+from src.models.image_models import ImageSystem
+from src.plugins.generator.image.stanli_symbols import StanliSupport, StanliLoad, SupportType, LoadType
 
+class GeometryProcessor:
     @staticmethod
     def get_structure_bounds_with_symbols(structure: ImageSystem) -> Tuple[float, float, float, float]:
-        """
-        Calculate the true bounding box of the structure including all rendered symbols.
-        Returns (min_x, min_y, max_x, max_y) in pixel coordinates.
-        """
         if not structure or not structure.nodes:
             return (0, 0, 0, 0)
-        
+
         all_bounds = []
-        
-        # 1. NODE & SUPPORT BOUNDS
+
+        # 1) Nodes + supports
         for node in structure.nodes:
-            support_type = getattr(node, 'support_type', 'free') 
-            
-            if support_type and support_type != "free": 
+            st = getattr(node, "support_type", None)
+
+            x, y = node.pixel_x, node.pixel_y
+            pos = (x, y)
+            rotation = float(getattr(node, "rotation", 0.0) or 0.0)
+
+            if st != SupportType.FREIES_ENDE:
                 try:
-                    support_symbol = StanliSupport(support_type)
-                    # Use pixel coordinates
-                    pos = (node.pixel_x, node.pixel_y) 
-                    
-                    # Assume standard upright rotation for generated supports, or read from node if exists
-                    rotation = getattr(node, 'rotation', 0.0)
-                    bbox = support_symbol.get_bbox(pos, rotation)
-                    all_bounds.append(bbox)
+                    bbox = StanliSupport(st).get_bbox(pos, rotation)
+                    if bbox is not None:
+                        all_bounds.append(bbox)
+                        continue
                 except Exception:
-                    x, y = node.pixel_x, node.pixel_y
-                    all_bounds.append((x-5, y-5, x+5, y+5))
-            else:
-                x, y = node.pixel_x, node.pixel_y
-                padding = 5.0
-                all_bounds.append((x - padding, y - padding, x + padding, y + padding))
-        
-        # 2. LOAD BOUNDS
-        for load in structure.loads:
-            if hasattr(load, 'node_id') and load.node_id:
-                node = next((n for n in structure.nodes if n.id == load.node_id), None)
-                if not node: continue
-                pos = (node.pixel_x, node.pixel_y)
-                
-                # ImageLoad likely has 'load_type' field (e.g., 'force_point')
-                load_type = getattr(load, 'load_type', 'force_point')
-                
-                try:
-                    # Map 'force_point' to whatever StanliLoad expects (e.g. 'Force')
-                    # You might need a small mapping here if names don't match exactly
-                    symbol_name = "Force" if "force" in load_type else "Moment"
-                    load_symbol = StanliLoad(symbol_name)
-                    
-                    rotation = getattr(load, 'angle_deg', 0.0) 
-                    length = 50.0 # Standard visual length for generated loads
-                    
-                    bbox = load_symbol.get_bbox(pos, rotation, length)
-                    all_bounds.append(bbox)
-                except:
                     pass
 
-        # Combine all bounding boxes
-        if not all_bounds:
-            if not structure.nodes: return (0,0,0,0)
-            x_vals = [n.pixel_x for n in structure.nodes]
-            y_vals = [n.pixel_y for n in structure.nodes]
-            return (min(x_vals), min(y_vals), max(x_vals), max(y_vals))
-        
-        min_x = min(bbox[0] for bbox in all_bounds)
-        min_y = min(bbox[1] for bbox in all_bounds)
-        max_x = max(bbox[2] for bbox in all_bounds)
-        max_y = max(bbox[3] for bbox in all_bounds)
-        
+            # fallback node bbox
+            pad = 5.0
+            all_bounds.append((x - pad, y - pad, x + pad, y + pad))
+
+        # 2) Loads
+        for load in getattr(structure, "loads", []):
+            node_id = getattr(load, "node_id", None)
+            if not node_id:
+                continue
+
+            node = next((n for n in structure.nodes if n.id == node_id), None)
+            if not node:
+                continue
+
+            pos = (node.pixel_x, node.pixel_y)
+            #lt = coerce_load_type(getattr(load, "load_type", None))
+            lt = getattr(load, "load_type", None)
+
+            try:
+                rotation = float(getattr(load, "angle_deg", 0.0) or 0.0)
+                length = 50.0
+                bbox = StanliLoad(lt).get_bbox(pos, rotation, length)
+                if bbox is not None:
+                    all_bounds.append(bbox)
+            except Exception:
+                # fallback around the node if load bbox fails
+                x, y = pos
+                pad = 10.0
+                all_bounds.append((x - pad, y - pad, x + pad, y + pad))
+
+        # combine
+        min_x = min(b[0] for b in all_bounds)
+        min_y = min(b[1] for b in all_bounds)
+        max_x = max(b[2] for b in all_bounds)
+        max_y = max(b[3] for b in all_bounds)
         return (min_x, min_y, max_x, max_y)
 
 

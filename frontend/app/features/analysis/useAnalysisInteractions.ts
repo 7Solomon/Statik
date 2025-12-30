@@ -75,7 +75,6 @@ export function useAnalysisInteractions() {
         if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
             canvas.width = width * dpr;
             canvas.height = height * dpr;
-            ctx.scale(dpr, dpr);
             canvas.style.width = `${width}px`;
             canvas.style.height = `${height}px`;
 

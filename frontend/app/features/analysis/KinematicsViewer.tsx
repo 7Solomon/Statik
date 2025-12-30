@@ -3,6 +3,7 @@ import { useStore } from "~/store/useStore";
 import { Play, Pause, AlertTriangle, CheckCircle, Layers, RotateCw, RefreshCw } from "lucide-react";
 import AnalysisCanvas from "./AnalysisCanvas";
 import { drawStructuralSystem } from "../drawing/drawKinematicSystem";
+import { RenderUtils } from "../drawing/RenderUtils";
 
 export default function KinematicViewer() {
     const session = useStore(s => s.analysis.analysisSession);
@@ -53,6 +54,9 @@ export default function KinematicViewer() {
     // --- RENDER LOOP ---
     const handleRender = useCallback((ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, view: any) => {
         if (!system) return;
+
+        RenderUtils.clearScreen(ctx, canvas);
+        RenderUtils.drawGrid(ctx, canvas, view);
 
         // 1. If NO result, just draw the static system (background for the 'Run' card)
         if (!kinematicResult) {

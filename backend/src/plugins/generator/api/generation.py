@@ -1,3 +1,5 @@
+import base64
+import shutil
 import threading
 import traceback
 
@@ -97,6 +99,36 @@ def gen_yolo_dataset():
             sys.stderr.write(traceback.format_exc())
             sys.stderr.flush()
             return jsonify({"error": str(e)}), 500
+        
+
+@bp.route("/dataset/delete", methods=["POST"])
+def delete_dataset():
+    """Delete a dataset folder."""
+    try:
+        data = request.get_json()
+        dataset_path = Path(data.get('dataset_path', ''))
+        
+        base_dir = Path("./content/datasets").resolve()
+        target_path = dataset_path.resolve()
+
+        if not str(target_path).startswith(str(base_dir)):
+            pass 
+
+        if not target_path.exists():
+            return jsonify({"error": "Dataset not found"}), 404
+
+        # 3. Check if it looks like a dataset (safety)
+        if not (target_path / "dataset.yaml").exists():
+             return jsonify({"error": "Invalid dataset folder (missing dataset.yaml)"}), 400
+
+        # 4. Delete Recursively
+        shutil.rmtree(target_path)
+        
+        return jsonify({"success": True, "message": f"Deleted {target_path.name}"})
+
+    except Exception as e:
+        sys.stderr.write(f"[DELETE ERROR] {e}\n")
+        return jsonify({"error": str(e)}), 500
 
 @bp.route("/preview_symbols", methods=["POST"])
 def preview_symbols():
@@ -198,55 +230,109 @@ def dataset_images():
         ])
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-
-@bp.route("/dataset/labels", methods=["POST"])
-def dataset_labels():
-    """Get labels for image."""
+    
+@bp.route("/dataset/labels_batch", methods=["POST"])
+def dataset_labels_batch():
+    """
+    Get labels for multiple images in one request to reduce server log spam.
+    Expects JSON: { "dataset_path": str, "split": str, "stems": [str] }
+    """
     try:
         data = request.get_json()
-        dataset_path = Path(data['dataset_path'])
-        split = data['split']
-        stem = data['stem']
+        dataset_path = Path(data.get('dataset_path', ''))
+        split = data.get('split', 'train')
+        stems = data.get('stems', [])  # List of IDs e.g. ["train_0", "train_1"]
         
-        label_path = dataset_path / split / "labels" / f"{stem}.txt"
-        if not label_path.exists():
-            return jsonify([])
-        
+        # 1. Load class names once
         yaml_path = dataset_path / "dataset.yaml"
         classes = []
         if yaml_path.exists():
-            with open(yaml_path, 'r') as f:
-                data_yaml = yaml.safe_load(f)
-                classes = data_yaml.get("names", [])
+            try:
+                with open(yaml_path, 'r') as f:
+                    data_yaml = yaml.safe_load(f)
+                    classes = data_yaml.get("names", [])
+            except Exception:
+                pass # Fallback to empty classes if yaml is broken
+
+        results = {}
         
-        labels = []
-        with open(label_path, "r") as f:
-            for line in f:
-                parts = line.strip().split()
-                if len(parts) != 5: continue
-                try:
-                    class_id = int(float(parts[0]))
-                    cx, cy, w, h = map(float, parts[1:])
-                    class_name = classes[class_id] if 0 <= class_id < len(classes) else f"class_{class_id}"
-                    labels.append({"class_id": class_id, "class_name": class_name, "cx": cx, "cy": cy, "w": w, "h": h})
-                except: continue
+        # 2. Iterate through all requested stems
+        labels_dir = dataset_path / split / "labels"
         
-        return jsonify(labels)
+        for stem in stems:
+            label_path = labels_dir / f"{stem}.txt"
+            
+            # Default to empty list if no label file exists
+            if not label_path.exists():
+                results[stem] = []
+                continue
+                
+            file_labels = []
+            try:
+                with open(label_path, "r") as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if len(parts) != 5: continue
+                        
+                        # Parse YOLO format: class_id cx cy w h
+                        class_id = int(float(parts[0]))
+                        cx, cy, w, h = map(float, parts[1:])
+                        
+                        # Resolve class name
+                        if 0 <= class_id < len(classes):
+                            class_name = classes[class_id]
+                        else:
+                            class_name = f"class_{class_id}"
+                            
+                        file_labels.append({
+                            "class_id": class_id, 
+                            "class_name": class_name, 
+                            "cx": cx, "cy": cy, "w": w, "h": h
+                        })
+            except Exception:
+                pass # Skip malformed files
+                
+            results[stem] = file_labels
+
+        return jsonify(results)
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@bp.route("/dataset/image", methods=["POST"])
-def dataset_image():
-    """Serve image."""
+
+@bp.route("/dataset/images_batch", methods=["POST"])
+def dataset_images_batch():
+    """
+    Get multiple images as Base64 strings in one request.
+    Expects JSON: { "dataset_path": str, "split": str, "filenames": [str] }
+    """
     try:
         data = request.get_json()
-        dataset_path = Path(data['dataset_path'])
-        split = data['split']
-        filename = data['filename']
-        
-        image_path = dataset_path / split / "images" / filename
-        if not image_path.exists():
-            abort(404)
-        return send_file(image_path, mimetype='image/jpeg')
-    except:
-        abort(404)
+        dataset_path = Path(data.get('dataset_path', ''))
+        split = data.get('split', 'train')
+        filenames = data.get('filenames', []) # List of files e.g. ["train_0.jpg", "train_1.jpg"]
+
+        images_dir = dataset_path / split / "images"
+        results = {}
+
+        for filename in filenames:
+            image_path = images_dir / filename
+            
+            if image_path.exists():
+                try:
+                    # Read binary and encode to base64
+                    with open(image_path, "rb") as img_file:
+                        encoded_string = base64.b64encode(img_file.read()).decode('utf-8')
+                        
+                    # Return standard Data URI scheme
+                    mime_type = "image/png" if filename.lower().endswith('.png') else "image/jpeg"
+                    results[filename] = f"data:{mime_type};base64,{encoded_string}"
+                except Exception as e:
+                    results[filename] = None # Error reading specific file
+            else:
+                results[filename] = None # File not found
+
+        return jsonify(results)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

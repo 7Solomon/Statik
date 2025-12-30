@@ -1,5 +1,7 @@
 import random
+import sys
 import time
+import traceback
 import uuid
 from pathlib import Path
 from tqdm import tqdm
@@ -37,9 +39,9 @@ class DatasetPipeline:
         manager = YOLODatasetManager(self.datasets_dir, self.config.classes, dataset_id)
         output_dir = manager.get_output_dir()
         
-        print(f"[PIPELINE] Output: {output_dir}")
+        #print(f"[PIPELINE] Output: {output_dir}")
         
-        print("[PIPELINE] Creating dataset structure...")
+        #print("[PIPELINE] Creating dataset structure...")
         manager.create_dataset_structure()
         
         if not (output_dir / "dataset.yaml").exists():
@@ -53,7 +55,7 @@ class DatasetPipeline:
         sample_count = 0
         
         for split_name, split_size in splits:
-            print(f"Generating {split_size} {split_name} samples...")
+            #print(f"Generating {split_size} {split_name} samples...")
             
             for i in tqdm(range(split_size)):
                 try:
@@ -68,6 +70,7 @@ class DatasetPipeline:
                         sample_count += 1
                         
                 except Exception as e:
+                    sys.stderr.write(traceback.format_exc())
                     print(f"Error generating sample {i}: {e}")
                     continue
         

@@ -24,7 +24,9 @@ export default function AnalysisCanvas({ children, onRender }: AnalysisCanvasPro
         let animationId: number;
 
         const render = () => {
-            resizeCanvas(canvas, ctx);
+            const { width, height } = resizeCanvas(canvas, ctx);
+            const dpr = window.devicePixelRatio || 1;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
             onRender(ctx, canvas, view.current);
             animationId = requestAnimationFrame(render);

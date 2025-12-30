@@ -3,6 +3,8 @@ import { useStore } from "~/store/useStore";
 import { Share2, Wand2, RotateCw, RefreshCw } from "lucide-react";
 import AnalysisCanvas from "./AnalysisCanvas";
 import { Renderer } from "../drawing/Renderer";
+import { RenderUtils } from "../drawing/RenderUtils";
+import type { AnalysisInteractionState } from "~/types/app";
 
 export default function SimplifiedViewer() {
     const session = useStore(s => s.analysis.analysisSession);
@@ -48,7 +50,14 @@ export default function SimplifiedViewer() {
     const interaction = session?.interaction;
 
     const handleRender = useCallback((ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, view: any) => {
-        if (!systemToRender || !interaction) return;
+        if (!systemToRender) return;
+
+        const interaction: AnalysisInteractionState = session?.interaction ?? {
+            isDragging: false,
+            mousePos: { x: 0, y: 0 },
+            hoveredNodeId: null,
+            hoveredMemberId: null
+        };
 
         Renderer.renderAnalysis(
             ctx,
@@ -59,7 +68,7 @@ export default function SimplifiedViewer() {
             view,
             interaction
         );
-    }, [systemToRender, interaction]);
+    }, [systemToRender, session?.interaction]);
 
 
     if (!system || system.nodes.length === 0) return <div className="flex h-full items-center justify-center text-slate-400">No System Loaded</div>;

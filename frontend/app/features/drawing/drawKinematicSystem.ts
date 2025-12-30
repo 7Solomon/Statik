@@ -16,8 +16,14 @@ export function drawStructuralSystem(
     ctx: CanvasRenderingContext2D,
     system: StructuralSystem,
     view: ViewportState,
-    nodePositions: Node[]
+    nodePositions: Node[],
+    //canvas?: HTMLCanvasElement
 ) {
+
+    //if (canvas) {
+    //    RenderUtils.clearScreen(ctx, canvas);
+    //    RenderUtils.drawGrid(ctx, canvas, view);
+    //}
     // 1. Analyze Node States (for correct connection corners/hinges)
     // We must pass the original members but the specific (potentially deformed) node positions
     const nodeStates = NodeRenderer.analyzeNodeStates(nodePositions, system.members);

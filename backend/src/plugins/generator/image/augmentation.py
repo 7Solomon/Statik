@@ -67,7 +67,7 @@ class ImageAugmenter:
                 lx, ly = rot(l.pixel_x, l.pixel_y)
                 # Update angle_deg if present
                 if hasattr(l, "angle_deg"):
-                    new_angle = (getattr(l, "angle_deg", 0.0) - angle) % 360
+                    new_angle = (getattr(l, "angle_deg", 0.0) + angle) % 360
                     new_loads.append(replace(l, pixel_x=lx, pixel_y=ly, angle_deg=new_angle))
                 else:
                     new_loads.append(replace(l, pixel_x=lx, pixel_y=ly))

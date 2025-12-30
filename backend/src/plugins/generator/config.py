@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Tuple, List, Optional
 from pathlib import Path
 
+from src.plugins.generator.image.stanli_symbols import HingeType, LoadType, SupportType
+
 @dataclass
 class DatasetConfig:
     """Configuration for dataset generation - paths coordinated by AppState"""
@@ -47,11 +49,11 @@ class DatasetConfig:
     symbol_scale: float = 1.0
     
     # YOLO classes
-    classes: List[str] = field(default_factory=lambda: [
-        "FESTLAGER", "LOSLAGER", "FESTE_EINSPANNUNG", "GLEITLAGER", 
-        "FEDER", "TORSIONSFEDER",
-        "EINZELLAST", "MOMENT_UHRZEIGER"
-    ])
+    classes: List[str] = field(default_factory=lambda: (
+        [e.name for e in SupportType if e.name != 'FREIES_ENDE'] + 
+        [e.name for e in LoadType] +
+        [e.name for e in HingeType]
+    ))
 
 
     def __post_init__(self):

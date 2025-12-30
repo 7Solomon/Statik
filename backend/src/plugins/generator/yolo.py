@@ -9,7 +9,10 @@ import yaml
 from PIL import Image
 
 from src.models.image_models import ImageSystem
-from src.plugins.generator.image.stanli_symbols import StanliSupport, StanliHinge, StanliLoad, SupportType
+from src.plugins.generator.image.stanli_symbols import (
+    LoadType, StanliSupport, StanliHinge, StanliLoad, 
+    SupportType, HingeType, StanliSymbol
+)
 
 class YOLODatasetManager:
     """Manages YOLO format dataset creation"""
@@ -17,7 +20,6 @@ class YOLODatasetManager:
     def __init__(self, datasets_dir: Path, classes: List[str], dataset_id:str):
         self.classes = classes
         self.datasets_dir = datasets_dir
-
         self.dataset_id = dataset_id
 
         self.output_dir = self.datasets_dir / self.dataset_id
@@ -26,12 +28,10 @@ class YOLODatasetManager:
         print(f"[DATASET] Created dataset folder: {self.output_dir}")
 
     def get_output_dir(self) -> Path:
-        """Return the unique dataset path."""
         return self.output_dir
     
     @classmethod
     def from_dataset_yaml(cls, dataset_yaml: str):
-        """Create a manager by loading dataset.yaml."""
         dataset_yaml = Path(dataset_yaml)
         with open(dataset_yaml, "r") as f:
             data = yaml.safe_load(f)
@@ -40,25 +40,19 @@ class YOLODatasetManager:
         class Cfg:
             output_dir = str(base)
             classes = tuple(data["names"])
-            # Defaults for fields not needed by viewer
             node_radius = 4
             support_size = 16
             image_size = (640, 640)
 
-        return cls(Cfg())
+        return cls(datasets_dir=base.parent, classes=data["names"], dataset_id=base.name)
     
     def create_dataset_structure(self):
-        """Create YOLO dataset folder structure"""
-        # Create main directories
         for split in ['train', 'val', 'test']:
             (self.output_dir / split / 'images').mkdir(parents=True, exist_ok=True)
             (self.output_dir / split / 'labels').mkdir(parents=True, exist_ok=True)
-        
-        # Create dataset.yaml
         self._create_dataset_yaml()
     
     def _create_dataset_yaml(self):
-        """Create YOLO dataset configuration file"""
         dataset_info = {
             'path': str(self.output_dir.absolute()),
             'train': 'train/images',
@@ -66,22 +60,18 @@ class YOLODatasetManager:
             'test': 'test/images',
             'names': list(self.classes)
         }
-        
-        with open(self.output_dir / 'dataset.yaml', 'w') as f:
+        with open(self.output_dir / 'dataset.yaml', 'w', encoding="utf-8") as f:
             yaml.dump(dataset_info, f, default_flow_style=False)
     
     def save_sample(self, image: Image.Image, system: ImageSystem,
                 filename: str, split: str = 'train'):
-        """Save image and labels - CREATE DIRECTORIES IF MISSING."""
-        
-        # CREATE DIRECTORIES if they don't exist
+        # Create dirs just in case
         images_dir = self.output_dir / split / 'images'
         labels_dir = self.output_dir / split / 'labels'
-        
         images_dir.mkdir(parents=True, exist_ok=True)
         labels_dir.mkdir(parents=True, exist_ok=True)
         
-        # Save image
+        # Save Image
         image_path = images_dir / f'{filename}.jpg'
         try:
             image.save(image_path, 'JPEG', quality=95)
@@ -89,174 +79,136 @@ class YOLODatasetManager:
             print(f"[SAVE ERROR] Image {image_path}: {e}")
             return False
         
-        # Create YOLO labels
+        # Generate Labels
         try:
             labels = self._structure_to_yolo_labels(system, image.size)
         except Exception as e:
             print(f"[LABELS ERROR] {e}")
+            import traceback
+            traceback.print_exc()
             labels = []
         
-        # Save labels
+        # Save Labels
         label_path = labels_dir / f'{filename}.txt'
         try:
-            with open(label_path, 'w') as f:
+            with open(label_path, 'w', encoding="utf-8") as f:
                 for label in labels:
                     f.write(' '.join(map(str, label)) + '\n')
         except Exception as e:
             print(f"[SAVE ERROR] Labels {label_path}: {e}")
             return False
         
-        return True  # Success!
+        return True
 
-    
     def _normalize_class_name(self, obj) -> str:
-        """Return uniform name (e.g. FESTE_EINSPANNUNG, VOLLGELENK)."""
-        if hasattr(obj, "name"):
-            return obj.name
+        if hasattr(obj, "name"): return obj.name
         s = str(obj)
-        if "." in s:
-            s = s.split(".")[-1]
+        if "." in s: s = s.split(".")[-1]
         return s
 
-    def _class_id(self, name: str) -> int:
-        names = list(self.classes)
-        if name not in names:
-            # Instead of silently producing -1 somewhere else, fail loud & early
-            raise ValueError(
-                f"Class '{name}' not found in config.classes. "
-                f"Add it to DatasetConfig.classes or dataset.yaml names list.\nCurrent: {names}"
-            )
-        return names.index(name)
+    # --- Helpers for Enum Conversion ---
+    def _get_support_enum(self, name: str) -> Optional[SupportType]:
+        try: return SupportType[name]
+        except KeyError: return None
 
+    def _get_load_enum(self, name: str) -> Optional[LoadType]:
+        key = name.upper()
+        try:
+            return LoadType[key]
+        except KeyError:
+            mapping = {
+                'FORCE': LoadType.EINZELLAST,
+                'FORCE_POINT': LoadType.EINZELLAST,
+                'MOMENT': LoadType.MOMENT_UHRZEIGER,
+            }
+            return mapping.get(key)
 
+    # --- CORE LABEL GENERATION LOGIC ---
     def _structure_to_yolo_labels(self, system: ImageSystem, image_size: Tuple[int, int]) -> List[List[float]]:
-        """Simple bounding boxes - NO CRASHES."""
         labels = []
-        w, h = image_size
+        w_img, h_img = image_size
         
-        # Supports
+        # 1. SUPPORTS
         for node in getattr(system, 'nodes', []):
-            support_type = getattr(node, 'support_type', None)
-            if support_type and support_type != 'free':
-                subtype = self._normalize_class_name(support_type)
-                if subtype in self.classes:
-                    class_id = self.classes.index(subtype)
-                    
-                    # FIXED 16x16 box around node center
-                    x, y = node.pixel_x, node.pixel_y
-                    half = 8.0
-                    cx = (x / w)
-                    cy = (y / h) 
-                    bw = (16.0 / w)
-                    bh = (16.0 / h)
-                    
-                    labels.append([class_id, cx, cy, bw, bh])
-        
-        # Loads  
+            support_str = getattr(node, 'support_type', None)
+            
+            # Skip if None, "free", or "FREIES_ENDE" (assuming that isn't a valid detection class)
+            if not support_str or str(support_str).upper() in ['FREE', 'FREIES_ENDE']:
+                continue
+
+            # Normalize string (e.g. SupportType.FESTLAGER -> "FESTLAGER")
+            subtype = self._normalize_class_name(support_str)
+            
+            if subtype in self.classes:
+                class_id = self.classes.index(subtype)
+                stype_enum = self._get_support_enum(subtype)
+                
+                if stype_enum:
+                    symbol = StanliSupport(stype_enum)
+                    rotation = getattr(node, 'rotation', 0.0)
+                    min_x, min_y, max_x, max_y = symbol.get_bbox((node.pixel_x, node.pixel_y), rotation=rotation)
+                    self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img)
+
+        # 2. LOADS
         for load in getattr(system, 'loads', []):
-            ltype = self._normalize_class_name(getattr(load, 'load_type', ''))
-            if ltype in self.classes:
-                class_id = self.classes.index(ltype)
-                
-                # Use node position or load position
-                x = getattr(load, 'pixel_x', 320.0)
-                y = getattr(load, 'pixel_y', 320.0)
-                if hasattr(load, 'node_id') and load.node_id:
-                    node = next((n for n in getattr(system, 'nodes', []) if n.id == load.node_id), None)
-                    if node:
-                        x, y = node.pixel_x, node.pixel_y
-                
-                # FIXED 24x24 box
-                half = 12.0
-                cx = (x / w)
-                cy = (y / h)
-                bw = (24.0 / w)
-                bh = (24.0 / h)
-                
-                labels.append([class_id, cx, cy, bw, bh])
-        
+            # 1. Map string type to Enum if necessary
+            ltype = load.load_type
+            if isinstance(ltype, str):
+                ltype = self._get_load_enum(ltype) # Use your helper from renderer
+            
+            # 2. Get the symbol and bbox
+            symbol = StanliLoad(ltype)
+            node = next((n for n in system.nodes if n.id == load.node_id), None)
+            pos = (node.pixel_x, node.pixel_y) if node else (load.pixel_x, load.pixel_y)
+            
+            min_x, min_y, max_x, max_y = symbol.get_bbox(pos, rotation=getattr(load, 'angle_deg', 0))
+            self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img)
+                    
         return labels
 
+    def _add_label(self, labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img):
+        """Helper to normalize and append label if valid."""
+        # Clamp to image bounds
+        min_x = max(0, min_x)
+        min_y = max(0, min_y)
+        max_x = min(w_img, max_x)
+        max_y = min(h_img, max_y)
 
+        # Calculate normalized center + width/height
+        bw = (max_x - min_x)
+        bh = (max_y - min_y)
+        cx = (min_x + max_x) / 2
+        cy = (min_y + max_y) / 2
+        
+        # Only add if it has non-zero size
+        if bw > 0.5 and bh > 0.5: # at least 0.5px big
+            labels.append([
+                class_id, 
+                cx / w_img, 
+                cy / h_img, 
+                bw / w_img, 
+                bh / h_img
+            ])
 
     def get_image_list(self, split: str = "train") -> List[Dict]:
-        """Get list of images with metadata for web viewer."""
         images_dir = self.output_dir / split / "images"
-        if not images_dir.exists():
-            return []
+        if not images_dir.exists(): return []
         
-        img_paths = sorted([
-            p for p in images_dir.glob("*") 
-            if p.suffix.lower() in {".jpg", ".jpeg", ".png"}
-        ])
-        
-        return [
-            {
-                "index": i,
-                "filename": p.name,
-                "stem": p.stem,
-            }
-            for i, p in enumerate(img_paths)
-        ]
+        img_paths = sorted([p for p in images_dir.glob("*") if p.suffix.lower() in {".jpg", ".jpeg", ".png"}])
+        return [{"index": i, "filename": p.name, "stem": p.stem} for i, p in enumerate(img_paths)]
     
     def get_labels_for_image(self, stem: str, split: str = "train") -> List[Dict]:
-        """Get labels for a specific image in web-friendly format."""
-        labels_dir = self.output_dir / split / "labels"
-        label_path = labels_dir / f"{stem}.txt"
-        
+        label_path = self.output_dir / split / "labels" / f"{stem}.txt"
         labels = []
         if label_path.exists():
-            with open(label_path, "r") as f:
+            with open(label_path, "r", encoding="utf-8") as f:
                 for line in f:
                     parts = line.strip().split()
-                    if len(parts) != 5:
-                        continue
+                    if len(parts) != 5: continue
                     try:
                         class_id = int(float(parts[0]))
                         cx, cy, w, h = map(float, parts[1:])
-                        class_name = (
-                            list(self.classes)[class_id] 
-                            if 0 <= class_id < len(self.classes) 
-                            else f"class_{class_id}"
-                        )
-                        labels.append({
-                            "class_id": class_id,
-                            "class_name": class_name,
-                            "cx": cx,
-                            "cy": cy,
-                            "w": w,
-                            "h": h,
-                        })
-                    except Exception:
-                        continue
+                        class_name = self.classes[class_id] if 0 <= class_id < len(self.classes) else str(class_id)
+                        labels.append({"class_id": class_id, "class_name": class_name, "cx": cx, "cy": cy, "w": w, "h": h})
+                    except: continue
         return labels
-    
-    def get_class_colors(self) -> Dict[int, str]:
-        """Get color mapping for each class (as hex colors)."""
-        import matplotlib.pyplot as plt
-        cmap = plt.get_cmap("tab20")
-        colors = {}
-        for i in range(len(self.classes)):
-            rgba = cmap(i % 20)
-            # Convert to hex
-            hex_color = "#{:02x}{:02x}{:02x}".format(
-                int(rgba[0] * 255),
-                int(rgba[1] * 255),
-                int(rgba[2] * 255)
-            )
-            colors[i] = hex_color
-        return colors
-
-#def visualize_yolo_dataset(
-#    dataset: str | YOLODatasetManager,
-#    split: str = "train",
-#    indices: List[int] = None,
-#    shuffle: bool = False,
-#    invert_y: bool = False,
-#):
-#    """Convenience function to visualize a dataset using dataset.yaml."""
-#    if isinstance(dataset, str):
-#        mgr = YOLODatasetManager.from_dataset_yaml(dataset)
-#    elif isinstance(dataset, YOLODatasetManager):
-#        mgr = dataset
-#    mgr.visualize_dataset(split=split, indices=indices, shuffle=shuffle, invert_y=invert_y)

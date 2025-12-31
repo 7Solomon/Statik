@@ -1,0 +1,16 @@
+# Frontend ignores
+frontend/.react-router
+frontend/build
+frontend/node_modules
+
+# Backend ignores
+backend/.venv
+backend/__pycache__
+backend/*.pyc
+backend/.pytest_cache
+
+# General
+.git
+.gitignore
+*.md
+.env

@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: statik:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      # SWITCH
+      - ./backend/content:/app/content # TEST
+    # - app-content:/app/content  # PRODUCTION
+    environment:
+      - FLASK_ENV=production
+
+volumes:
+  app-content:

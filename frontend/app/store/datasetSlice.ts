@@ -1,29 +1,11 @@
 import type { StateCreator } from "zustand";
 import type { AppStore } from "./types";
 
-export interface Dataset {
-    path: string;
-    yaml: string;
-    created: number;
-}
-
-export interface DatasetState {
-    datasets: Dataset[];
-    isLoading: boolean;
-    currentPreviewConfig: any | null;
-}
-
-export interface DatasetActions {
-    fetchDatasets: () => Promise<void>;
-    generateDataset: (numSamples: number, forceRecreate?: boolean) => Promise<void>;
-    previewSymbols: () => Promise<void>;
-}
-
 export const createDatasetSlice: StateCreator<
     AppStore,
     [],
     [],
-    { dataset: DatasetState & { actions: DatasetActions } }
+    Pick<AppStore, 'dataset'>
 > = (set, get) => ({
     dataset: {
         datasets: [],
@@ -32,12 +14,10 @@ export const createDatasetSlice: StateCreator<
 
         actions: {
             fetchDatasets: async () => {
-                console.log("FETCHING")
                 set((s) => ({ dataset: { ...s.dataset, isLoading: true } }));
                 try {
                     const res = await fetch('/api/generation/list_datasets');
                     const data = await res.json();
-                    console.log(data)
 
                     set((s) => ({
                         dataset: { ...s.dataset, datasets: data.datasets, isLoading: false },
@@ -84,19 +64,18 @@ export const createDatasetSlice: StateCreator<
                 }
             },
 
-
             getDatasetInfo: async (datasetPath: string) => {
-                const res = await fetch(`/generation/${encodeURIComponent(datasetPath)}/info`);
+                const res = await fetch(`/api/generation/${encodeURIComponent(datasetPath)}/info`);
                 return res.json();
             },
 
             getSplitImages: async (datasetPath: string, split: 'train' | 'val' | 'test') => {
-                const res = await fetch(`/generation/${encodeURIComponent(datasetPath)}/${split}/images`);
+                const res = await fetch(`/api/generation/${encodeURIComponent(datasetPath)}/${split}/images`);
                 return res.json();
             },
 
             getImageLabels: async (datasetPath: string, split: string, stem: string) => {
-                const res = await fetch(`/generation/${encodeURIComponent(datasetPath)}/${split}/labels/${stem}`);
+                const res = await fetch(`/api/generation/${encodeURIComponent(datasetPath)}/${split}/labels/${stem}`);
                 return res.json();
             },
         },

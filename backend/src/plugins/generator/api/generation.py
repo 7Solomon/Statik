@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional
 
 import sys
 
-bp = Blueprint('generation', __name__, url_prefix='/generation')
+bp = Blueprint('generation', __name__, url_prefix='/api/generation')
 
 _pipeline_cache: Dict[str, Any] = {}
 _generation_lock = threading.Lock()

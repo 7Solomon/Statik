@@ -7,7 +7,7 @@ import shutil
 import time
 
 raise NotImplementedError("JUST FOR TESTS")
-bp = Blueprint('models', __name__, url_prefix='/models')
+bp = Blueprint('models', __name__, url_prefix='/api/models')
 
 _training_lock = threading.Lock()
 _current_training = {

@@ -77,8 +77,8 @@ export default function SimplifiedViewer() {
     if (!simplifyResult) {
         return (
             <AnalysisCanvas onRender={handleRender}>
-                <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px] z-20">
-                    <div className="bg-white p-6 rounded-xl shadow-xl border border-slate-100 text-center max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200">
+                <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px] z-20 pointer-events-none">
+                    <div className="bg-white p-6 rounded-xl shadow-xl border border-slate-100 text-center max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200 pointer-events-auto">
                         <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Wand2 size={24} />
                         </div>

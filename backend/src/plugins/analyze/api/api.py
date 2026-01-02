@@ -10,7 +10,7 @@ import sys
 import traceback
 
 
-bp = Blueprint('analyze', __name__, url_prefix='/analyze')
+bp = Blueprint('analyze', __name__, url_prefix='/api/analyze')
 @bp.route("/kinematics", methods=["POST"])
 def analyze_system():
     payload = request.get_json(force=True)

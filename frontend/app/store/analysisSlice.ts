@@ -9,8 +9,6 @@ const DEFAULT_VIEWPORT_ANALYSIS: ViewportState = {
     gridSize: 1.0,
     width: 0,
     height: 0,
-    x: 0,
-    y: 0
 };
 
 const DEFAULT_INTERACTION_ANALYSIS: AnalysisInteractionState = {
@@ -129,8 +127,6 @@ export const createAnalysisSlice: StateCreator<
 
             setViewMode: (mode) => {
                 set((state) => {
-                    console.log("SETVIEWMODE")
-                    console.log(state.analysis.analysisSession)
                     if (!state.analysis.analysisSession) return state;
                     return {
                         analysis: {

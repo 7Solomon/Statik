@@ -2,16 +2,15 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AppStore, EditorActions, EditorState } from './types';
 import type { StateCreator } from 'zustand';
 import type { Node, Member, Load } from '~/types/model';
+import type { ViewportState } from '~/types/app';
 
 // Constants
-const DEFAULT_VIEWPORT = {
+const DEFAULT_VIEWPORT: ViewportState = {
     zoom: 50,
     pan: { x: 400, y: 400 },
     gridSize: 1.0,
     width: 0,
     height: 0,
-    x: 0,
-    y: 0
 };
 
 const DEFAULT_INTERACTION = {

@@ -100,8 +100,6 @@ export default function KinematicViewer() {
     }, [kinematicResult, system, activeModeIndex, amplitude, isPlaying, startTime]);
 
     // --- RENDER UI ---
-    console.log("SYSTEM");
-    console.log(system)
     // Case 1: No System (Shouldn't happen if initialized correctly)
     if (!system || system.nodes.length === 0) return <div className="flex h-full items-center justify-center text-slate-400">No System Loaded</div>;
 
@@ -109,8 +107,8 @@ export default function KinematicViewer() {
     if (!kinematicResult) {
         return (
             <AnalysisCanvas onRender={handleRender}>
-                <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px] z-20">
-                    <div className="bg-white p-6 rounded-xl shadow-xl border border-slate-100 text-center max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200">
+                <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px] z-20 pointer-events-none">
+                    <div className="bg-white p-6 rounded-xl shadow-xl border border-slate-100 text-center max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200 pointer-events-auto">
                         <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Layers size={24} />
                         </div>

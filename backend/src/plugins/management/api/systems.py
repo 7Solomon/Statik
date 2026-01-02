@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 
-bp = Blueprint('systems_management', __name__, url_prefix='/systems_management')
+bp = Blueprint('systems_management', __name__, url_prefix='/api/systems_management')
 
 @bp.route("/save", methods=["POST"])
 def save_system():

@@ -1,17 +1,25 @@
+import os
 from pathlib import Path
 from flask import Flask
 from flask_cors import CORS
 
 def create_app(content_dir=Path("content")):
-    """Flask app factory"""
+    if os.environ.get("RUNNING_IN_DOCKER") == "true":
+        base_dir = Path("/app")
+    else:
+        base_dir = Path(__file__).resolve().parent.parent.parent
     
-    base_dir = Path(__file__).parent.parent.parent
-    frontend_dist = base_dir / "frontend" / "dist"
+    frontend_dist = base_dir / "frontend" / "dist" / "client"
+    
+    # Debug to be sure
+    print(f"--- ENVIRONMENT: {'DOCKER' if os.environ.get('RUNNING_IN_DOCKER') else 'LOCAL'} ---")
+    print(f"--- FRONTEND PATH: {frontend_dist} ---")
+    print(f"--- PATH EXISTS: {frontend_dist.exists()} ---")
 
-    app = Flask(__name__, 
+    app = Flask(__name__,
                 template_folder=str(frontend_dist),     # Looks for index.html
-                static_folder=str(frontend_dist),       # Looks for assets/ here
-                static_url_path='')                     # Serve assets at root URL (e.g. /assets/index.js)
+                static_folder=str(frontend_dist)
+                )                
 
     CORS(app)
     
@@ -35,8 +43,19 @@ def create_app(content_dir=Path("content")):
     @app.route("/", defaults={'path': ''})
     @app.route("/<path:path>")
     def serve_react(path):
+        print("SERVE REACT")
+        if path.startswith("api/") or path.startswith("api"):
+            return "API endpoint not found", 404
+        
         if path != "" and (frontend_dist / path).exists():
             return send_from_directory(frontend_dist, path)
+        
         return send_from_directory(frontend_dist, "index.html")
+
+    print("--- REGISTERED ROUTES ---")
+    for rule in app.url_map.iter_rules():
+        print(f"{rule.endpoint}: {rule}")
+    print("-------------------------")
+
 
     return app

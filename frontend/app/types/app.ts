@@ -30,8 +30,8 @@ export type LoadType =
 export interface ViewportState {
     width: number;
     height: number;
-    x: number;
-    y: number;
+    //x: number;
+    //y: number;
     zoom: number;      // Scale factor (pixels per meter)
     pan: Vec2;        // Offset in pixels
     gridSize: number; // In meters (e.g., 1.0m)

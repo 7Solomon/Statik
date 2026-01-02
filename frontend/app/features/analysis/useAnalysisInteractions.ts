@@ -2,23 +2,17 @@ import { useRef, useCallback, useEffect } from 'react';
 import { useStore } from '~/store/useStore';
 import type { ViewportState } from '~/types/app';
 
-// Default viewport fallback in case hook is called too early
 const DEFAULT_VIEWPORT: ViewportState = {
     zoom: 50,
     pan: { x: 0, y: 0 },
     gridSize: 1.0,
     width: 0,
     height: 0,
-    x: 0,
-    y: 0
 };
 
 export function useAnalysisInteractions() {
-    // 1. Access Store Actions
     const setViewport = useStore((state) => state.analysis.actions.setViewport);
 
-    // 2. Access Initial State safely
-    // We check if analysisSession exists; if not, fall back to defaults to prevent crashes
     const initialSession = useStore.getState().analysis.analysisSession;
     const initialViewport = initialSession?.viewport || DEFAULT_VIEWPORT;
 
@@ -26,45 +20,54 @@ export function useAnalysisInteractions() {
     const isDragging = useRef(false);
     const lastPos = useRef({ x: 0, y: 0 });
 
-    // 3. Handlers
+    // Handle mouse move and up at document level
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isDragging.current) return;
+
+            const dx = e.clientX - lastPos.current.x;
+            const dy = e.clientY - lastPos.current.y;
+
+            view.current.pan.x += dx;
+            view.current.pan.y += dy;
+
+            lastPos.current = { x: e.clientX, y: e.clientY };
+        };
+
+        const handleMouseUp = () => {
+            console.log("MOUSE UP")
+            if (isDragging.current) {
+                isDragging.current = false;
+                setViewport({ pan: { x: view.current.pan.x, y: view.current.pan.y } });
+            }
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [setViewport]);
+
     const handleWheel = useCallback((e: React.WheelEvent) => {
         const scale = e.deltaY > 0 ? 0.9 : 1.1;
         view.current.zoom = Math.max(5, Math.min(200, view.current.zoom * scale));
-
         setViewport({ zoom: view.current.zoom });
     }, [setViewport]);
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        console.log("MOUSE DOWN");
         isDragging.current = true;
         lastPos.current = { x: e.clientX, y: e.clientY };
     }, []);
 
-    const handleMouseMove = useCallback((e: React.MouseEvent) => {
-        if (!isDragging.current) return;
-
-        const dx = e.clientX - lastPos.current.x;
-        const dy = e.clientY - lastPos.current.y;
-
-        view.current.x += dx;
-        view.current.y += dy;
-
-        lastPos.current = { x: e.clientX, y: e.clientY };
-    }, []);
-
-    const handleMouseUp = useCallback(() => {
-        if (isDragging.current) {
-            isDragging.current = false;
-            setViewport({ x: view.current.x, y: view.current.y });
-        }
-    }, [setViewport]);
-
-    // 4. Utilities
     const resetView = useCallback(() => {
         view.current.zoom = 50;
-        view.current.x = 0;
-        view.current.y = 0;
+        view.current.pan = { x: 0, y: 0 };
 
-        setViewport({ zoom: 50, x: 0, y: 0 });
+        setViewport({ zoom: 50, pan: { x: 0, y: 0 } });
     }, [setViewport]);
 
     const resizeCanvas = useCallback((canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
@@ -85,9 +88,7 @@ export function useAnalysisInteractions() {
         return { width, height };
     }, []);
 
-    // 5. Sync on Mount/Unmount
     useEffect(() => {
-        // Safe access with optional chaining
         const currentSession = useStore.getState().analysis.analysisSession;
         if (currentSession?.viewport) {
             view.current = { ...currentSession.viewport };
@@ -105,9 +106,7 @@ export function useAnalysisInteractions() {
         handlers: {
             onWheel: handleWheel,
             onMouseDown: handleMouseDown,
-            onMouseMove: handleMouseMove,
-            onMouseUp: handleMouseUp,
-            onMouseLeave: handleMouseUp,
+            // Remove onMouseMove, onMouseUp, onMouseLeave from here
         }
     };
 }

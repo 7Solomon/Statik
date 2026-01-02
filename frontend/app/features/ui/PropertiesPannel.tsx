@@ -239,12 +239,15 @@ const ReleaseGroup = ({ label, releases, onChange }: {
     onChange: (newReleases: { fx: boolean, fy: boolean, mz: boolean }) => void
 }) => {
     // 1. Determine current selection state
-    let value = 'rigid'; // Default: No release
-    if (releases.mz) value = 'moment';
-    else if (releases.fy) value = 'shear';
-    else if (releases.fx) value = 'axial';
+    let value = 'rigid';
 
-    // 2. Handle change: Set all to false, then enable only the selected one
+    // Strict matching for standard types to avoid UI confusion
+    if (releases.mz && !releases.fx && !releases.fy) value = 'moment'; // Standard Hinge
+    else if (releases.fy && !releases.mz && !releases.fx) value = 'shear'; // Shear Hinge
+    else if (releases.fx && !releases.mz && !releases.fy) value = 'axial'; // Axial Release
+    else if (!releases.fx && !releases.fy && !releases.mz) value = 'rigid';
+    else value = 'custom'; // Handle mixed cases (optional)
+
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const type = e.target.value;
         const reset = { fx: false, fy: false, mz: false };
@@ -252,27 +255,24 @@ const ReleaseGroup = ({ label, releases, onChange }: {
         if (type === 'moment') onChange({ ...reset, mz: true });
         else if (type === 'shear') onChange({ ...reset, fy: true });
         else if (type === 'axial') onChange({ ...reset, fx: true });
-        else onChange(reset); // 'rigid'
+        else if (type === 'rigid') onChange(reset);
+        // Custom is read-only in this simple UI
     };
 
     return (
         <div className="p-3 border border-slate-200 rounded bg-slate-50 flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{label}</span>
-
             <div className="relative">
                 <select
                     value={value}
                     onChange={handleChange}
-                    className="
-                        appearance-none bg-white border border-slate-300 text-slate-700 
-                        text-xs rounded px-3 py-1.5 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500
-                        cursor-pointer shadow-sm min-w-[120px]
-                    "
+                    className="..."
                 >
                     <option value="rigid">Rigid (None)</option>
                     <option value="moment">Hinge (M)</option>
                     <option value="shear">Slider (V)</option>
                     <option value="axial">Axial (N)</option>
+                    {value === 'custom' && <option value="custom" disabled>Custom/Mixed</option>}
                 </select>
 
                 {/* Custom chevron for better UI */}

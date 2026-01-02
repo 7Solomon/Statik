@@ -6,7 +6,6 @@ import { COLORS, SIZES, RenderUtils, type NodeState } from './RenderUtils';
 
 export class NodeRenderer {
 
-    // ... analyzeNodeStates (Same as before) ...
     static analyzeNodeStates(nodes: Node[], members: Member[]): Map<string, NodeState> {
         const map = new Map<string, NodeState>();
 
@@ -60,7 +59,6 @@ export class NodeRenderer {
         return map;
     }
 
-    // ... drawRigidConnections (Same as before) ...
     static drawRigidConnections(
         ctx: CanvasRenderingContext2D,
         nodes: Node[],
@@ -136,22 +134,64 @@ export class NodeRenderer {
         const { fixX, fixY, fixM } = node.supports;
         const rotation = node.rotation;
 
-        // 1. Draw Support Symbol
         const isRigid = (val: SupportValue) => val === true;
         const isFree = (val: SupportValue) => val === false;
         const isSpring = (val: SupportValue) => typeof val === 'number';
 
         let symbolKey: string | null = null;
+        let drawRotation = node.rotation;
         let activeColor = isHovered ? COLORS.highlight : COLORS.support;
 
-        if (isRigid(fixX) && isRigid(fixY) && isRigid(fixM)) symbolKey = 'FESTE_EINSPANNUNG';
-        else if (isRigid(fixX) && isRigid(fixY)) symbolKey = isSpring(fixM) ? 'TORSIONSFEDER' : 'FESTLAGER';
-        else if (isRigid(fixY) && isFree(fixX) && isFree(fixM)) symbolKey = 'LOSLAGER';
-        else if (isRigid(fixX) && isFree(fixY)) symbolKey = 'GLEITLAGER';
-        else if (isSpring(fixY) && isFree(fixX)) symbolKey = 'FEDER';
+
+        // 1. FULLY FIXED (Clamped)
+        if (isRigid(fixX) && isRigid(fixY) && isRigid(fixM)) {
+            symbolKey = 'FESTE_EINSPANNUNG';
+        }
+        // 2. PINNED (Hinged Support) - Fixed X/Y, Free Moment
+        else if (isRigid(fixX) && isRigid(fixY) && isFree(fixM)) {
+            symbolKey = 'FESTLAGER';
+        }
+        // 3. TORSION SPRING (Pinned XY + Spring M)
+        else if (isRigid(fixX) && isRigid(fixY) && isSpring(fixM)) {
+            symbolKey = 'TORSIONSFEDER';
+        }
+        // 4. ROLLER (Loslager) - One direction fixed, one free, moment free
+        //    We need to handle X-only or Y-only by rotating the symbol.
+        else if (isFree(fixM)) {
+            // Case A: Standard Roller (Fix Y, Free X) -> Rotation 0
+            if (isRigid(fixY) && isFree(fixX)) {
+                symbolKey = 'LOSLAGER';
+                // drawRotation stays as node.rotation (usually 0)
+            }
+            // Case B: Vertically Rolling (Fix X, Free Y) -> Rotation 90
+            else if (isRigid(fixX) && isFree(fixY)) {
+                symbolKey = 'LOSLAGER';
+                drawRotation += 90; // Rotate the roller symbol 90 degrees
+            }
+            // Case C: Spring Support (Spring Y, Free X)
+            else if (isSpring(fixY) && isFree(fixX)) {
+                symbolKey = 'FEDER';
+            }
+            else if (isSpring(fixX) && isFree(fixY)) {
+                symbolKey = 'FEDER';
+                drawRotation += 90;
+            }
+        }
+        // 5. SLIDER (Gleitlager) - Fixed Rotation + Fixed Transverse, Free Axial
+        else if (isRigid(fixM)) {
+            // Case A: Horizontal Slider (Fix Y, Fix M, Free X)
+            if (isRigid(fixY) && isFree(fixX)) {
+                symbolKey = 'GLEITLAGER';
+            }
+            // Case B: Vertical Slider (Fix X, Fix M, Free Y)
+            else if (isRigid(fixX) && isFree(fixY)) {
+                symbolKey = 'GLEITLAGER';
+                drawRotation += 90;
+            }
+        }
 
         if (symbolKey) {
-            SymbolRenderer.draw(ctx, symbolKey, p, rotation, activeColor);
+            SymbolRenderer.draw(ctx, symbolKey, p, drawRotation, activeColor);
         }
 
         // 2. Draw Node Appearance based on State

@@ -2,8 +2,9 @@ import type { Load, Member, Node, KinematicResult, Release, Vec2, StructuralSyst
 import type { AnalysisInteractionState, EditorInteractionState, ToolType, ViewportState } from '~/types/app';
 
 // --- SHARED DOMAIN ---
-export type AppMode = 'EDITOR' | 'ANALYSIS' | 'DATASET';
+export type AppMode = 'EDITOR' | 'ANALYSIS' | 'MODELS';
 export type AnalysisViewMode = 'KINEMATIC' | 'SIMPLIFIED' | 'SOLUTION';
+export type ModelViewMode = 'TRAINING' | 'DATASETS';
 
 // --- EDITOR DOMAIN ---
 export interface EditorState {
@@ -58,24 +59,40 @@ export interface AnalysisActions {
     setSolutionResult: (result: FEMResult | null) => void;
 }
 
-// --- DATASET DOMAIN ---
+// --- DATASET & MODEL DOMAIN ---
 export interface Dataset {
     path: string;
     yaml: string;
     created: number;
+    name: string;
 }
 
-export interface DatasetState {
+export interface Model {
+    name: string;
+    created: number;
+    path: string;
+}
+
+export interface ModelManagementState {
+    viewMode: ModelViewMode;
     datasets: Dataset[];
+    models: Model[];
     isLoading: boolean;
     currentPreviewConfig: any | null;
 }
 
-export interface DatasetActions {
+export interface ModelManagementActions {
+    setViewMode: (mode: ModelViewMode) => void;
+
+    // Data Fetching
     fetchDatasets: () => Promise<void>;
+    fetchModels: () => Promise<void>;
+
+    // Actions
     generateDataset: (numSamples: number, forceRecreate?: boolean) => Promise<void>;
     previewSymbols: () => Promise<void>;
 
+    // API Helpers
     getDatasetInfo: (datasetPath: string) => Promise<any>;
     getSplitImages: (datasetPath: string, split: 'train' | 'val' | 'test') => Promise<any[]>;
     getImageLabels: (datasetPath: string, split: string, stem: string) => Promise<any[]>;
@@ -94,6 +111,6 @@ export interface SharedActions {
 export interface AppStore {
     editor: EditorState & { actions: EditorActions };
     analysis: AnalysisState & { actions: AnalysisActions };
-    dataset: DatasetState & { actions: DatasetActions };
+    model_management: ModelManagementState & { actions: ModelManagementActions };
     shared: SharedState & { actions: SharedActions };
 }

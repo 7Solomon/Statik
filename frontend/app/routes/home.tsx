@@ -7,7 +7,7 @@ import { SaveSystemModal } from "~/features/modals/SaveSystemModal";
 import { LoadSystemModal } from "~/features/modals/LoadSystemModal";
 import { SidePanel } from "~/features/ui/SidePannel";
 import AnalysisViewer from "~/features/analysis/AnalysisViewer";
-import DatasetManager from "~/features/datasets/DataSetManager";
+import ModelManagement from "~/features/model_management/ModelManager";
 
 export default function Home() {
   const mode = useStore(state => state.shared.mode);
@@ -23,7 +23,7 @@ export default function Home() {
 
   const [modalOpen, setModalOpen] = useState<'save' | 'load' | null>(null);
 
-  const handleToggleMode = (targetMode: 'EDITOR' | 'ANALYSIS' | 'DATASET') => {
+  const handleToggleMode = (targetMode: 'EDITOR' | 'ANALYSIS' | 'MODELS') => {
     if (targetMode === 'ANALYSIS') {
       // 1. Initialize Analysis Session with current Editor System
       startAnalysis({ nodes, members, loads });
@@ -68,10 +68,10 @@ export default function Home() {
           />
           <div className="w-px bg-slate-200 my-1 mx-1"></div>
           <ModeButton
-            active={mode === 'DATASET'}
-            onClick={() => handleToggleMode('DATASET')}
+            active={mode === 'MODELS'}
+            onClick={() => handleToggleMode('MODELS')}
             icon={<Database size={14} />}
-            label="Datasets"
+            label="Models"
           />
         </div>
       </header>
@@ -80,7 +80,7 @@ export default function Home() {
         <main className="flex-1 relative bg-slate-100/50">
           {mode === 'EDITOR' && <EditorCanvas />}
           {mode === 'ANALYSIS' && <AnalysisViewer />}
-          {mode === 'DATASET' && <DatasetManager />}
+          {mode === 'MODELS' && <ModelManagement />}
         </main>
         {mode === 'EDITOR' && <SidePanel />}
       </div>
@@ -109,8 +109,8 @@ function ModeButton({ active, onClick, icon, label }: any) {
     <button
       onClick={onClick}
       className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${active
-          ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
-          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+        ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
+        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
         }`}
     >
       {icon}

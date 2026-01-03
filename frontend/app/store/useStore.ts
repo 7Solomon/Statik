@@ -3,11 +3,11 @@ import { createEditorSlice } from './editorSlice';
 import { createAnalysisSlice } from './analysisSlice';
 import type { AppStore } from './types';
 import { createSharedSlice } from './sharedSlice';
-import { createDatasetSlice } from './datasetSlice';
+import { createModelManagementSlice } from './modelsSlice';
 
 export const useStore = create<AppStore>()((...a) => ({
     ...createEditorSlice(...a),
     ...createAnalysisSlice(...a),
-    ...createDatasetSlice(...a),
+    ...createModelManagementSlice(...a),
     ...createSharedSlice(...a),
 }));

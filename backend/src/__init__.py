@@ -33,9 +33,11 @@ def create_app(content_dir=Path("content")):
     from src.plugins.analyze.api import api
     from src.plugins.management.api import systems
     from src.plugins.generator.api import generation
+    from src.plugins.models.api import models
     app.register_blueprint(api.bp)
     app.register_blueprint(systems.bp)
     app.register_blueprint(generation.bp)
+    app.register_blueprint(models.bp)
 
     
     from flask import send_from_directory
@@ -43,7 +45,6 @@ def create_app(content_dir=Path("content")):
     @app.route("/", defaults={'path': ''})
     @app.route("/<path:path>")
     def serve_react(path):
-        print("SERVE REACT")
         if path.startswith("api/") or path.startswith("api"):
             return "API endpoint not found", 404
         

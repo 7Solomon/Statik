@@ -64,7 +64,6 @@ export function AnalyzeSystemModal({ onClose, onAnalysisComplete }: AnalyzeSyste
             }
 
             const data = await response.json();
-            console.log(data)
             setResult(data);
             setResultType(type);
 

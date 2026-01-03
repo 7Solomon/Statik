@@ -99,16 +99,15 @@ hatchingLength = 1.5
 class StanliSymbol:
     line_width: int = LINE_NORMAL
 
-    # In stanli_symbols.py
     def _rot(self, p, origin, angle_deg):
         a = math.radians(angle_deg)
         ox, oy = origin
         x, y = p
-        # Standard screen-space CCW rotation (Y-down)
         return (
-            ox + math.cos(a)*(x-ox) + math.sin(a)*(y-oy),
-            -math.sin(a)*(x-ox) + math.cos(a)*(y-oy) + oy # Wait, simplified:
+            ox + math.cos(a)*(x-ox) - math.sin(a)*(y-oy),
+            oy + math.sin(a)*(x-ox) + math.cos(a)*(y-oy)
         )
+
 
     def _rot_many(self, pts, origin, ang):
         return [self._rot(p, origin, ang) for p in pts]

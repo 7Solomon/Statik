@@ -132,11 +132,14 @@ class YOLODatasetManager:
         for node in getattr(system, 'nodes', []):
             support_str = getattr(node, 'support_type', None)
             
-            # Skip if None, "free", or "FREIES_ENDE" (assuming that isn't a valid detection class)
-            if not support_str or str(support_str).upper() in ['FREE', 'FREIES_ENDE']:
+            if not support_str:
                 continue
 
-            # Normalize string (e.g. SupportType.FESTLAGER -> "FESTLAGER")
+            rotation = getattr(node, 'rotation', 0.0)
+            print(f"Node {node.id[:8]}: pos=({node.pixel_x:.1f}, {node.pixel_y:.1f}), "
+                f"support={support_str}, rotation={rotation}°")
+            
+            
             subtype = self._normalize_class_name(support_str)
             
             if subtype in self.classes:
@@ -162,7 +165,7 @@ class YOLODatasetManager:
             pos = (node.pixel_x, node.pixel_y) if node else (load.pixel_x, load.pixel_y)
             
             min_x, min_y, max_x, max_y = symbol.get_bbox(pos, rotation=getattr(load, 'angle_deg', 0))
-            self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img)
+            self._add_label(labels, ltype, min_x, min_y, max_x, max_y, w_img, h_img)
                     
         return labels
 

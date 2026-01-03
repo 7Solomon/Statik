@@ -50,14 +50,7 @@ class DatasetConfig:
     
     # YOLO classes
     classes: List[str] = field(default_factory=lambda: (
-        [e.name for e in SupportType if e.name != 'FREIES_ENDE'] + 
+        [e.name for e in SupportType] + 
         [e.name for e in LoadType] +
         [e.name for e in HingeType]
     ))
-
-
-    def __post_init__(self):
-        """Initialize directory structure"""
-        #self.base_dir = self.root_dir / self.folder_name
-        #self.base_dir.mkdir(parents=True, exist_ok=True)
-        #self.output_dir = self.base_dir  # JUST FOR COMPATABILITY BUT THIS NEEDS TO BE LOOKED AFTER IF NESECARRY AND WHAT IT DO

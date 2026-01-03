@@ -58,7 +58,10 @@ class ImageAugmenter:
         new_nodes = []
         for n in system.nodes:
             nx, ny = rot(n.pixel_x, n.pixel_y)
-            new_nodes.append(replace(n, pixel_x=nx, pixel_y=ny))
+            current_rot = getattr(n, "rotation", 0.0) or 0.0
+            new_rot = (current_rot + angle) % 360
+            
+            new_nodes.append(replace(n, pixel_x=nx, pixel_y=ny, rotation=new_rot))
 
         # Rotate loads that store explicit pixel positions
         new_loads = []

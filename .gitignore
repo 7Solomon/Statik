@@ -71,3 +71,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+
+# SYSTEMS
+!backend\content\system_templates\doppelhaus.json
+!backend\content\system_templates\einfeld-trager.json

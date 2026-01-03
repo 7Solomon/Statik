@@ -112,16 +112,8 @@ class YOLODatasetManager:
         except KeyError: return None
 
     def _get_load_enum(self, name: str) -> Optional[LoadType]:
-        key = name.upper()
-        try:
-            return LoadType[key]
-        except KeyError:
-            mapping = {
-                'FORCE': LoadType.EINZELLAST,
-                'FORCE_POINT': LoadType.EINZELLAST,
-                'MOMENT': LoadType.MOMENT_UHRZEIGER,
-            }
-            return mapping.get(key)
+        try: return LoadType[name]
+        except KeyError: return None
 
     # --- CORE LABEL GENERATION LOGIC ---
     def _structure_to_yolo_labels(self, system: ImageSystem, image_size: Tuple[int, int]) -> List[List[float]]:
@@ -135,11 +127,6 @@ class YOLODatasetManager:
             if not support_str:
                 continue
 
-            rotation = getattr(node, 'rotation', 0.0)
-            print(f"Node {node.id[:8]}: pos=({node.pixel_x:.1f}, {node.pixel_y:.1f}), "
-                f"support={support_str}, rotation={rotation}°")
-            
-            
             subtype = self._normalize_class_name(support_str)
             
             if subtype in self.classes:
@@ -159,14 +146,25 @@ class YOLODatasetManager:
             if isinstance(ltype, str):
                 ltype = self._get_load_enum(ltype) # Use your helper from renderer
             
+            class_name = self._normalize_class_name(ltype)
+            if class_name not in self.classes:
+                print(f"Warning: Load class '{class_name}' not in dataset classes")
+                continue
+                
+            class_id = self.classes.index(class_name)
+            
             # 2. Get the symbol and bbox
             symbol = StanliLoad(ltype)
             node = next((n for n in system.nodes if n.id == load.node_id), None)
             pos = (node.pixel_x, node.pixel_y) if node else (load.pixel_x, load.pixel_y)
             
-            min_x, min_y, max_x, max_y = symbol.get_bbox(pos, rotation=getattr(load, 'angle_deg', 0))
-            self._add_label(labels, ltype, min_x, min_y, max_x, max_y, w_img, h_img)
-                    
+            min_x, min_y, max_x, max_y = symbol.get_bbox(
+                pos, 
+                rotation=getattr(load, 'angle_deg', 0),
+                length=50.0 
+            )
+
+            self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img )
         return labels
 
     def _add_label(self, labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img):

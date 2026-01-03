@@ -103,10 +103,15 @@ class StanliSymbol:
         a = math.radians(angle_deg)
         ox, oy = origin
         x, y = p
-        return (
-            ox + math.cos(a)*(x-ox) - math.sin(a)*(y-oy),
-            oy + math.sin(a)*(x-ox) + math.cos(a)*(y-oy)
-        )
+        dx = x - ox
+        dy = y - oy
+        # CCW math
+        #qx = ox + dx * math.cos(a) - dy * math.sin(a)
+        #qy = oy + dx * math.sin(a) + dy * math.cos(a)
+        
+        qx = ox + dx * math.cos(a) + dy * math.sin(a)
+        qy = oy - dx * math.sin(a) + dy * math.cos(a)
+        return qx, qy
 
 
     def _rot_many(self, pts, origin, ang):

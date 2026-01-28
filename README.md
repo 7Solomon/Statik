@@ -254,6 +254,27 @@ The FEM solver implements 2D frame analysis with member releases and distributed
 
 ---
 
+### Current Limitations
+
+- **Rigid-body kinematics assumption**:  
+  The kinematic analysis assumes axially rigid members. It only detects purely geometric mechanisms (motions without member deformation) and does not account for stabilization by axial flexibility or geometric stiffness effects.
+
+- **Mechanisms with double hinges**:  
+  Systems with a node where *all* connected members have moment releases (double hinge situations) are treated as mechanisms. Such configurations will report a positive degree of freedom and should not be analyzed with FEM until at least one member is made rotationally fixed at that node.
+
+- **FEM on unstable systems**:  
+  If the kinematic analysis finds DOF > 0, the global stiffness matrix becomes singular and the FEM solver cannot produce a valid solution. In this case the analysis will fail with an instability / singular-matrix error and the structure must be stabilized (supports or releases adjusted).
+
+- **Member load angles (current state)**:  
+  Nodal point loads fully respect their angle (converted into global x/y components). Point loads applied *on members* are currently interpreted as acting perpendicular to the member axis; arbitrary load angles along members are not yet supported.
+
+- **Linear-elastic, small-deformation model**:  
+  The FEM implementation assumes linear material behavior and small displacements/rotations. Geometric nonlinearity (P–Δ / P–δ effects, large rotations) and material nonlinearity (plastic hinges, cracking, etc.) are not modeled.
+
+- **2D frames only**:  
+  Analysis is limited to planar frame systems with 3 DOFs per node (u, v, θ). 3D effects, torsion about the member axis, and out-of-plane behavior are not included.
+
+
 ## Application Info
 
 **Version**: v1.0  

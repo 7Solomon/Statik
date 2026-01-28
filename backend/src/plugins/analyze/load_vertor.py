@@ -96,30 +96,40 @@ def calculate_fixed_end_forces(member: 'Member', load: 'Load') -> np.ndarray:
         # Distance from start node 'a'
         a = load.ratio * L
         b = L - a
-        P = load.value # Magnitude
         
-        # Assuming Force is Perpendicular to Beam (Local Y)
-        # If you support angled loads on beams, you need to project P first.
-        # For now, let's assume P acts in Local Y (transverse).
-        print(Warning("HERE ANGLE NEDS TO BE ADDED!"))
+        # Get member orientation for coordinate transformation
+        dx = member._end_node.position.x - member._start_node.position.x
+        dy = member._end_node.position.y - member._start_node.position.y
+        L_check = np.hypot(dx, dy)
+        c = dx / L_check  # cos(member_angle)
+        s = dy / L_check  # sin(member_angle)
         
-        # Standard formulas for Fixed-Fixed Beam with Point Load
-        # Fy1
-        f[1] = (P * b**2 * (3*a + b)) / L**3
-        # M1
-        f[2] = (P * a * b**2) / L**2
-        # Fy2
-        f[4] = (P * a**2 * (a + 3*b)) / L**3
-        # M2 (Note sign convention: usually Counter-Clockwise is positive)
-        f[5] = -(P * a**2 * b) / L**2
+        # Transform global load to local member coordinates
+        angle_rad = np.radians(load.angle)
+        fx_global = load.value * np.cos(angle_rad)
+        fy_global = load.value * np.sin(angle_rad)
+        
+        # Rotation to local frame
+        # Local X = along member axis, Local Y = perpendicular to member
+        fx_local = fx_global * c + fy_global * s      # Axial component
+        fy_local = -fx_global * s + fy_global * c     # Transverse component
+        
+        # Apply fixed-end formulas for TRANSVERSE load (perpendicular)
+        f[1] = (fy_local * b**2 * (3*a + b)) / L**3   # Fy1
+        f[2] = (fy_local * a * b**2) / L**2           # M1
+        f[4] = (fy_local * a**2 * (a + 3*b)) / L**3   # Fy2
+        f[5] = -(fy_local * a**2 * b) / L**2          # M2
+        
+        # Apply fixed-end formulas for AXIAL load (along member)
+        # Axial reactions are distributed based on position
+        f[0] = fx_local * (b / L)  # Fx1 (closer to load = larger reaction)
+        f[3] = fx_local * (a / L)  # Fx2
         
     # --- DISTRIBUTED LOAD ---
     elif load.type == 'DISTRIBUTED':
         # Simplified: Uniform Load over full length
-        # You'd need more complex math for partial trapezoidal loads
-        w = load.value # N/m
+        w = load.value  # N/m (perpendicular to member)
         
-        # If Partial load, math is harder. Let's assume full length for this example:
         # Fy1
         f[1] = (w * L) / 2
         # M1
@@ -130,6 +140,7 @@ def calculate_fixed_end_forces(member: 'Member', load: 'Load') -> np.ndarray:
         f[5] = -(w * L**2) / 12
 
     return f
+
 
 def transform_local_to_global(f_local: np.ndarray, member: 'Member') -> np.ndarray:
     """

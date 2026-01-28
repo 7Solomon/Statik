@@ -3,7 +3,7 @@
 A structural analysis tool for civil engineering. Create, analyze, and visualize 2D structural systems with an nice interface.
 
 <p align="center">
-  <img src="assets/home.jpg" alt="Statik Editor Interface" width="800"/>
+  <img src="assets/home.png" alt="Statik Editor Interface" width="800"/>
 </p>
 
 ## Overview
@@ -19,7 +19,7 @@ Statik provides a complete workflow for structural analysis, from model creation
 Build structural models with precision using an interactive canvas workspace.
 
 <p align="center">
-  <img src="assets/einfeldtraeger.jpg" alt="Simple beam structure" width="700"/>
+  <img src="assets/einfeldtraeger.png" alt="Simple beam structure" width="700"/>
 </p>
 
 #### Toolbox
@@ -27,7 +27,7 @@ Build structural models with precision using an interactive canvas workspace.
 The editor provides specialized tools for creating structural elements:
 
 <p align="center">
-  <img src="assets/toolbox.jpg" alt="Toolbox panel" width="300"/>
+  <img src="assets/toolbox.png" alt="Toolbox panel" width="300"/>
 </p>
 
 **Basic Tools**
@@ -53,7 +53,7 @@ The editor provides specialized tools for creating structural elements:
 - **Distributed Load**: Uniform or varying loads along members
 
 <p align="center">
-  <img src="assets/simplify_system.jpg" alt="Beam with distributed load" width="700"/>
+  <img src="assets/simplify_system.png" alt="Beam with distributed load" width="700"/>
 </p>
 
 ---
@@ -63,17 +63,17 @@ The editor provides specialized tools for creating structural elements:
 Switch from Editor to Analysis mode to solve and visualize your structural system.
 
 <p align="center">
-  <img src="assets/mode_switch.jpg" alt="Mode selector" width="200"/>
+  <img src="assets/mode_switch.png" alt="Mode selector" width="200"/>
 </p>
 
 <p align="center">
-  <img src="assets/analysis.jpg" alt="Analysis results view" width="700"/>
+  <img src="assets/analysis.png" alt="Analysis results view" width="700"/>
 </p>
 
 #### Analysis Types
 
 <p align="center">
-  <img src="assets/analysis_mode_switch.jpg" alt="Analysis type selector" width="300"/>
+  <img src="assets/analysis_mode_switch.png" alt="Analysis type selector" width="300"/>
 </p>
 
 **Available Analysis Methods:**
@@ -86,7 +86,7 @@ Switch from Editor to Analysis mode to solve and visualize your structural syste
 Check degrees of freedom and validate structural stability before static analysis.
 
 <p align="center">
-  <img src="assets/kinematic_analysis.jpg" alt="Kinematic analysis interface" width="700"/>
+  <img src="assets/kinematic_analysis.png" alt="Kinematic analysis interface" width="700"/>
 </p>
 
 The kinematic analysis identifies:
@@ -99,7 +99,7 @@ The kinematic analysis identifies:
 Automatically generates simplified structural topology by identifying and consolidating rigid connections.
 
 <p align="center">
-  <img src="assets/simplified.jpg" alt="Simplified system" width="700"/>
+  <img src="assets/simplified.png" alt="Simplified system" width="700"/>
 </p>
 
 This view shows:
@@ -114,7 +114,7 @@ View complete analysis results including:
 - Deformed shape (Not yet implemented)
 
 <p align="center">
-  <img src="assets/fem_solution.jpg" alt="FEM solution with moment diagram" width="700"/>
+  <img src="assets/fem_solution.png" alt="FEM solution with moment diagram" width="700"/>
 </p>
 
 Toggle between different force components:
@@ -126,7 +126,7 @@ Toggle between different force components:
 
 
 <p align="center">
-  <img src="assets/einfeldtraeger.jpg" alt="Simple beam structure" width="700"/>
+  <img src="assets/einfeldtraeger.png" alt="Simple beam structure" width="700"/>
 </p>
 
 ---
@@ -136,11 +136,11 @@ Toggle between different force components:
 Save and load structural systems for later use.
 
 <p align="center">
-  <img src="assets/file_management.jpg" alt="File management controls" width="150"/>
+  <img src="assets/file_management.png" alt="File management controls" width="150"/>
 </p>
 
 <p align="center">
-  <img src="assets/load_system_modal.jpg" alt="Load system dialog" width="500"/>
+  <img src="assets/load_system_modal.png" alt="Load system dialog" width="500"/>
 </p>
 
 **Features:**

@@ -1,39 +1,58 @@
 import { useState } from "react";
 import EditorCanvas from "../features/editor/EditorCanvas";
 import { useStore } from "../store/useStore";
-// Import Database icon
 import { Save, FolderOpen, LayoutDashboard, Calculator, Database } from 'lucide-react';
 import { SaveSystemModal } from "~/features/modals/SaveSystemModal";
 import { LoadSystemModal } from "~/features/modals/LoadSystemModal";
 import { SidePanel } from "~/features/ui/SidePannel";
 import AnalysisViewer from "~/features/analysis/AnalysisViewer";
 import ModelManagement from "~/features/model_management/ModelManager";
+import { DoubleHingeWarningModal } from "~/features/modals/DoubleHingeWarningModal";
 
 export default function Home() {
   const mode = useStore(state => state.shared.mode);
   const setMode = useStore(state => state.shared.actions.setMode);
 
-  // Editor state to sync to analysis
-  const nodes = useStore(s => s.editor.nodes);
-  const members = useStore(s => s.editor.members);
-  const loads = useStore(s => s.editor.loads);
-
   const startAnalysis = useStore(state => state.analysis.actions.startAnalysis);
   const clearAnalysis = useStore(state => state.analysis.actions.clearAnalysisSession);
 
-  const [modalOpen, setModalOpen] = useState<'save' | 'load' | null>(null);
+  const [modalOpen, setModalOpen] = useState<'save' | 'load' | 'double-hinge' | null>(null);
+  const [doubleHingeNodes, setDoubleHingeNodes] = useState<any[]>([]);
 
   const handleToggleMode = (targetMode: 'EDITOR' | 'ANALYSIS' | 'MODELS') => {
     if (targetMode === 'ANALYSIS') {
-      // 1. Initialize Analysis Session with current Editor System
-      startAnalysis({ nodes, members, loads });
+      // Get CURRENT state (don't capture in variables)
+      const currentState = useStore.getState().editor;
+
+      // Check for double hinges
+      const doubleHinges = detectDoubleHinges(currentState.nodes, currentState.members);
+
+      if (doubleHinges.length > 0) {
+        setDoubleHingeNodes(doubleHinges);
+        setModalOpen('double-hinge');
+        return;
+      }
+
+      // No issues - start analysis
+      startAnalysisWithCurrentState();
     } else {
-      // Clear analysis if leaving analysis mode
       if (mode === 'ANALYSIS') {
         clearAnalysis();
       }
       setMode(targetMode);
     }
+  };
+
+  const startAnalysisWithCurrentState = () => {
+    // Always get fresh state from store
+    const { nodes, members, loads } = useStore.getState().editor;
+    startAnalysis({ nodes, members, loads });
+  };
+
+  const handleDoubleHingeResolved = () => {
+    setModalOpen(null);
+    // Use the fresh state getter
+    startAnalysisWithCurrentState();
   };
 
   return (
@@ -46,13 +65,11 @@ export default function Home() {
 
         <div className="w-px h-6 bg-slate-200 mx-2"></div>
 
-        {/* Left Actions */}
         <div className="flex items-center gap-1 mr-auto">
           <HeaderButton icon={<FolderOpen size={16} />} label="Open" onClick={() => setModalOpen('load')} />
           <HeaderButton icon={<Save size={16} />} label="Save" onClick={() => setModalOpen('save')} />
         </div>
 
-        {/* Center Mode Switcher - NOW WITH 3 BUTTONS */}
         <div className="absolute left-1/2 -translate-x-1/2 bg-slate-100 p-1 rounded-lg flex gap-1 border border-slate-200">
           <ModeButton
             active={mode === 'EDITOR'}
@@ -85,14 +102,48 @@ export default function Home() {
         {mode === 'EDITOR' && <SidePanel />}
       </div>
 
-      {/* MODALS */}
       {modalOpen === 'save' && <SaveSystemModal onClose={() => setModalOpen(null)} />}
       {modalOpen === 'load' && <LoadSystemModal onClose={() => setModalOpen(null)} />}
+      {modalOpen === 'double-hinge' && (
+        <DoubleHingeWarningModal
+          doubleHingeNodes={doubleHingeNodes}
+          onClose={() => setModalOpen(null)}
+          onResolved={handleDoubleHingeResolved}
+        />
+      )}
     </div>
   );
 }
 
-// Helper components for cleaner JSX
+// Helper: Detect double hinges
+function detectDoubleHinges(nodes: any[], members: any[]) {
+  const nodeHinges: Record<string, any[]> = {};
+
+  for (const member of members) {
+    if (member.releases.end.mz) {
+      const nodeId = member.endNodeId;
+      if (!nodeHinges[nodeId]) nodeHinges[nodeId] = [];
+      nodeHinges[nodeId].push({ member, end: 'end' });
+    }
+
+    if (member.releases.start.mz) {
+      const nodeId = member.startNodeId;
+      if (!nodeHinges[nodeId]) nodeHinges[nodeId] = [];
+      nodeHinges[nodeId].push({ member, end: 'start' });
+    }
+  }
+
+  const doubleHinges = [];
+  for (const [nodeId, hingedMembers] of Object.entries(nodeHinges)) {
+    if (hingedMembers.length >= 2) {
+      const node = nodes.find(n => n.id === nodeId);
+      doubleHinges.push({ node, hingedMembers });
+    }
+  }
+
+  return doubleHinges;
+}
+
 function HeaderButton({ icon, label, onClick }: any) {
   return (
     <button
@@ -109,8 +160,8 @@ function ModeButton({ active, onClick, icon, label }: any) {
     <button
       onClick={onClick}
       className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${active
-        ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
-        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
+          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
         }`}
     >
       {icon}

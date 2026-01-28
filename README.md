@@ -265,9 +265,6 @@ The FEM solver implements 2D frame analysis with member releases and distributed
 - **FEM on unstable systems**:  
   If the kinematic analysis finds DOF > 0, the global stiffness matrix becomes singular and the FEM solver cannot produce a valid solution. In this case the analysis will fail with an instability / singular-matrix error and the structure must be stabilized (supports or releases adjusted).
 
-- **Member load angles (current state)**:  
-  Nodal point loads fully respect their angle (converted into global x/y components). Point loads applied *on members* are currently interpreted as acting perpendicular to the member axis; arbitrary load angles along members are not yet supported.
-
 - **Linear-elastic, small-deformation model**:  
   The FEM implementation assumes linear material behavior and small displacements/rotations. Geometric nonlinearity (P–Δ / P–δ effects, large rotations) and material nonlinearity (plastic hinges, cracking, etc.) are not modeled.
 

@@ -284,3 +284,4 @@ def apply_support(K, F, idx):
     K[:, idx] = 0
     K[idx, idx] = 1.0
     F[idx] = 0.0
+

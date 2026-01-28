@@ -139,7 +139,8 @@ export interface MemberResult {
 
 export interface FEMResult {
   success: boolean;
-  displacements: Record<string, [number, number, number]>;
-  reactions: Record<string, [number, number, number]>;
-  memberResults: Record<string, MemberResult>;
+  error?: string;
+  displacements?: Record<string, [number, number, number]>;
+  reactions?: Record<string, [number, number, number]>;
+  memberResults?: Record<string, MemberResult>;
 }

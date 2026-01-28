@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
 import { useStore } from "~/store/useStore";
-import { RotateCw, ArrowRight, ArrowUp, Zap, Info, RefreshCw } from "lucide-react";
+import { RotateCw, ArrowRight, ArrowUp, Zap, Info, RefreshCw, AlertTriangle } from "lucide-react";
 import AnalysisCanvas from "./AnalysisCanvas";
 import { SolutionRenderer, type DiagramType } from "../drawing/SolutionRenderer";
+import type { FEMResult } from "~/types/model";
+
 
 export default function SolutionViewer() {
     const session = useStore(s => s.analysis.analysisSession);
@@ -34,11 +36,27 @@ export default function SolutionViewer() {
                 headers: { 'Content-Type': 'application/json' }
             });
 
-            if (!res.ok) throw new Error("Failed");
-            const data = await res.json();
+            if (!res.ok) {
+                // Network or server error (4xx/5xx)
+                const errorText = await res.text();
+                setSolutionResult({
+                    success: false,
+                    error: `Server error (${res.status}): ${errorText}`
+                });
+                return;
+            }
+
+            const data: FEMResult = await res.json();
+
+            // Always set result (even if success=false)
             setSolutionResult(data);
+
         } catch (e) {
             console.error("FEM analysis failed:", e);
+            setSolutionResult({
+                success: false,
+                error: `Network error: ${e instanceof Error ? e.message : 'Unknown error'}`
+            });
         } finally {
             setIsLoading(false);
         }
@@ -48,7 +66,7 @@ export default function SolutionViewer() {
     const handleRender = useCallback((ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, view: any) => {
         if (!system || system.nodes.length === 0) return;
 
-        if (!solutionResult) {
+        if (!solutionResult || !solutionResult.success) {
             return;
         }
 
@@ -62,9 +80,9 @@ export default function SolutionViewer() {
         );
     }, [solutionResult, system, diagramType]);
 
-
-
-    if (!system || system.nodes.length === 0) return <div className="flex h-full items-center justify-center text-slate-400">No System Loaded</div>;
+    if (!system || system.nodes.length === 0) {
+        return <div className="flex h-full items-center justify-center text-slate-400">No System Loaded</div>;
+    }
 
     // Case 2: No Result -> Show "Run" Card
     if (!solutionResult) {
@@ -93,7 +111,96 @@ export default function SolutionViewer() {
         );
     }
 
-    // Case 3: Result Loaded
+    // Case 3A: Result with Error -> Show Error Card
+    if (!solutionResult.success) {
+        return (
+            <AnalysisCanvas onRender={handleRender}>
+                <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px] z-20 pointer-events-none">
+                    <div className="bg-white p-6 rounded-xl shadow-xl border border-red-200 text-center max-w-md w-full mx-4 animate-in zoom-in-95 duration-200 pointer-events-auto">
+                        <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle size={24} />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-800 mb-2">Analysis Failed</h3>
+
+                        {/* Error Message Box */}
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                            <p className="text-sm text-red-700 font-mono break-words">
+                                {solutionResult.error || "Unknown error occurred"}
+                            </p>
+                        </div>
+
+                        {/* Helpful Tips */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-6 text-left">
+                            <p className="text-xs text-slate-600 mb-2 font-semibold">Common solutions:</p>
+                            <ul className="text-xs text-slate-600 space-y-1.5">
+                                {solutionResult.error?.includes("Singular") && (
+                                    <>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-red-500 mt-0.5">•</span>
+                                            <span>Add supports to constrain the structure</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-red-500 mt-0.5">•</span>
+                                            <span>Remove double hinges at the same node</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-red-500 mt-0.5">•</span>
+                                            <span>Check for disconnected members</span>
+                                        </li>
+                                    </>
+                                )}
+                                {!solutionResult.error?.includes("Singular") && (
+                                    <>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-slate-400 mt-0.5">•</span>
+                                            <span>Check member properties (E, A, I)</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-slate-400 mt-0.5">•</span>
+                                            <span>Verify node connectivity</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-slate-400 mt-0.5">•</span>
+                                            <span>Check load definitions</span>
+                                        </li>
+                                    </>
+                                )}
+                            </ul>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleRunFEM}
+                                disabled={isLoading}
+                                className="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm disabled:opacity-70 flex items-center justify-center gap-2 transition-all"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <RotateCw className="animate-spin" size={18} />
+                                        <span>Retrying...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCw size={18} />
+                                        <span>Retry</span>
+                                    </>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setSolutionResult(null)}
+                                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-all"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </AnalysisCanvas>
+        );
+    }
+
+    // Case 3B: Result Loaded Successfully
     return (
         <AnalysisCanvas onRender={handleRender}>
             {/* Re-Run Button (Top Left) */}
@@ -144,11 +251,10 @@ export default function SolutionViewer() {
             </div>
 
             {/* Info Badge */}
-            <div className="absolute top-20 left-4 bg-white/80 backdrop-blur px-3 py-1.5 rounded-md border border-slate-200 text-xs text-slate-500 font-mono flex items-center gap-2 z-20">
+            <div className="absolute top-20 left-4 bg-emerald-50 backdrop-blur px-3 py-1.5 rounded-md border border-emerald-200 text-xs text-emerald-700 font-mono flex items-center gap-2 z-20">
                 <Info size={12} />
-                {solutionResult.success ? "Analysis Converged" : "Analysis Failed"}
+                Analysis Converged
             </div>
-
         </AnalysisCanvas>
     );
 }
@@ -160,12 +266,12 @@ function DiagramButton({ active, onClick, label, desc, icon }: any) {
             onClick={onClick}
             title={desc}
             className={`
-        relative flex items-center justify-center w-10 h-10 rounded-lg transition-all
-        ${active
+                relative flex items-center justify-center w-10 h-10 rounded-lg transition-all
+                ${active
                     ? 'bg-blue-600 text-white shadow-md scale-105'
                     : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }
-      `}
+            `}
         >
             {icon}
             <span className={`absolute -bottom-1 -right-1 text-[9px] font-bold px-1 rounded ${active ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-500'

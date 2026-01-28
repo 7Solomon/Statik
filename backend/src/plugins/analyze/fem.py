@@ -11,6 +11,7 @@ def calculate_complex_fem(system: StructuralSystem) -> FEMResult:
     """
     Solves 2D Frame with Releases and Distributed Loads.
     """
+    print(system)
     # 1. Map DoFs
     # [u, v, theta] for each node
     dof_map = {n.id: [i*3, i*3+1, i*3+2] for i, n in enumerate(system.nodes)}

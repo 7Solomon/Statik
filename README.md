@@ -260,17 +260,21 @@ The FEM solver implements 2D frame analysis with member releases and distributed
   The kinematic analysis assumes axially rigid members. It only detects purely geometric mechanisms (motions without member deformation) and does not account for stabilization by axial flexibility or geometric stiffness effects.
 
 - **Mechanisms with double hinges**:  
-  Systems with a node where *all* connected members have moment releases (double hinge situations) are treated as mechanisms. Such configurations will report a positive degree of freedom and should not be analyzed with FEM until at least one member is made rotationally fixed at that node.
+  Systems with a node where *all* connected members have moment releases (double hinge situations) create a rotational mechanism. The software automatically detects these configurations and requires the user to designate a primary member before FEM analysis. The current implementation removes the hinge from the selected member, creating a rigid connection at that joint. While this approach ensures numerical stability and is commonly used in commercial software, it represents a simplification of the physical coupling behavior. Future versions will implement more sophisticated methods such as:
+  - **Penalty method**: Adding stiff rotational springs to approximate the kinematic constraint
+  - **Lagrange multipliers**: Explicitly enforcing the coupling constraint `θ_node = Ω_member`
+  - **Master-slave elimination**: Direct substitution of the constraint into the system equations
+  
+  These methods would maintain the hinge behavior while properly coupling the rotational degrees of freedom.
 
 - **FEM on unstable systems**:  
-  If the kinematic analysis finds DOF > 0, the global stiffness matrix becomes singular and the FEM solver cannot produce a valid solution. In this case the analysis will fail with an instability / singular-matrix error and the structure must be stabilized (supports or releases adjusted).
+  If the kinematic analysis finds DOF > 0, the global stiffness matrix becomes singular and the FEM solver cannot produce a valid solution. In this case the analysis will fail with an instability / singular-matrix error and the structure must be stabilized (supports or releases adjusted). The software provides clear error messages and warnings to guide the user in resolving structural instability issues.
 
 - **Linear-elastic, small-deformation model**:  
   The FEM implementation assumes linear material behavior and small displacements/rotations. Geometric nonlinearity (P–Δ / P–δ effects, large rotations) and material nonlinearity (plastic hinges, cracking, etc.) are not modeled.
 
 - **2D frames only**:  
   Analysis is limited to planar frame systems with 3 DOFs per node (u, v, θ). 3D effects, torsion about the member axis, and out-of-plane behavior are not included.
-
 
 ## Application Info
 

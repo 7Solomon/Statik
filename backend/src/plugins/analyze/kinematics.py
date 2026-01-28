@@ -30,8 +30,8 @@ def solve_kinematics(system: 'StructuralSystem') -> Tuple[List[KinematicMode], i
     # Member Constraints
     add_member_constraints(members, nodes, node_idx_map, num_dofs, constraints)
     
-    # Coupled Hinge Constraints  (TO FIX THE "Mechanisms with double hinges" Limitation)
-    add_coupled_hinge_constraints(members, nodes, node_idx_map, num_dofs, constraints)
+    ## Coupled Hinge Constraints  (TO FIX THE "Mechanisms with double hinges" Limitation)
+    #add_coupled_hinge_constraints(members, nodes, node_idx_map, num_dofs, constraints)
     
     
     # --- 4. Solve SVD ---

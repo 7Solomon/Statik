@@ -22,7 +22,7 @@ const HINGE_CONFIGS: Record<string, Partial<Release>> = {
 
 // Use simple config objects. We will build the full Load object in logic below.
 const LOAD_CONFIGS: Record<string, { type: LoadType, value: number, angle?: number }> = {
-    'point': { type: 'POINT', value: 10, angle: 90 },
+    'point': { type: 'POINT', value: 10, angle: -90 },
     'moment': { type: 'MOMENT', value: 10 },
     'distributed': { type: 'DISTRIBUTED', value: 5 },
 };

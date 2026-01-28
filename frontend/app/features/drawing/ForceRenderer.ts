@@ -43,7 +43,7 @@ export class ForceRenderer {
                     this.drawMoment(ctx, screenPos, load.value);
                 } else {
                     // Point load on node
-                    this.drawPointLoad(ctx, screenPos, load.angle || 90, load.value);
+                    this.drawPointLoad(ctx, screenPos, load.angle ?? -90, load.value);
                 }
             }
         }
@@ -67,7 +67,10 @@ export class ForceRenderer {
                         const wy = startNode.position.y + (endNode.position.y - startNode.position.y) * t;
 
                         const screenPos = Coords.worldToScreen(wx, wy, viewport);
-                        this.drawPointLoad(ctx, screenPos, load.angle || 90, load.value);
+                        this.drawPointLoad(ctx, screenPos, load.angle ?? -90, load.value);
+                        console.log("----")
+                        console.log(load.angle ?? 90)
+                        console.log(load.angle)
                     }
 
                     // B. DISTRIBUTED LOAD
@@ -93,7 +96,7 @@ export class ForceRenderer {
         ctx.translate(pos.x, pos.y);
 
         // Rotate canvas so +X is the direction of the force
-        const angleRad = (angleDeg) * (Math.PI / 180);
+        const angleRad = -(angleDeg) * (Math.PI / 180);
         ctx.rotate(angleRad);
 
         const L = FORCE_CONFIG.pointLength;

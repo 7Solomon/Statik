@@ -31,6 +31,7 @@ export default function KinematicViewer() {
                 nodes: system.nodes,
                 members: system.members,
                 loads: system.loads,
+                scheiben: system.scheiben,
                 meta: { zoom: 1, pan: { x: 0, y: 0 } }
             };
 
@@ -52,38 +53,38 @@ export default function KinematicViewer() {
     };
 
     // --- RENDER LOOP ---
+    // In KinematicViewer.tsx
+
     const handleRender = useCallback((ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, view: any) => {
         if (!system) return;
 
         RenderUtils.clearScreen(ctx, canvas);
         RenderUtils.drawGrid(ctx, canvas, view);
 
-        // 1. If NO result, just draw the static system (background for the 'Run' card)
         if (!kinematicResult) {
             drawStructuralSystem(ctx, system, view, system.nodes);
             return;
         }
 
-        // 2. If RESULT exists, draw Ghost + Animation
-        // A. Draw Ghost (Original System)
+        // Draw Ghost
         ctx.save();
         ctx.globalAlpha = 0.15;
         drawStructuralSystem(ctx, system, view, system.nodes);
         ctx.restore();
 
-        // B. Calculate Animation Factor
+        // Animation Factor
         const time = (Date.now() - startTime) / 1000;
         const animFactor = (isPlaying && kinematicResult.is_kinematic)
             ? Math.sin(time * 3) * amplitude
             : (kinematicResult.is_kinematic ? amplitude : 0);
 
-        // C. Calculate Deformed Nodes
-        // Safe access to mode
         const mode = kinematicResult.modes[activeModeIndex];
-        const deformedNodes = (mode && mode.velocities)
+
+        // Deform Nodes
+        const deformedNodes = (mode && mode.node_velocities)
             ? system.nodes.map(node => {
-                if (!mode.velocities[node.id]) return node;
-                const vel = mode.velocities[node.id];
+                if (!mode.node_velocities[node.id]) return node;
+                const vel = mode.node_velocities[node.id];
                 return {
                     ...node,
                     position: {
@@ -94,8 +95,72 @@ export default function KinematicViewer() {
             })
             : system.nodes;
 
-        // D. Draw Deformed System
-        drawStructuralSystem(ctx, system, view, deformedNodes);
+        // Deform Scheiben
+        // Deform Scheiben - USE TRANSFORM APPROACH
+        const deformedScheiben = (mode?.scheibe_velocities && system.scheiben)
+            ? system.scheiben.map(scheibe => {
+                const vel = mode.scheibe_velocities?.[scheibe.id];
+                if (!vel) return scheibe;
+
+                const [center_vx, center_vy, omega] = vel;
+
+                // Current center
+                const old_cx = (scheibe.corner1.x + scheibe.corner2.x) / 2;
+                const old_cy = (scheibe.corner1.y + scheibe.corner2.y) / 2;
+
+                // New center (translation only)
+                const new_cx = old_cx + center_vx * animFactor;
+                const new_cy = old_cy + center_vy * animFactor;
+
+                // Keep corners at same relative positions (don't rotate them)
+                const dx1 = scheibe.corner1.x - old_cx;
+                const dy1 = scheibe.corner1.y - old_cy;
+                const dx2 = scheibe.corner2.x - old_cx;
+                const dy2 = scheibe.corner2.y - old_cy;
+
+                // Rotation angle (accumulate)
+                const angle = omega * animFactor;
+
+                return {
+                    ...scheibe,
+                    corner1: {
+                        x: new_cx + dx1,  // Translate only
+                        y: new_cy + dy1
+                    },
+                    corner2: {
+                        x: new_cx + dx2,  // Translate only
+                        y: new_cy + dy2
+                    },
+                    rotation: scheibe.rotation + angle * (180 / Math.PI)  // Store total rotation
+                };
+            })
+            : system.scheiben;
+
+
+        // Create deformed system
+        const deformedSystem = {
+            ...system,
+            scheiben: deformedScheiben
+        };
+
+        // Extract rigid bodies
+        const rigidBodyScheibeIds = new Set<string>();
+        if (mode?.rigid_bodies && system.scheiben) {
+            mode.rigid_bodies.forEach(rb => {
+                const scheibe = system.scheiben[rb.id];
+                if (scheibe) rigidBodyScheibeIds.add(scheibe.id);
+            });
+        }
+
+        // Draw
+        drawStructuralSystem(
+            ctx,
+            deformedSystem,
+            view,
+            deformedNodes,
+            kinematicResult.is_kinematic,
+            rigidBodyScheibeIds
+        );
 
     }, [kinematicResult, system, activeModeIndex, amplitude, isPlaying, startTime]);
 

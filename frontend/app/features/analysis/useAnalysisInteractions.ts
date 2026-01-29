@@ -35,7 +35,6 @@ export function useAnalysisInteractions() {
         };
 
         const handleMouseUp = () => {
-            console.log("MOUSE UP")
             if (isDragging.current) {
                 isDragging.current = false;
                 setViewport({ pan: { x: view.current.pan.x, y: view.current.pan.y } });
@@ -58,7 +57,6 @@ export function useAnalysisInteractions() {
     }, [setViewport]);
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
-        console.log("MOUSE DOWN");
         isDragging.current = true;
         lastPos.current = { x: e.clientX, y: e.clientY };
     }, []);

@@ -1,4 +1,5 @@
 import { RenderUtils } from './RenderUtils';
+import { ScheibenRenderer } from './ScheibenRenderer';
 import type { ViewportState } from '~/types/app';
 import type { Node, Member, StructuralSystem } from '~/types/model';
 import type { FEMResult, MemberResult, StationResult } from '~/types/model';
@@ -22,14 +23,11 @@ export class SolutionRenderer {
         RenderUtils.clearScreen(ctx, canvas);
         RenderUtils.drawGrid(ctx, canvas, viewport);
 
-        // 2. Draw Deformed Shape (Optional / Ghost)
-        // For now, let's draw the UNDEFORMED structure as the base
-        // (You can enhance this to draw the deformed structure if you add displacements to nodes)
+        // 2. Draw Base Structure (Undeformed)
         this.drawBaseStructure(ctx, system, viewport);
 
         // 3. Draw Diagrams
-        if (diagramType !== 'NONE' && result.success) {
-            // Calculate a global scale factor for the diagram
+        if (diagramType !== 'NONE' && result.success && result.memberResults) {
             const scaleFactor = this.calculateDiagramScale(result, diagramType, viewport);
 
             Object.values(result.memberResults).forEach(memberResult => {
@@ -60,7 +58,6 @@ export class SolutionRenderer {
         }
 
         // 5. Draw Node Symbols (Joints) on top
-        // (Re-using your existing logic roughly, or simplified)
         system.nodes.forEach(node => {
             const screenPos = RenderUtils.project(node.position, viewport);
             ctx.beginPath();
@@ -75,6 +72,20 @@ export class SolutionRenderer {
         system: StructuralSystem,
         view: ViewportState
     ) {
+        // 1. Draw Scheiben first (as background) ← NEW
+        if (system.scheiben && system.scheiben.length > 0) {
+            system.scheiben.forEach(scheibe => {
+                ScheibenRenderer.draw(
+                    ctx,
+                    scheibe,
+                    view,
+                    false,  // Not active
+                    false   // Not selected
+                );
+            });
+        }
+
+        // 2. Draw Members
         ctx.strokeStyle = '#cbd5e1'; // Light grey for base structure
         ctx.lineWidth = 1;
 
@@ -117,11 +128,6 @@ export class SolutionRenderer {
         ctx.beginPath();
         ctx.moveTo(0, 0); // Start at node 1
 
-        // Draw points along the beam
-        // stations.x is in meters (Local coords). We need to scale to Screen Pixels.
-        // The beam length on screen is L_screen. 
-        // We assume res.stations[last].x approx equals member length in meters.
-
         // Find max length (to normalize x)
         const L_real = res.stations[res.stations.length - 1].x;
 
@@ -130,15 +136,14 @@ export class SolutionRenderer {
 
             // Get value based on type
             let val = 0;
-            if (type === 'M') val = -s.M; // Invert Moment for standard "Tension Side" plot?
+            if (type === 'M') val = -s.M; // Invert Moment for standard "Tension Side" plot
             else if (type === 'V') val = s.V;
             else if (type === 'N') val = s.N;
 
             // py is perpendicular offset
-            // Value * ScaleFactor -> Pixels
             const py = val * scale;
 
-            ctx.lineTo(px, -py); // Negative Y is "Up" in local coords usually
+            ctx.lineTo(px, -py); // Negative Y is "Up" in local coords
         });
 
         ctx.lineTo(L_screen, 0); // Close to node 2
@@ -159,26 +164,26 @@ export class SolutionRenderer {
         ctx.fill();
         ctx.stroke();
 
-        // Optional: Draw text labels for max values?
-
         ctx.restore();
     }
 
     private static calculateDiagramScale(result: FEMResult, type: DiagramType, view: ViewportState): number {
-        // Heuristic: We want the maximum value to be roughly 40-50 pixels high on screen
         let maxVal = 0;
+
+        if (!result.memberResults) return 1;
 
         Object.values(result.memberResults).forEach(m => {
             if (type === 'M') maxVal = Math.max(maxVal, Math.abs(m.maxM), Math.abs(m.minM));
             else if (type === 'V') maxVal = Math.max(maxVal, Math.abs(m.maxV), Math.abs(m.minV));
-            else if (type === 'N') maxVal = Math.max(maxVal, Math.abs(m.maxN || 0)); // Assuming you add maxN
+            else if (type === 'N') maxVal = Math.max(maxVal, Math.abs(m.maxN || 0));
         });
 
-        if (maxVal < 1e-6) return 1; // Avoid divide by zero
+        if (maxVal < 1e-6) return 1;
 
         const targetHeightPixels = 50;
         return targetHeightPixels / maxVal;
     }
+
 
     private static drawReactions(
         ctx: CanvasRenderingContext2D,
@@ -194,18 +199,15 @@ export class SolutionRenderer {
             const r = reactions[node.id];
             if (!r) return;
 
-            // r is [Rx, Ry, Mz]
             const [rx, ry, mz] = r;
             const screenPos = RenderUtils.project(node.position, view);
 
-            // Draw Reaction Arrows (Simplified)
+            // Draw Reaction Arrows
             if (Math.abs(rx) > 1e-3) {
-                // Draw Horizontal Arrow
                 this.drawArrow(ctx, screenPos.x - 30 * Math.sign(rx), screenPos.y, screenPos.x, screenPos.y);
                 ctx.fillText(`Rx:${rx.toFixed(1)}`, screenPos.x - 40, screenPos.y - 5);
             }
             if (Math.abs(ry) > 1e-3) {
-                // Draw Vertical Arrow
                 this.drawArrow(ctx, screenPos.x, screenPos.y + 30 * Math.sign(ry), screenPos.x, screenPos.y);
                 ctx.fillText(`Ry:${ry.toFixed(1)}`, screenPos.x + 5, screenPos.y + 20);
             }

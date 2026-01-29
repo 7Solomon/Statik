@@ -68,9 +68,6 @@ export class ForceRenderer {
 
                         const screenPos = Coords.worldToScreen(wx, wy, viewport);
                         this.drawPointLoad(ctx, screenPos, load.angle ?? -90, load.value);
-                        console.log("----")
-                        console.log(load.angle ?? 90)
-                        console.log(load.angle)
                     }
 
                     // B. DISTRIBUTED LOAD

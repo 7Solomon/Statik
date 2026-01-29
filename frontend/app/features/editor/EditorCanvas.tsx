@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useStore } from '../../store/useStore';
 import { Renderer } from '../drawing/Renderer';
 import { useCanvasInteraction } from './useCanvisInteraction';
+import { ShapeSelector } from '../ui/pannel/ShapeSelector';
 
 const EditorCanvas: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -10,13 +11,14 @@ const EditorCanvas: React.FC = () => {
     // Connect Interaction Logic (Controller)
     const { handleMouseDown, handleMouseMove, handleMouseUp } = useCanvasInteraction(canvasRef as React.RefObject<HTMLCanvasElement>);
 
-    // Connect Data (Store)
+    // Connect Data 
     const nodes = useStore((state) => state.editor.nodes);
     const members = useStore((state) => state.editor.members);
     const loads = useStore((state) => state.editor.loads)
+    const scheiben = useStore((state) => state.editor.scheiben)
     const interaction = useStore((state) => state.editor.interaction);
     const viewport = useStore((state) => state.editor.viewport);
-    // const actions = useStore((state) => state.editor.actions); // Not strictly needed here if handled in logic
+    // const actions = useStore((state) => state.editor.actions); // Not strictly needed here becaus ehandled in logic
 
     // --- RESIZE HANDLER ---
     useEffect(() => {
@@ -47,6 +49,7 @@ const EditorCanvas: React.FC = () => {
                     useStore.getState().editor.nodes,
                     useStore.getState().editor.members,
                     useStore.getState().editor.loads,
+                    useStore.getState().editor.scheiben,
                     useStore.getState().editor.viewport,
                     useStore.getState().editor.interaction
                 );
@@ -93,7 +96,7 @@ const EditorCanvas: React.FC = () => {
         if (!ctx) return;
 
         requestAnimationFrame(() => {
-            Renderer.renderEditor(ctx, canvas, nodes, members, loads, viewport, interaction);
+            Renderer.renderEditor(ctx, canvas, nodes, members, loads, scheiben, viewport, interaction);
         });
 
     }, [nodes, members, viewport, interaction]);
@@ -117,6 +120,7 @@ const EditorCanvas: React.FC = () => {
                 <div>Zoom: {viewport.zoom.toFixed(1)} px/m</div>
                 <div>Nodes: {nodes.length} | Members: {members.length} | Loads {loads.length}</div>
             </div>
+            <ShapeSelector />
         </div>
     );
 };

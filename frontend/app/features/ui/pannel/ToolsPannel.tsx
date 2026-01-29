@@ -3,7 +3,7 @@ import { MousePointer2, Circle, Route, Square, ArrowDown, RotateCw, Waves } from
 import { useStore } from '~/store/useStore';
 import supportLibraryRaw from '~/assets/support_symbols.json';
 import hingeLibraryRaw from '~/assets/hinge_symbols.json';
-import type { ToolType, SupportType, HingeType, LoadType } from '~/types/app';
+import type { ToolType, SupportType, HingeType, LoadType, ScheibeShape } from '~/types/app';
 
 // Merge symbol libraries
 const UI_SYMBOL_LIBRARY = {
@@ -15,7 +15,7 @@ const UI_SYMBOL_LIBRARY = {
 type ToolItemConfig = {
     label: string;
     tool: ToolType;
-    subType: SupportType | HingeType | LoadType | null;
+    subType: SupportType | HingeType | LoadType | ScheibeShape | null;
     icon?: React.ReactNode;
     symbolKey?: string;
     description?: string;
@@ -51,6 +51,13 @@ const TOOL_GROUPS: ToolGroupConfig[] = [
                 subType: null,
                 icon: <Circle size={20} />,
                 description: "Place free nodes"
+            },
+            {
+                label: 'Scheibe',
+                tool: 'scheibe',
+                subType: 'rectangle',
+                icon: <Square size={20} />,
+                description: "Add rigid plate element"
             },
         ]
     },

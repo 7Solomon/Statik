@@ -45,8 +45,8 @@ export default function Home() {
 
   const startAnalysisWithCurrentState = () => {
     // Always get fresh state from store
-    const { nodes, members, loads } = useStore.getState().editor;
-    startAnalysis({ nodes, members, loads });
+    const { nodes, members, loads, scheiben } = useStore.getState().editor;
+    startAnalysis({ nodes, members, loads, scheiben });
   };
 
   const handleDoubleHingeResolved = () => {
@@ -160,8 +160,8 @@ function ModeButton({ active, onClick, icon, label }: any) {
     <button
       onClick={onClick}
       className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${active
-          ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
-          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+        ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
+        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
         }`}
     >
       {icon}

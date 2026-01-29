@@ -25,6 +25,7 @@ export default function SimplifiedViewer() {
                 nodes: system.nodes,
                 members: system.members,
                 loads: system.loads,
+                scheiben: system.scheiben,
                 meta: { zoom: 1, pan: { x: 0, y: 0 } }
             };
 
@@ -33,6 +34,8 @@ export default function SimplifiedViewer() {
                 body: JSON.stringify(payload),
                 headers: { 'Content-Type': 'application/json' }
             });
+
+            //console.log('Response status:', res.status);
 
             if (!res.ok) throw new Error("Failed");
             const data = await res.json();
@@ -65,6 +68,7 @@ export default function SimplifiedViewer() {
             systemToRender.nodes,
             systemToRender.members,
             systemToRender.loads,
+            systemToRender.scheiben,
             view,
             interaction
         );

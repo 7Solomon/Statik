@@ -6,6 +6,7 @@ export type ToolType =
     | 'member'
     | 'hinge'
     | 'load'
+    | 'scheibe'
 
 export type HingeType =
     | 'vollgelenk'
@@ -26,6 +27,11 @@ export type LoadType =
     | 'moment'
     | 'distributed';
 
+export type ScheibeShape =
+    | 'rectangle'
+    | 'triangle'
+    | 'circle'
+    | 'polygon'
 
 export interface ViewportState {
     width: number;
@@ -39,7 +45,7 @@ export interface ViewportState {
 
 export interface EditorInteractionState {
     activeTool: ToolType;
-    activeSubTypeTool: HingeType | SupportType | LoadType | null;
+    activeSubTypeTool: HingeType | SupportType | LoadType | ScheibeShape | null;
 
     isDragging: boolean;
     mousePos: Vec2; // World coordinates
@@ -48,13 +54,18 @@ export interface EditorInteractionState {
     hoveredNodeId: string | null;
     hoveredMemberId: string | null;
 
-    // Creation State
-    dragStartNodeId: string | null;
+    // NEW: Unified creation state
+    creationState: {
+        mode: 'idle' | 'drawing_member' | 'sizing_load' | 'sizing_scheibe';
+        startPos: Vec2 | null;
+        activeId: string | null;
+    };
 
     // Selection
     selectedId: string | null;
-    selectedType: 'node' | 'member' | 'load' | null;
+    selectedType: 'node' | 'member' | 'load' | 'scheibe' | null;
 }
+
 
 export interface AnalysisInteractionState {
     isDragging: boolean;

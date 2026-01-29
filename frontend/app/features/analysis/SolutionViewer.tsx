@@ -27,6 +27,7 @@ export default function SolutionViewer() {
                 nodes: system.nodes,
                 members: system.members,
                 loads: system.loads,
+                scheiben: system.scheiben,
                 meta: { zoom: 1, pan: { x: 0, y: 0 } }
             };
 

@@ -1,4 +1,4 @@
-import type { Load, Member, Node, KinematicResult, Release, Vec2, StructuralSystem, FEMResult } from '~/types/model';
+import type { Load, Member, Node, KinematicResult, Release, Vec2, StructuralSystem, FEMResult, Scheibe } from '~/types/model';
 import type { AnalysisInteractionState, EditorInteractionState, ToolType, ViewportState } from '~/types/app';
 
 // --- SHARED DOMAIN ---
@@ -11,6 +11,7 @@ export interface EditorState {
     nodes: Node[];
     members: Member[];
     loads: Load[];
+    scheiben: Scheibe[]
     viewport: ViewportState;
     interaction: EditorInteractionState;
 }
@@ -20,11 +21,14 @@ export interface EditorActions {
     addMember: (startNodeId: string, endNodeId: string) => void;
     addHingeAtNode: (nodeId: string, releases: Partial<Release>) => void;
     addLoad: (data: Load) => void;
+    addScheibe: (data: Omit<Scheibe, 'id'>) => string;
     removeNode: (id: string) => void;
+    removeScheibe: (id: string) => void;
     selectObject: (id: string | null, type: 'node' | 'member' | 'load' | null) => void;
     updateNode: (id: string, data: Partial<Node>) => void;
     updateMember: (id: string, data: Partial<Member>) => void;
     updateLoad: (id: string, data: Partial<Load>) => void;
+    updateScheibe: (id: string, data: Partial<Scheibe>) => void;
     setTool: (tool: ToolType) => void;
     setViewport: (view: Partial<ViewportState>) => void;
     setInteraction: (inter: Partial<EditorInteractionState>) => void;

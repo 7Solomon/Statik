@@ -1,6 +1,4 @@
-/**
- * GEOMETRY & PHYSICS DATA MODELS
- */
+import type { ScheibeShape } from "./app";
 
 export interface Vec2 {
   x: number;
@@ -51,6 +49,39 @@ export interface Member {
 }
 
 
+export interface ScheibeConnection {
+  nodeId: string;
+  releases?: Release;
+}
+
+export interface Scheibe {
+  id: string;
+  shape: ScheibeShape;
+
+  // Geometry
+  corner1: Vec2;
+  corner2: Vec2;
+  additionalPoints?: Vec2[];
+  rotation: number;
+
+  // Analysis Type
+  type: 'RIGID' | 'ELASTIC';
+
+  // Properties
+  properties: {
+    E: number;
+    nu: number;
+    thickness: number;
+    rho: number;
+  };
+
+  connections: ScheibeConnection[]; // NODES ON SCHEIBE
+
+  meshLevel?: 1 | 2 | 3 | 4 | 5;
+}
+
+
+
 export type LoadType = 'POINT' | 'MOMENT' | 'DISTRIBUTED';
 export type LoadScope = 'NODE' | 'MEMBER';
 
@@ -93,7 +124,8 @@ export type Load = NodeLoad | MemberPointLoad | MemberDistLoad;
 
 export interface KinematicMode {
   index: number;
-  velocities: Record<string, number[]>;
+  node_velocities: Record<string, number[]>;
+  scheibe_velocities: Record<string, number[]>;
   member_poles: Record<string, number[] | null>;
   rigid_bodies: any[];
 }
@@ -102,6 +134,7 @@ export interface StructuralSystem {
   nodes: Node[];
   members: Member[];
   loads: any[];
+  scheiben: Scheibe[];
 }
 
 

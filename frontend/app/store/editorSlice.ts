@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { AppStore, EditorActions, EditorState } from './types';
 import type { StateCreator } from 'zustand';
-import type { Node, Member, Load } from '~/types/model';
+import type { Node, Member, Load, Scheibe } from '~/types/model';
 import type { ViewportState } from '~/types/app';
 
 // Constants
@@ -13,16 +13,22 @@ const DEFAULT_VIEWPORT: ViewportState = {
     height: 0,
 };
 
+
 const DEFAULT_INTERACTION = {
     activeTool: 'select' as const,
     activeSubTypeTool: null,
     isDragging: false,
     hoveredNodeId: null,
     hoveredMemberId: null,
-    dragStartNodeId: null,
     mousePos: { x: 0, y: 0 },
     selectedId: null,
     selectedType: null,
+
+    creationState: {
+        mode: 'idle' as const,
+        startPos: null,
+        activeId: null
+    }
 };
 
 const DEFAULT_MEMBER_PROPS = {
@@ -45,6 +51,7 @@ export const createEditorSlice: StateCreator<
         nodes: [],
         members: [],
         loads: [],
+        scheiben: [],
         viewport: DEFAULT_VIEWPORT,
         interaction: DEFAULT_INTERACTION,
 
@@ -137,6 +144,22 @@ export const createEditorSlice: StateCreator<
                 }));
             },
 
+            addScheibe: (data) => {
+                const newScheibe: Scheibe = {
+                    id: uuidv4(),
+                    ...data
+                };
+
+                set((state) => ({
+                    editor: {
+                        ...state.editor,
+                        scheiben: [...state.editor.scheiben, newScheibe]
+                    }
+                }));
+                return newScheibe.id;
+            },
+
+
             removeNode: (id) => {
                 set((state) => {
                     // Extract from nested state
@@ -158,6 +181,15 @@ export const createEditorSlice: StateCreator<
                         }
                     };
                 });
+            },
+
+            removeScheibe: (id) => {
+                set((state) => ({
+                    editor: {
+                        ...state.editor,
+                        scheiben: state.editor.scheiben.filter(s => s.id !== id)
+                    }
+                }));
             },
 
             setTool: (tool) => {
@@ -236,13 +268,26 @@ export const createEditorSlice: StateCreator<
                     }
                 }));
             },
+
+            updateScheibe: (id, data) => {
+                set((state) => ({
+                    editor: {
+                        ...state.editor,
+                        scheiben: state.editor.scheiben.map(s =>
+                            s.id === id ? { ...s, ...data } : s
+                        )
+                    }
+                }));
+            },
+
             loadStructuralSystem: (system) => {
                 set((state) => ({
                     editor: {
                         ...state.editor,
-                        nodes: system.nodes,
-                        members: system.members,
-                        loads: system.loads,
+                        nodes: system.nodes ?? [],
+                        members: system.members ?? [],
+                        loads: system.loads ?? [],
+                        scheiben: system.scheiben ?? [],
                         interaction: {
                             ...state.editor.interaction,
                             selectedId: null,
@@ -254,11 +299,12 @@ export const createEditorSlice: StateCreator<
                 }));
             },
             exportStructuralSystem: () => {
-                const { nodes, members, loads } = get().editor;
+                const { nodes, members, loads, scheiben } = get().editor;
                 return {
                     nodes,
                     members,
-                    loads
+                    loads,
+                    scheiben
                 };
             }
         }

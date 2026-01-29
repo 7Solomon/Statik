@@ -160,7 +160,6 @@ Save and load structural systems for later use.
 - Load previously saved systems
 - Search through saved projects
 - Timestamped project history
-- Scheiben are preserved in saved files
 
 ---
 

@@ -3,43 +3,10 @@ import type { AppStore, EditorActions, EditorState } from './types';
 import type { StateCreator } from 'zustand';
 import type { Node, Member, Load, Scheibe } from '~/types/model';
 import type { ViewportState } from '~/types/app';
-
-// Constants
-const DEFAULT_VIEWPORT: ViewportState = {
-    zoom: 50,
-    pan: { x: 400, y: 400 },
-    gridSize: 1.0,
-    width: 0,
-    height: 0,
-};
+import { DEFAULT_INTERACTION, DEFAULT_MEMBER_PROPS, DEFAULT_RELEASES, DEFAULT_VIEWPORT, sanitizeLoad, sanitizeMember, sanitizeNode, sanitizeScheibe } from '~/utils/sanitize_system';
 
 
-const DEFAULT_INTERACTION = {
-    activeTool: 'select' as const,
-    activeSubTypeTool: null,
-    isDragging: false,
-    hoveredNodeId: null,
-    hoveredMemberId: null,
-    mousePos: { x: 0, y: 0 },
-    selectedId: null,
-    selectedType: null,
 
-    creationState: {
-        mode: 'idle' as const,
-        startPos: null,
-        activeId: null
-    }
-};
-
-const DEFAULT_MEMBER_PROPS = {
-    E: 210e9,
-    A: 0.005,
-    I: 0.0001,
-};
-
-const DEFAULT_RELEASES = {
-    fx: false, fy: false, mz: false
-};
 
 export const createEditorSlice: StateCreator<
     AppStore,
@@ -281,13 +248,30 @@ export const createEditorSlice: StateCreator<
             },
 
             loadStructuralSystem: (system) => {
+                // Sanitize and validate all arrays
+                const sanitizedNodes = (system.nodes ?? [])
+                    .map(sanitizeNode)
+                    .filter((n): n is Node => n !== null);
+
+                const sanitizedMembers = (system.members ?? [])
+                    .map(sanitizeMember)
+                    .filter((m): m is Member => m !== null);
+
+                const sanitizedScheiben = (system.scheiben ?? [])
+                    .map(sanitizeScheibe)
+                    .filter((s): s is Scheibe => s !== null);
+
+                const sanitizedLoads = (system.loads ?? [])
+                    .map(sanitizeLoad)
+                    .filter((l): l is Load => l !== null);
+
                 set((state) => ({
                     editor: {
                         ...state.editor,
-                        nodes: system.nodes ?? [],
-                        members: system.members ?? [],
-                        loads: system.loads ?? [],
-                        scheiben: system.scheiben ?? [],
+                        nodes: sanitizedNodes,
+                        members: sanitizedMembers,
+                        loads: sanitizedLoads,
+                        scheiben: sanitizedScheiben,
                         interaction: {
                             ...state.editor.interaction,
                             selectedId: null,

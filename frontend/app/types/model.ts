@@ -38,6 +38,7 @@ export interface Member {
     E: number; // Young's Modulus (kN/m²)
     A: number; // Cross-section Area (m²)
     I: number; // Moment of Inertia (m⁴)
+    m: number; // mass
   };
 
   // Releases (Hinges) at member ends
@@ -121,7 +122,6 @@ export interface MemberDistLoad extends BaseLoad {
 export type Load = NodeLoad | MemberPointLoad | MemberDistLoad;
 
 
-
 export interface KinematicMode {
   index: number;
   node_velocities: Record<string, number[]>;
@@ -142,7 +142,6 @@ export interface KinematicResult {
   is_kinematic: boolean;
   dof: number;
   modes: KinematicMode[];
-
 }
 
 

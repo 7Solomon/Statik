@@ -267,6 +267,26 @@ The FEM solver implements 2D frame analysis with member releases and distributed
   
   These methods would maintain the hinge behavior while properly coupling the rotational degrees of freedom.
 
+- **RIGID Scheiben (plate elements)**:  
+  RIGID Scheiben are treated as infinitely stiff constraint elements in the FEM analysis. Connected nodes are coupled using penalty methods to enforce rigid body motion (translation and rotation). While this approach is effective for kinematic constraints, the current implementation has the following characteristics:
+  - **No internal stress analysis**: RIGID Scheiben are assumed infinitely stiff and do not deform, so internal stresses and strains are not computed
+  - **Penalty stiffness**: A large penalty factor (10¹²) is used to enforce rigid body constraints, which may affect numerical conditioning
+  - **Hinge releases**: Connection releases at Scheibe-node interfaces are not yet fully implemented
+  
+  Future improvements may include adaptive penalty scaling and Lagrange multiplier formulations for improved numerical stability.
+
+- **ELASTIC Scheiben not yet supported**:  
+  ELASTIC Scheiben require full 2D continuum finite element meshing (triangular or quadrilateral elements) with plane stress/strain formulations. This functionality is not yet implemented. Current behavior:
+  - ELASTIC Scheiben are ignored in FEM analysis with a warning message
+  - Only the bounding geometry is displayed for visualization
+  - Internal stress distributions (σₓ, σᵧ, τₓᵧ) and deformation fields are not computed
+  
+  Future versions will include:
+  - Automatic mesh generation for Scheiben regions
+  - Plane stress/plane strain element formulations
+  - Integration with frame elements through displacement compatibility
+  - Contour plotting of stress and displacement fields
+
 - **FEM on unstable systems**:  
   If the kinematic analysis finds DOF > 0, the global stiffness matrix becomes singular and the FEM solver cannot produce a valid solution. In this case the analysis will fail with an instability / singular-matrix error and the structure must be stabilized (supports or releases adjusted). The software provides clear error messages and warnings to guide the user in resolving structural instability issues.
 
@@ -274,7 +294,11 @@ The FEM solver implements 2D frame analysis with member releases and distributed
   The FEM implementation assumes linear material behavior and small displacements/rotations. Geometric nonlinearity (P–Δ / P–δ effects, large rotations) and material nonlinearity (plastic hinges, cracking, etc.) are not modeled.
 
 - **2D frames only**:  
-  Analysis is limited to planar frame systems with 3 DOFs per node (u, v, θ). 3D effects, torsion about the member axis, and out-of-plane behavior are not included.
+  Analysis is limited to planar frame systems with 3 DOFs per node (u, v, θ). 3D effects, torsion about the member axis, and out-of-plane behavior are not included. Scheiben are also limited to 2D plane stress/strain conditions.
+
+- **Distributed loads on Scheiben**:  
+  Surface loads, pressure distributions, and body forces (self-weight) on Scheiben are not yet implemented. Only nodal loads and member line loads are currently supported.
+
 
 ## Application Info
 

@@ -19,7 +19,8 @@ def analyze_system():
         system = StructuralSystem.create(
             payload.get("nodes", []), 
             payload.get("members", []),
-            payload.get("loads", [])
+            payload.get("loads", []),
+            payload.get("scheiben", [])
         )
 
         modes_objects, dof = solve_kinematics(system) 
@@ -40,6 +41,7 @@ def analyze_system():
             system=system,
             modes=modes_objects # These are now fully populated
         )
+        print(result)
 
         # 5. Send Response
         return jsonify(result.to_dict()), 200
@@ -55,7 +57,8 @@ def simplify():
         system = StructuralSystem.create(
             payload.get("nodes", []), 
             payload.get("members", []),
-            payload.get("loads", [])
+            payload.get("loads", []),
+            payload.get("scheiben", [])
         )
         simplified_system = prune_cantilevers(system)
         return jsonify(simplified_system.to_dict()), 200 
@@ -69,9 +72,12 @@ def solution():
         system = StructuralSystem.create(
             payload.get("nodes", []), 
             payload.get("members", []),
-            payload.get("loads", [])
+            payload.get("loads", []),
+            payload.get("scheiben", [])
         )
+        print(system)
         fem_solution_dict = calculate_complex_fem(system)
+        print(fem_solution_dict)
         
         if not fem_solution_dict.get("success", False):
             error_message = fem_solution_dict.get("error", "Unknown calculation error")

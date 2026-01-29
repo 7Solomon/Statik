@@ -73,14 +73,11 @@ def build_adjacency_map(nodes: List[Node], members: List[Member]) -> Dict[str, L
 def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
     """
     Iteratively removes statically determinate 'leaves' (cantilevers) from the system.
+    Also handles Scheibe connections.
     Returns a NEW simplified StructuralSystem.
     """
     # Work on a deep copy to keep original safe
     system = copy.deepcopy(system_in)
-    
-    # Helper lookups (we rebuild these if we delete stuff, or maintain them)
-    # Since we are mutating lists, rebuilding maps inside the loop is safer but slower.
-    # For small structures, it's fine.
     
     changed = True
     while changed:
@@ -91,14 +88,27 @@ def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
         member_map = {m.id: m for m in system.members}
         adjacency = build_adjacency_map(system.nodes, system.members)
         
-        # 2. Find candidate nodes (Degree 1 and No Support)
+        # Build Scheibe connection map: {node_id: [scheibe1, scheibe2, ...]}
+        scheibe_connections = {n.id: [] for n in system.nodes}
+        for scheibe in system.scheiben:
+            for conn in scheibe.connections:
+                if conn.node_id in scheibe_connections:
+                    scheibe_connections[conn.node_id].append(scheibe)
+        
+        # 2. Find candidate nodes (Degree 1, No Support, Not in Scheibe)
         nodes_to_prune = []
         for n_id, connected_m_ids in adjacency.items():
             if len(connected_m_ids) == 1:
                 node = node_map[n_id]
-                # If it has any fixity, it is NOT a free end
+                
+                # Check if it has any fixity
                 has_support = node.supports.fix_x or node.supports.fix_y or node.supports.fix_m
-                if not has_support:
+                
+                # Check if connected to any Scheibe (Scheiben act as constraints)
+                connected_to_scheibe = len(scheibe_connections.get(n_id, [])) > 0
+                
+                # Only prune if: no support AND not in a Scheibe
+                if not has_support and not connected_to_scheibe:
                     nodes_to_prune.append(n_id)
 
         # 3. Process Pruning
@@ -114,16 +124,15 @@ def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
                 root_node = node_map[member.start_node_id]
             
             # --- B. Transfer Forces ---
-            F_tip = get_node_loads_vector(system, tip_node_id) # [Fx, Fy, M]
+            F_tip = get_node_loads_vector(system, tip_node_id)  # [Fx, Fy, M]
             
             tip_node = node_map[tip_node_id]
-            r = tip_node.coordinates - root_node.coordinates # Vector from Root to Tip
+            r = tip_node.coordinates - root_node.coordinates  # Vector from Root to Tip
             
             F_root_x = F_tip[0]
             F_root_y = F_tip[1]
             
             # Moment Transfer: M_root = M_tip + (r x F)
-            # 2D Cross Product: r_x * F_y - r_y * F_x
             M_transport = r[0] * F_tip[1] - r[1] * F_tip[0]
             M_root = F_tip[2] + M_transport
             
@@ -142,10 +151,24 @@ def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
                 if not (l.scope == 'NODE' and l.node_id == tip_node_id)
             ]
             
+            # Remove Scheibe connections to deleted node (shouldn't happen, but be safe)
+            for scheibe in system.scheiben:
+                scheibe.connections = [
+                    conn for conn in scheibe.connections 
+                    if conn.node_id != tip_node_id
+                ]
+            
             # Flag to run another pass (chains of members)
             changed = True
             
             # Break inner loop to rebuild maps safely
-            break 
+            break
+    
+    # Optional: Remove empty Scheiben (no connections left)
+    system.scheiben = [
+        s for s in system.scheiben 
+        if len(s.connections) > 0
+    ]
+    
     print(system)
     return system

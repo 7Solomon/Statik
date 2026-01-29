@@ -141,15 +141,89 @@ class Load:
                 if self.end_value is not None: base["endValue"] = self.end_value
 
         return base
+    
+@dataclass
+class ScheibeProperties:
+    E: float        # Young's modulus (Pa)
+    nu: float       # Poisson's ratio
+    thickness: float  # Thickness (m)
+    rho: float      # Density (kg/m³)
+
+
+@dataclass
+class ScheibeConnection:
+    node_id: str
+    releases: Optional[Release] = None
+
+
+@dataclass
+class Scheibe:
+    id: str
+    shape: Literal['rectangle', 'circle', 'triangle', 'polygon']
+    
+    # Geometry
+    corner1: Vec2
+    corner2: Vec2
+    additional_points: Optional[List[Vec2]] = None
+    rotation: float = 0.0
+    
+    # Analysis type
+    type: Literal['RIGID', 'ELASTIC'] = 'RIGID'
+    
+    # Material properties
+    properties: ScheibeProperties = field(default_factory=lambda: ScheibeProperties(E=30e9, nu=0.2, thickness=0.2, rho=2400))
+    
+    # Connections to nodes
+    connections: List[ScheibeConnection] = field(default_factory=list)
+    
+    # Meshing
+    mesh_level: int = 3  # 1-5
+    
+    def to_dict(self):
+        result = {
+            "id": self.id,
+            "shape": self.shape,
+            "corner1": {"x": self.corner1.x, "y": self.corner1.y},
+            "corner2": {"x": self.corner2.x, "y": self.corner2.y},
+            "rotation": self.rotation,
+            "type": self.type,
+            "properties": {
+                "E": self.properties.E,
+                "nu": self.properties.nu,
+                "thickness": self.properties.thickness,
+                "rho": self.properties.rho
+            },
+            "connections": [
+            {
+                "nodeId": conn.node_id,
+                "releases": None if conn.releases is None else {  # ← Explicitly None
+                    "fx": conn.releases.fx,
+                    "fy": conn.releases.fy,
+                    "mz": conn.releases.mz
+                }
+            }
+                for conn in self.connections
+            ],
+            "meshLevel": self.mesh_level
+        }
+        
+        if self.additional_points:
+            result["additionalPoints"] = [
+                {"x": p.x, "y": p.y} for p in self.additional_points
+            ]
+        
+        return result
+
 
 @dataclass
 class StructuralSystem:
     nodes: List[Node] = field(default_factory=list)
     members: List[Member] = field(default_factory=list)
     loads: List[Load] = field(default_factory=list)
+    scheiben: List[Scheibe] = field(default_factory=list)
 
     @classmethod
-    def create(cls, nodes_data: List[dict], members_data: List[dict], loads_data: List[dict]) -> 'StructuralSystem':
+    def create(cls, nodes_data: List[dict], members_data: List[dict], loads_data: List[dict], scheiben_data: List[Dict]) -> 'StructuralSystem':
         system = cls()
         node_map = {}
 
@@ -242,13 +316,78 @@ class StructuralSystem:
             
             system.loads.append(load)
 
+        # SCHEIBEN
+        for s_data in scheiben_data:
+            # Parse corner positions
+            c1 = s_data.get("corner1", {"x": 0, "y": 0})
+            c2 = s_data.get("corner2", {"x": 0, "y": 0})
+            
+            # Parse additional points (for polygon, l_shape)
+            additional_points = None
+            if "additionalPoints" in s_data and s_data["additionalPoints"]:
+                additional_points = [
+                    Vec2(x=float(p["x"]), y=float(p["y"])) 
+                    for p in s_data["additionalPoints"]
+                ]
+            
+            # Parse properties
+            props = s_data.get("properties", {})
+            properties = ScheibeProperties(
+                E=float(props.get("E", 30e9)),
+                nu=float(props.get("nu", 0.2)),
+                thickness=float(props.get("thickness", 0.2)),
+                rho=float(props.get("rho", 2400))
+            )
+            
+            # Parse connections
+            connections = []
+            for conn_data in s_data.get("connections", []):
+                node_id = str(conn_data["nodeId"])
+                
+                if node_id not in node_map:
+                    print(f"Warning: Scheibe {s_data['id']} references missing node {node_id}")
+                    continue
+                
+                # Parse releases - handle null/None properly
+                releases = None
+                rel_data = conn_data.get("releases")
+                
+                # Only create Release object if releases is explicitly provided and not null
+                if rel_data is not None:
+                    releases = Release(
+                        fx=rel_data.get("fx", False),
+                        fy=rel_data.get("fy", False),
+                        mz=rel_data.get("mz", False)
+                    )
+                
+                connections.append(ScheibeConnection(
+                    node_id=node_id,
+                    releases=releases
+                ))
+
+            
+            scheibe = Scheibe(
+                id=str(s_data["id"]),
+                shape=s_data.get("shape", "rectangle"),
+                corner1=Vec2(x=float(c1["x"]), y=float(c1["y"])),
+                corner2=Vec2(x=float(c2["x"]), y=float(c2["y"])),
+                additional_points=additional_points,
+                rotation=float(s_data.get("rotation", 0.0)),
+                type=s_data.get("type", "RIGID"),
+                properties=properties,
+                connections=connections,
+                mesh_level=int(s_data.get("meshLevel", 3))
+            )
+            
+            system.scheiben.append(scheibe)
         return system
     
     def to_dict(self):
         return {
             "nodes": [n.to_dict() for n in self.nodes],
             "members": [m.to_dict() for m in self.members],
-            "loads": [l.to_dict() for l in self.loads] 
+            "loads": [l.to_dict() for l in self.loads],
+            "scheiben": [s.to_dict() for s in self.scheiben]
         }
 @dataclass
 class RigidBody:
@@ -269,17 +408,21 @@ class RigidBody:
 class KinematicMode:
     """Represents one specific independent movement (Degree of Freedom)"""
     index: int
-    node_velocities: Dict[str, np.ndarray] 
+    node_velocities: Dict[str, np.ndarray] # [vx, vy]
+    scheibe_velocities: Dict[str, np.ndarray] #[vx, vy, omega]
     member_poles: Dict[str, np.ndarray]
     rigid_bodies: List[RigidBody]
 
     def to_dict(self):
         def vec_to_list(v):
-            return [float(v[0]), float(v[1])] if v is not None else None
+            if v is None:
+                return None
+            return [float(x) for x in v]
 
         return {
             "index": int(self.index),
-            "velocities": {k: vec_to_list(v) for k, v in self.node_velocities.items()},
+            "node_velocities": {k: vec_to_list(v) for k, v in self.node_velocities.items()},
+            "scheibe_velocities": {k: vec_to_list(v) for k, v in self.scheibe_velocities.items()},
             "member_poles": {k: vec_to_list(v) for k, v in self.member_poles.items()},
             "rigid_bodies": [rb.to_dict() for rb in self.rigid_bodies]
         }

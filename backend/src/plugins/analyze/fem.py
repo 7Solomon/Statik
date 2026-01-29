@@ -11,8 +11,13 @@ def calculate_complex_fem(system: StructuralSystem) -> FEMResult:
     """
     Solves 2D Frame with Releases and Distributed Loads.
     """
-    print(system)
-    # 1. Map DoFs
+    elastic_scheiben = [s for s in system.scheiben if s.type == 'ELASTIC']
+    if elastic_scheiben:
+        print(f"Warning: {len(elastic_scheiben)} ELASTIC Scheiben found.")
+        print("ELASTIC Scheiben require 2D FEM meshing (not yet implemented).")
+        print("They will be ignored in this analysis.")
+    
+    #  Map DoFs
     # [u, v, theta] for each node
     dof_map = {n.id: [i*3, i*3+1, i*3+2] for i, n in enumerate(system.nodes)}
     total_dof = len(system.nodes) * 3
@@ -23,7 +28,7 @@ def calculate_complex_fem(system: StructuralSystem) -> FEMResult:
     # Cache element data for post-processing
     elem_contexts: Dict[str, ElementContext] = {}
 
-    # 2. Process Members (Stiffness + Distributed Load -> Equivalent Nodal Load)
+    # Process Members (Stiffness + Distributed Load -> Equivalent Nodal Load)
     for member in system.members:
         start_node = next(n for n in system.nodes if n.id == member.start_node_id)
         end_node = next(n for n in system.nodes if n.id == member.end_node_id)
@@ -64,8 +69,12 @@ def calculate_complex_fem(system: StructuralSystem) -> FEMResult:
             F_global[r] -= f_fixed_global[i] # Equivalent Load vector
             for j, c_idx in enumerate(dofs):
                 K_global[r, c_idx] += k_global[i, j]
+    
+    # Process RIGID Scheiben as Penalty Constraints
+    apply_scheibe_constraints(K_global, system.scheiben, system.nodes, dof_map)
 
-    # 3. Process Nodal Loads (Direct Application)
+
+    # Process Nodal Loads (Direct Application)
     for load in system.loads:
         if load.scope == 'NODE':
             dofs = dof_map[load.node_id]
@@ -76,20 +85,20 @@ def calculate_complex_fem(system: StructuralSystem) -> FEMResult:
             elif load.type == 'MOMENT':
                 F_global[dofs[2]] += load.value
 
-    # 4. Apply Supports
+    #  Apply Supports
     for node in system.nodes:
         dofs = dof_map[node.id]
         if node.supports.fix_x: apply_support(K_global, F_global, dofs[0])
         if node.supports.fix_y: apply_support(K_global, F_global, dofs[1])
         if node.supports.fix_m: apply_support(K_global, F_global, dofs[2])
 
-    # 5. Solve
+    #Solve
     try:
         U_global = np.linalg.solve(K_global, F_global)
     except np.linalg.LinAlgError:
         return {"success": False, "error": "Singular Matrix (Unstable Structure)"}
 
-    # 6. Post-Processing
+    # Post-Processing
     results = {
         "success": True, 
         "system": system.to_dict(),
@@ -226,6 +235,100 @@ def apply_static_condensation(k: np.ndarray, releases: MemberReleases):
         k[5, :] = 0; k[:, 5] = 0
 
     return k, None # Returns modified K
+
+def apply_scheibe_constraints(
+    K_global: np.ndarray,
+    scheiben: List,
+    nodes: List[Node],
+    dof_map: Dict[str, List[int]]
+) -> None:
+    """
+    Apply rigid body constraints for RIGID Scheiben using penalty method.
+    
+    For each RIGID Scheibe with N connected nodes:
+    - All nodes must move together as a rigid body
+    - Use penalty stiffness to enforce constraints
+    """
+    PENALTY = 1e12  # Large penalty factor
+    
+    for scheibe in scheiben:
+        if scheibe.type != 'RIGID':
+            continue  # Skip ELASTIC scheiben
+        
+        # Get rigid connections (no releases)
+        rigid_node_ids = [
+            conn.node_id 
+            for conn in scheibe.connections 
+            if conn.releases is None
+        ]
+        
+        if len(rigid_node_ids) < 2:
+            continue  # Need at least 2 nodes to constrain
+        
+        # Get node objects
+        node_map = {n.id: n for n in nodes}
+        
+        # Use first node as reference
+        ref_id = rigid_node_ids[0]
+        ref_node = node_map[ref_id]
+        ref_dofs = dof_map[ref_id]
+        
+        # Constrain all other nodes to move rigidly with reference
+        for other_id in rigid_node_ids[1:]:
+            if other_id == ref_id:
+                continue
+            
+            other_node = node_map[other_id]
+            other_dofs = dof_map[other_id]
+            
+            # Relative position
+            dx = other_node.position.x - ref_node.position.x
+            dy = other_node.position.y - ref_node.position.y
+            
+            # CONSTRAINT 1: Equal rotation (theta_other = theta_ref)
+            # Penalty form: PENALTY * (theta_other - theta_ref)^2
+            i_theta = other_dofs[2]
+            j_theta = ref_dofs[2]
+            
+            K_global[i_theta, i_theta] += PENALTY
+            K_global[i_theta, j_theta] -= PENALTY
+            K_global[j_theta, i_theta] -= PENALTY
+            K_global[j_theta, j_theta] += PENALTY
+            
+            # CONSTRAINT 2: X-displacement rigid body motion
+            # u_other = u_ref - dy * theta_ref
+            # Penalty form: PENALTY * (u_other - u_ref + dy*theta_ref)^2
+            i_ux = other_dofs[0]
+            j_ux = ref_dofs[0]
+            
+            K_global[i_ux, i_ux] += PENALTY
+            K_global[i_ux, j_ux] -= PENALTY
+            K_global[j_ux, i_ux] -= PENALTY
+            K_global[j_ux, j_ux] += PENALTY
+            
+            # Cross terms with rotation
+            K_global[i_ux, j_theta] += PENALTY * dy
+            K_global[j_theta, i_ux] += PENALTY * dy
+            K_global[j_ux, j_theta] -= PENALTY * dy
+            K_global[j_theta, j_ux] -= PENALTY * dy
+            
+            # CONSTRAINT 3: Y-displacement rigid body motion
+            # v_other = v_ref + dx * theta_ref
+            # Penalty form: PENALTY * (v_other - v_ref - dx*theta_ref)^2
+            i_uy = other_dofs[1]
+            j_uy = ref_dofs[1]
+            
+            K_global[i_uy, i_uy] += PENALTY
+            K_global[i_uy, j_uy] -= PENALTY
+            K_global[j_uy, i_uy] -= PENALTY
+            K_global[j_uy, j_uy] += PENALTY
+            
+            # Cross terms with rotation
+            K_global[i_uy, j_theta] -= PENALTY * dx
+            K_global[j_theta, i_uy] -= PENALTY * dx
+            K_global[j_uy, j_theta] += PENALTY * dx
+            K_global[j_theta, j_uy] += PENALTY * dx
+
 
 def apply_release_correction_to_loads(f_fixed: np.ndarray, k_condensed: np.ndarray, releases: MemberReleases):
     # If a node is hinged, it cannot sustain a Fixed End Moment.

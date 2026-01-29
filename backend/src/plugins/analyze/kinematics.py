@@ -1,40 +1,28 @@
-from typing import Tuple, List, Dict, Optional
+from typing import Any, Tuple, List, Dict, Optional
 import numpy as np
 
-from src.models.analyze_models import StructuralSystem, KinematicMode, Member, Node
+from src.models.analyze_models import RigidBody, Scheibe, StructuralSystem, KinematicMode, Member, Node
+
 
 
 def solve_kinematics(system: 'StructuralSystem') -> Tuple[List[KinematicMode], int]:
     """
     Solves the kinematic analysis of a structural system.
-    
-    Returns:
-        - List of kinematic modes (mechanisms)
-        - Total degrees of freedom
     """
     nodes = system.nodes
     members = system.members
+    scheiben = system.scheiben
     num_nodes = len(nodes)
     
-    # 3 DOFs per node (u, v, theta)
     num_dofs = 3 * num_nodes
-    
-    # Map UUIDs to matrix indices
     node_idx_map = {n.id: i for i, n in enumerate(nodes)}
     
     constraints = []
     
-    # Support Constraints
     add_support_constraints(nodes, node_idx_map, num_dofs, constraints)
-    
-    # Member Constraints
     add_member_constraints(members, nodes, node_idx_map, num_dofs, constraints)
+    add_scheibe_constraints(scheiben, nodes, node_idx_map, num_dofs, constraints)
     
-    ## Coupled Hinge Constraints  (TO FIX THE "Mechanisms with double hinges" Limitation)
-    #add_coupled_hinge_constraints(members, nodes, node_idx_map, num_dofs, constraints)
-    
-    
-    # --- 4. Solve SVD ---
     if not constraints:
         return [], num_dofs
     
@@ -48,7 +36,6 @@ def solve_kinematics(system: 'StructuralSystem') -> Tuple[List[KinematicMode], i
     modes_result: List[KinematicMode] = []
     
     if dof_count > 0:
-        # The Null Space corresponds to the last 'dof_count' rows of Vh
         for k in range(dof_count):
             row_idx = -(k + 1)
             mode_vec = Vh[row_idx, :]
@@ -58,7 +45,7 @@ def solve_kinematics(system: 'StructuralSystem') -> Tuple[List[KinematicMode], i
             if max_val > 1e-9:
                 mode_vec /= max_val
             
-            # Build node velocities dictionary
+            # Build node velocities
             node_velocities = {}
             is_mechanism = False
             
@@ -66,24 +53,38 @@ def solve_kinematics(system: 'StructuralSystem') -> Tuple[List[KinematicMode], i
                 idx = node_idx_map[n.id]
                 vx = mode_vec[3*idx]
                 vy = mode_vec[3*idx+1]
-                vt = mode_vec[3*idx+2]
+                vtheta = mode_vec[3*idx+2]
                 
-                # Store [vx, vy]
                 node_velocities[n.id] = np.array([vx, vy])
                 
-                if np.sqrt(vx**2 + vy**2) > 1e-6:
+                # Check for ANY non-zero velocity (translation OR rotation)
+                if np.sqrt(vx**2 + vy**2) > 1e-6 or abs(vtheta) > 1e-6:
                     is_mechanism = True
             
+            # Calculate Scheibe velocities
+            scheibe_velocities = {}
+            for scheibe in scheiben:
+                vel = calculate_scheibe_velocity(scheibe, mode_vec, nodes, node_idx_map)
+                if vel is not None:
+                    scheibe_velocities[scheibe.id] = vel
+                    # Also check scheibe motion
+                    if np.sqrt(vel[0]**2 + vel[1]**2) > 1e-6 or abs(vel[2]) > 1e-6:
+                        is_mechanism = True
+            
             if is_mechanism:
+                rigid_bodies = detect_rigid_bodies(scheiben, node_velocities, nodes, node_idx_map, mode_vec)
+                
                 km = KinematicMode(
                     index=k,
                     node_velocities=node_velocities,
                     member_poles={},
-                    rigid_bodies=[]
+                    rigid_bodies=rigid_bodies,
+                    scheibe_velocities=scheibe_velocities
                 )
                 modes_result.append(km)
-    
+
     return modes_result, dof_count
+
 
 
 def add_support_constraints(
@@ -195,6 +196,301 @@ def add_member_constraints(
             row[ix], row[iy] = ny/L, -nx/L
             row[jx], row[jy] = -ny/L, nx/L
             constraints.append(row)
+            
+def add_scheibe_constraints(
+    scheiben: List[Scheibe],
+    nodes: List[Node],
+    node_idx_map: Dict[str, int],
+    num_dofs: int,
+    constraints: List[np.ndarray]
+) -> None:
+    """
+    Adds rigid body constraints for Scheiben.
+    
+    A RIGID Scheibe constrains all connected nodes to move as a single rigid body.
+    This means:
+    1. All nodes have the same rotation
+    2. Relative positions remain constant (rigid body kinematics)
+    
+    For ELASTIC scheiben: No kinematic constraints (handled in FEM)
+    """
+    for scheibe in scheiben:
+        # Only RIGID scheiben impose kinematic constraints
+        if scheibe.type != 'RIGID':
+            continue
+        
+        # Get nodes with rigid connections (no releases)
+        rigid_node_ids = [
+            conn.node_id 
+            for conn in scheibe.connections 
+            if conn.releases is None  # No releases = rigid connection
+        ]
+        
+        if len(rigid_node_ids) < 2:
+            continue  # Need at least 2 nodes to constrain
+        
+        # Strategy: Make first node the "reference" node
+        # All other nodes must move rigidly relative to it
+        ref_node_id = rigid_node_ids[0]
+        ref_idx = node_idx_map[ref_node_id]
+        ref_node = nodes[ref_idx]
+        
+        # Reference DOFs
+        ref_ux = 3 * ref_idx
+        ref_uy = 3 * ref_idx + 1
+        ref_theta = 3 * ref_idx + 2
+        
+        # Constrain all other nodes to move rigidly with reference
+        for other_node_id in rigid_node_ids[1:]:
+            other_idx = node_idx_map[other_node_id]
+            other_node = nodes[other_idx]
+            
+            # Other DOFs
+            other_ux = 3 * other_idx
+            other_uy = 3 * other_idx + 1
+            other_theta = 3 * other_idx + 2
+            
+            # Calculate relative position vector
+            dx = other_node.position.x - ref_node.position.x
+            dy = other_node.position.y - ref_node.position.y
+            
+            # CONSTRAINT 1: Rotation must be equal
+            # θ_other - θ_ref = 0
+            row_rotation = np.zeros(num_dofs)
+            row_rotation[other_theta] = 1.0
+            row_rotation[ref_theta] = -1.0
+            constraints.append(row_rotation)
+            
+            # CONSTRAINT 2: X-displacement follows rigid body motion
+            # u_other - u_ref + dy * θ_ref = 0
+            row_ux = np.zeros(num_dofs)
+            row_ux[other_ux] = 1.0
+            row_ux[ref_ux] = -1.0
+            row_ux[ref_theta] = dy  # Rotation coupling
+            constraints.append(row_ux)
+            
+            # CONSTRAINT 3: Y-displacement follows rigid body motion
+            # v_other - v_ref - dx * θ_ref = 0
+            row_uy = np.zeros(num_dofs)
+            row_uy[other_uy] = 1.0
+            row_uy[ref_uy] = -1.0
+            row_uy[ref_theta] = -dx  # Rotation coupling
+            constraints.append(row_uy)
+        
+        # Handle nodes with releases (hinged connections to Scheibe)
+        for conn in scheibe.connections:
+            if conn.releases is None:
+                continue  # Already handled above
+            
+            # Node is hinged to the Scheibe - only partial constraint
+            node_idx = node_idx_map[conn.node_id]
+            node = nodes[node_idx]
+            
+            node_ux = 3 * node_idx
+            node_uy = 3 * node_idx + 1
+            node_theta = 3 * node_idx + 2
+            
+            dx = node.position.x - ref_node.position.x
+            dy = node.position.y - ref_node.position.y
+            
+            # If moment is released (mz=True), allow relative rotation
+            # But still constrain translation to follow rigid body
+            if not conn.releases.mz:
+                # No moment release = constrain rotation
+                row = np.zeros(num_dofs)
+                row[node_theta] = 1.0
+                row[ref_theta] = -1.0
+                constraints.append(row)
+            
+            # If axial or shear are NOT released, constrain translation
+            if not conn.releases.fx:
+                # Constrain X displacement
+                row = np.zeros(num_dofs)
+                row[node_ux] = 1.0
+                row[ref_ux] = -1.0
+                row[ref_theta] = dy
+                constraints.append(row)
+            
+            if not conn.releases.fy:
+                # Constrain Y displacement
+                row = np.zeros(num_dofs)
+                row[node_uy] = 1.0
+                row[ref_uy] = -1.0
+                row[ref_theta] = -dx
+                constraints.append(row)
+
+def detect_rigid_bodies(
+    scheiben: List[Scheibe],
+    node_velocities: Dict[str, np.ndarray],
+    nodes: List[Node],
+    node_idx_map: Dict[str, int],
+    mode_vec: np.ndarray
+) -> List[RigidBody]:
+    """
+    Detect which Scheiben are moving as rigid bodies in this kinematic mode.
+    
+    Returns:
+        List of RigidBody objects with movement characterization
+    """
+    rigid_bodies = []
+    
+    for scheibe_idx, scheibe in enumerate(scheiben):
+        if scheibe.type != 'RIGID':
+            continue
+        
+        # Get rigid connections
+        rigid_node_ids = [
+            conn.node_id 
+            for conn in scheibe.connections 
+            if conn.releases is None
+        ]
+        
+        if len(rigid_node_ids) < 2:
+            continue
+        
+        # Check if all nodes have consistent rigid body motion
+        # Get first node as reference
+        ref_id = rigid_node_ids[0]
+        ref_idx = node_idx_map[ref_id]
+        ref_node = nodes[ref_idx]
+        
+        ref_vx = mode_vec[3 * ref_idx]
+        ref_vy = mode_vec[3 * ref_idx + 1]
+        ref_omega = mode_vec[3 * ref_idx + 2]
+        
+        # Check if this is a pure translation or rotation
+        is_rigid_motion = True
+        movement_type = None
+        
+        # Test if all nodes follow rigid body kinematics
+        for node_id in rigid_node_ids[1:]:
+            idx = node_idx_map[node_id]
+            node = nodes[idx]
+            
+            vx = mode_vec[3 * idx]
+            vy = mode_vec[3 * idx + 1]
+            omega = mode_vec[3 * idx + 2]
+            
+            # Check rotation consistency
+            if abs(omega - ref_omega) > 1e-6:
+                is_rigid_motion = False
+                break
+            
+            # Check translation consistency (rigid body formula)
+            dx = node.position.x - ref_node.position.x
+            dy = node.position.y - ref_node.position.y
+            
+            expected_vx = ref_vx - dy * ref_omega
+            expected_vy = ref_vy + dx * ref_omega
+            
+            if abs(vx - expected_vx) > 1e-6 or abs(vy - expected_vy) > 1e-6:
+                is_rigid_motion = False
+                break
+        
+        if not is_rigid_motion:
+            continue
+        
+        # Characterize movement type
+        trans_mag = np.sqrt(ref_vx**2 + ref_vy**2)
+        rot_mag = abs(ref_omega)
+        
+        if rot_mag < 1e-6 and trans_mag > 1e-6:
+            # Pure translation
+            movement_type = "translation"
+            direction = np.array([ref_vx, ref_vy])
+            direction /= np.linalg.norm(direction)  # Normalize
+            center_or_vector = direction
+            
+        elif rot_mag > 1e-6:
+            # Rotation (possibly with translation = instant center)
+            movement_type = "rotation"
+            
+            # Calculate instant center (pole)
+            if trans_mag < 1e-6:
+                # Pure rotation around reference point
+                center_or_vector = np.array([ref_node.position.x, ref_node.position.y])
+            else:
+                # General motion - find instant center
+                # IC is perpendicular to velocity, distance = v/ω
+                r = trans_mag / rot_mag
+                vx_perp = -ref_vy / trans_mag
+                vy_perp = ref_vx / trans_mag
+                
+                center_or_vector = np.array([
+                    ref_node.position.x + r * vx_perp,
+                    ref_node.position.y + r * vy_perp
+                ])
+        else:
+            # No movement
+            continue
+        
+        # Create RigidBody object
+        rigid_body = RigidBody(
+            id=scheibe_idx,
+            member_ids=[], # NO MEMEBER MAYBE ADD SCHEIBE
+            movement_type=movement_type,
+            center_or_vector=center_or_vector
+        )
+        
+        rigid_bodies.append(rigid_body)
+    
+    return rigid_bodies
+
+
+def calculate_scheibe_velocity(
+    scheibe: Scheibe,
+    mode_vec: np.ndarray,
+    nodes: List[Node],
+    node_idx_map: Dict[str, int]
+) -> Optional[np.ndarray]:
+    """
+    Calculate [vx, vy, omega] velocity of Scheibe center.
+    
+    For RIGID Scheiben: Calculate from any connected node (they all move rigidly)
+    For ELASTIC Scheiben: Return None (deforms with FEM)
+    """
+    if scheibe.type != 'RIGID':
+        return None
+    
+    # Get a rigid connection node
+    rigid_node_ids = [
+        conn.node_id 
+        for conn in scheibe.connections 
+        if conn.releases is None
+    ]
+    
+    if len(rigid_node_ids) == 0:
+        return None
+    
+    # Use first rigid node as reference
+    ref_id = rigid_node_ids[0]
+    ref_idx = node_idx_map[ref_id]
+    ref_node = nodes[ref_idx]
+    
+    # Node velocity
+    node_vx = mode_vec[3 * ref_idx]
+    node_vy = mode_vec[3 * ref_idx + 1]
+    node_omega = mode_vec[3 * ref_idx + 2]
+    
+    # Scheibe center
+    cx = (scheibe.corner1.x + scheibe.corner2.x) / 2
+    cy = (scheibe.corner1.y + scheibe.corner2.y) / 2
+    
+    # Relative position from node to center
+    dx = cx - ref_node.position.x
+    dy = cy - ref_node.position.y
+    
+    # Center velocity using rigid body kinematics
+    # v_center = v_node + omega × r
+    center_vx = node_vx - dy * node_omega
+    center_vy = node_vy + dx * node_omega
+    
+    # Angular velocity is the same for all points in rigid body
+    center_omega = node_omega
+    
+    return np.array([center_vx, center_vy, center_omega])
+
+
 
 def add_coupled_hinge_constraints(
     members: List[Member],

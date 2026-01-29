@@ -1,6 +1,6 @@
 # Statik - Structural Analysis Editor
 
-A structural analysis tool for civil engineering. Create, analyze, and visualize 2D structural systems with an nice interface.
+A structural analysis tool for civil engineering. Create, analyze, and visualize 2D structural systems with an intuitive interface.
 
 <p align="center">
   <img src="assets/home.png" alt="Statik Editor Interface" width="800"/>
@@ -8,7 +8,7 @@ A structural analysis tool for civil engineering. Create, analyze, and visualize
 
 ## Overview
 
-Statik provides a complete workflow for structural analysis, from model creation to kinematic and static analysis. The application features a canvas-based editor with tooling for nodes, members, supports, hinges, and loads.
+Statik provides a complete workflow for structural analysis, from model creation to kinematic and static analysis. The application features a canvas-based editor with tooling for nodes, members, supports, hinges, loads, and rigid plate elements (Scheiben).
 
 ---
 
@@ -34,6 +34,7 @@ The editor provides specialized tools for creating structural elements:
 - **Select**: Interact with existing elements, pan and zoom the canvas
 - **Node**: Create nodes with optional support conditions
 - **Member**: Connect nodes to form structural members
+- **Scheibe**: Create rigid or elastic plate elements (2D continuum regions)
 
 **Support Types**
 - **Festlager** (Fixed support): Constrains X and Y translation
@@ -51,6 +52,11 @@ The editor provides specialized tools for creating structural elements:
 - **Point Load**: Concentrated forces at nodes or along members
 - **Moment**: Rotational loads
 - **Distributed Load**: Uniform or varying loads along members
+
+**Scheiben (Plate Elements)**
+- **RIGID**: Infinitely stiff plate regions that move as rigid bodies
+- **ELASTIC**: Deformable continuum elements (requires meshing - future feature)
+- Connect nodes to Scheiben for rigid body constraints or continuum coupling
 
 <p align="center">
   <img src="assets/simplify_system.png" alt="Beam with distributed load" width="700"/>
@@ -92,7 +98,13 @@ Check degrees of freedom and validate structural stability before static analysi
 The kinematic analysis identifies:
 - Degree of freedom (DoF)
 - Mechanisms and instabilities
+- Rigid body motion of Scheiben
 - System determinacy
+
+**Scheiben in Kinematic Analysis**:
+- RIGID Scheiben act as kinematic constraints, coupling connected nodes
+- Mechanism modes show rigid body rotation and translation of Scheiben
+- Nodes connected to Scheiben move together as a rigid unit
 
 #### Simplified System View
 
@@ -106,12 +118,14 @@ This view shows:
 - Equivalent member system
 - Reduced node count
 - Simplified load representation
+- Scheiben preserved in simplified model
 
 #### Solution Visualization
 
 View complete analysis results including:
 - Internal force diagrams (Normal, Shear, Moment)
 - Deformed shape (Not yet implemented)
+- Scheiben displayed as constraint regions
 
 <p align="center">
   <img src="assets/fem_solution.png" alt="FEM solution with moment diagram" width="700"/>
@@ -122,8 +136,6 @@ Toggle between different force components:
 - **V**: Shear forces  
 - **M**: Bending moments
 - **Off**: Hide diagrams
-
-
 
 <p align="center">
   <img src="assets/einfeldtraeger.png" alt="Simple beam structure" width="700"/>
@@ -148,6 +160,7 @@ Save and load structural systems for later use.
 - Load previously saved systems
 - Search through saved projects
 - Timestamped project history
+- Scheiben are preserved in saved files
 
 ---
 
@@ -156,12 +169,14 @@ Save and load structural systems for later use.
 1. **Create Structure**: Use the Editor mode to build your structural system
    - Place nodes and supports
    - Connect members
+   - Add Scheiben for rigid regions
    - Define hinges at member ends
    - Apply loads
 
 2. **Validate Kinematics**: Switch to Analysis → Kinematics to check stability
    - Verify the system is statically determinate or indeterminate
    - Identify any mechanisms
+   - Check Scheibe rigid body motion
 
 3. **Analyze Structure**: Run full structural analysis
    - View simplified system topology
@@ -200,12 +215,17 @@ The kinematic solver validates structural stability before performing static ana
 - **Member Constraints**: 
   - Axial constraint prevents member length change unless axial releases exist at both ends
   - Rotational constraints enforce compatibility between node rotations and member rigid body rotation based on hinge releases
+- **Scheibe Constraints**:
+  - RIGID Scheiben enforce rigid body motion between all connected nodes
+  - Each Scheibe adds 3 constraints per connected node pair (compatibility in u, v, and θ)
+  - Scheibe-node connections can have releases (hinges) to allow relative rotation
 
 **Solution Method**: Singular Value Decomposition (SVD) of the constraint matrix identifies the null space, revealing kinematic modes (mechanisms) and degrees of freedom.
 
 **Output**: 
 - Total degrees of freedom
 - Node velocity vectors for each mechanism
+- Scheibe rigid body velocities (translation and rotation)
 - Instantaneous centers of rotation (poles) for each member
 
 #### 2. System Simplification
@@ -216,20 +236,29 @@ The simplification algorithm reduces complex topologies while maintaining static
 - Iteratively identifies and removes statically determinate branches (degree-1 nodes without supports)
 - Transfers loads from removed nodes to parent nodes using force and moment equilibrium
 - Moment transfer accounts for position offset: \( M_{root} = M_{tip} + \mathbf{r} \times \mathbf{F} \)
+- Nodes connected to Scheiben are protected from pruning (Scheibe acts as constraint)
 
 **Rigid Body Detection**:
 - Calculates instantaneous center of rotation (pole) for each member from nodal velocities
 - Groups members with coincident poles (within tolerance) into rigid bodies
 - Identifies translation-dominated regions where members move as a unit
+- Scheiben with rigid body motion are flagged as kinematic rigid bodies
 
 #### 3. Finite Element Analysis
 
-The FEM solver implements 2D frame analysis with member releases and distributed loads.
+The FEM solver implements 2D frame analysis with member releases, distributed loads, and rigid plate constraints.
 
 **Element Formulation**:
 - **Beam element**: 6 DOFs per element (3 per node: u, v, θ)
 - **Local stiffness matrix**: Combines axial stiffness \( EA/L \) and bending stiffness terms with \( EI/L^3 \)
 - **Transformation**: Rotation matrix converts between local (member-aligned) and global coordinate systems
+
+**Scheibe Handling**:
+- **RIGID Scheiben**: Treated as kinematic constraints using penalty method
+  - Penalty stiffness (10¹²) couples connected nodes to enforce rigid body motion
+  - Constraint equations: \( u_i = u_{ref} - dy \cdot \theta_{ref} \), \( v_i = v_{ref} + dx \cdot \theta_{ref} \), \( \theta_i = \theta_{ref} \)
+  - Reference node chosen as first connection point
+- **ELASTIC Scheiben**: Not yet implemented (require 2D continuum meshing)
 
 **Release Handling**:
 - **Static condensation**: Reduces stiffness matrix by eliminating DOFs at hinged connections
@@ -243,14 +272,16 @@ The FEM solver implements 2D frame analysis with member releases and distributed
 
 **Solution**:
 1. Assemble global stiffness matrix \( \mathbf{K} \) and force vector \( \mathbf{F} \)
-2. Apply boundary conditions by modifying constrained DOF rows
-3. Solve \( \mathbf{K} \mathbf{u} = \mathbf{F} \) for displacement vector \( \mathbf{u} \)
-4. Back-calculate member forces from \( \mathbf{f} = \mathbf{K}_{local} \mathbf{u}_{local} + \mathbf{f}_{fixed} \)
+2. Add Scheibe penalty constraints to \( \mathbf{K} \)
+3. Apply boundary conditions by modifying constrained DOF rows
+4. Solve \( \mathbf{K} \mathbf{u} = \mathbf{F} \) for displacement vector \( \mathbf{u} \)
+5. Back-calculate member forces from \( \mathbf{f} = \mathbf{K}_{local} \mathbf{u}_{local} + \mathbf{f}_{fixed} \)
 
 **Post-Processing**:
 - Internal forces sampled at 21 stations along each member
 - Superposition of reaction forces and applied load effects
 - Min/max values tracked for visualization scaling
+- Scheiben displayed as constraint regions (no internal stress computed for RIGID type)
 
 ---
 
@@ -299,9 +330,9 @@ The FEM solver implements 2D frame analysis with member releases and distributed
 - **Distributed loads on Scheiben**:  
   Surface loads, pressure distributions, and body forces (self-weight) on Scheiben are not yet implemented. Only nodal loads and member line loads are currently supported.
 
+---
 
 ## Application Info
 
-**Version**: v1.0  
-**Status**: Editor and Analysis modules fully functional
-
+**Version**: v1.2
+**Status**: Editor and Analysis modules fully functional with RIGID Scheiben support

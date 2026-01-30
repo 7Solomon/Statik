@@ -53,11 +53,11 @@ export const PropertiesPanel = () => {
                     {/* Support Configuration */}
                     <Section title="Support Conditions">
                         <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <SupportRow label="Translation X" value={node.supports.fixX}
-                                onChange={(v) => actions.updateNode(node.id, { supports: { ...node.supports, fixX: v } })} />
+                            <SupportRow label="Translation X" value={node.supports.fixN}
+                                onChange={(v) => actions.updateNode(node.id, { supports: { ...node.supports, fixN: v } })} />
 
-                            <SupportRow label="Translation Y" value={node.supports.fixY}
-                                onChange={(v) => actions.updateNode(node.id, { supports: { ...node.supports, fixY: v } })} />
+                            <SupportRow label="Translation Y" value={node.supports.fixV}
+                                onChange={(v) => actions.updateNode(node.id, { supports: { ...node.supports, fixV: v } })} />
 
                             <SupportRow label="Rotation M" value={node.supports.fixM} unit="kNm/rad"
                                 onChange={(v) => actions.updateNode(node.id, { supports: { ...node.supports, fixM: v } })} />

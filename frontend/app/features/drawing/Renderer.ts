@@ -1,9 +1,10 @@
 import type { AnalysisInteractionState, EditorInteractionState, ViewportState } from '~/types/app';
-import type { Load, Member, Node, Scheibe } from '~/types/model';
+import type { Constraint, Load, Member, Node, Scheibe } from '~/types/model';
 import { RenderUtils } from './RenderUtils';
 import { NodeRenderer } from './NodeRenderer';
 import { ForceRenderer } from './ForceRenderer';
 import { ScheibenRenderer } from './ScheibenRenderer';
+import { ConstraintRenderer } from './ConstraintRenderer';
 
 export class Renderer {
     static renderEditor(
@@ -13,6 +14,7 @@ export class Renderer {
         members: Member[],
         loads: Load[],
         scheiben: Scheibe[],
+        constraints: Constraint[],
         viewport: ViewportState,
         interaction: EditorInteractionState
     ) {
@@ -58,6 +60,15 @@ export class Renderer {
             ForceRenderer.draw(ctx, load, viewport, nodes, members);
         });
 
+        // Draw Constraints
+        constraints.forEach(constraint => {
+            const isHovered = interaction.hoveredConstraintId === constraint.id;
+            const isSelected = interaction.selectedType === 'constraint'
+                && interaction.selectedId === constraint.id;
+
+            ConstraintRenderer.draw(ctx, constraint, nodes, viewport, isHovered, isSelected);
+        });
+
         // Ghost Member
         if (interaction.creationState.mode === 'drawing_member' && interaction.creationState.startPos) {
             const startNode = nodes.find(n => n.id === interaction.creationState.activeId);
@@ -83,6 +94,7 @@ export class Renderer {
         members: Member[],
         loads: Load[],
         scheiben: Scheibe[],
+        constraints: Constraint[],
         viewport: ViewportState,
         interaction: AnalysisInteractionState
     ) {
@@ -116,6 +128,11 @@ export class Renderer {
                     nodeStates.get(endNode.id)
                 );
             }
+        });
+
+        // Draw Constraints
+        constraints?.forEach(constraint => {
+            ConstraintRenderer.draw(ctx, constraint, nodes, viewport, false, false);
         });
 
         // Draw Loads

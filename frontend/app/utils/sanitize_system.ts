@@ -1,5 +1,5 @@
 import type { ViewportState } from '~/types/app';
-import type { Node, Member, Load, Scheibe, Release, ScheibeConnection, SupportValue, Vec2 } from '~/types/model';
+import type { Node, Member, Load, Scheibe, Release, ScheibeConnection, SupportValue, Vec2, Constraint } from '~/types/model';
 
 export const DEFAULT_VIEWPORT: ViewportState = {
     zoom: 50,
@@ -15,6 +15,7 @@ export const DEFAULT_INTERACTION = {
     isDragging: false,
     hoveredNodeId: null,
     hoveredMemberId: null,
+    hoveredConstraintId: null,
     mousePos: { x: 0, y: 0 },
     selectedId: null,
     selectedType: null,
@@ -46,9 +47,25 @@ export const DEFAULT_RELEASES: Release = {
 };
 
 export const DEFAULT_NODE_SUPPORTS = {
-    fixX: false,
-    fixY: false,
+    fixN: false,
+    fixV: false,
     fixM: false,
+};
+
+export const DEFAULT_SPRING_PROPS = {
+    k: 1000, // kN/m
+    preload: 0
+};
+
+export const DEFAULT_DAMPER_PROPS = {
+    c: 100, // kN·s/m
+    k: undefined
+};
+
+export const DEFAULT_CABLE_PROPS = {
+    EA: 210000, // kN
+    prestress: 0,
+    weightPerLength: 0
 };
 
 
@@ -83,8 +100,8 @@ export const sanitizeNode = (node: any): Node | null => {
         position,
         rotation: typeof node.rotation === 'number' ? node.rotation : 0,
         supports: {
-            fixX: sanitizeSupportValue(node.supports?.fixX),
-            fixY: sanitizeSupportValue(node.supports?.fixY),
+            fixN: sanitizeSupportValue(node.supports?.fixN),
+            fixV: sanitizeSupportValue(node.supports?.fixV),
             fixM: sanitizeSupportValue(node.supports?.fixM),
         }
     };
@@ -124,10 +141,13 @@ const sanitizeScheibeConnection = (conn: any): ScheibeConnection | null => {
 export const sanitizeScheibe = (scheibe: any): Scheibe | null => {
     // Must have id
     if (!scheibe?.id || typeof scheibe.id !== 'string') return null;
-
+    console.log(scheibe)
     // Validate shape
-    const validShapes = ['RECTANGLE', 'TRIANGLE', 'CUSTOM']; // Add your ScheibeShape values
-    if (!validShapes.includes(scheibe.shape)) return null;
+
+    const incomingShape = scheibe.shape?.toUpperCase();
+
+    const validShapes = ['RECTANGLE', 'TRIANGLE', 'CUSTOM'];
+    if (!validShapes.includes(incomingShape)) return null;
 
     // Validate required geometry
     const corner1 = sanitizeVec2(scheibe.corner1);
@@ -156,6 +176,8 @@ export const sanitizeScheibe = (scheibe: any): Scheibe | null => {
         ? scheibe.meshLevel as (1 | 2 | 3 | 4 | 5)
         : undefined;
 
+    console.log(scheibe)
+
     return {
         id: scheibe.id,
         shape: scheibe.shape,
@@ -175,6 +197,50 @@ export const sanitizeScheibe = (scheibe: any): Scheibe | null => {
     };
 };
 
+export const sanitizeConstraint = (constraint: any): Constraint | null => {
+    // Must have id, type, and both node IDs
+    if (!constraint?.id || typeof constraint.id !== 'string') return null;
+    if (!constraint?.type) return null;
+    if (!constraint?.startNodeId || typeof constraint.startNodeId !== 'string') return null;
+    if (!constraint?.endNodeId || typeof constraint.endNodeId !== 'string') return null;
+
+    const baseConstraint = {
+        id: constraint.id,
+        startNodeId: constraint.startNodeId,
+        endNodeId: constraint.endNodeId,
+        rotation: typeof constraint.rotation === 'number' ? constraint.rotation : undefined
+    };
+
+    switch (constraint.type) {
+        case 'SPRING':
+            return {
+                ...baseConstraint,
+                type: 'SPRING',
+                k: typeof constraint.k === 'number' ? constraint.k : DEFAULT_SPRING_PROPS.k,
+                preload: typeof constraint.preload === 'number' ? constraint.preload : DEFAULT_SPRING_PROPS.preload
+            };
+
+        case 'DAMPER':
+            return {
+                ...baseConstraint,
+                type: 'DAMPER',
+                c: typeof constraint.c === 'number' ? constraint.c : DEFAULT_DAMPER_PROPS.c,
+                k: typeof constraint.k === 'number' ? constraint.k : DEFAULT_DAMPER_PROPS.k
+            };
+
+        case 'CABLE':
+            return {
+                ...baseConstraint,
+                type: 'CABLE',
+                EA: typeof constraint.EA === 'number' ? constraint.EA : DEFAULT_CABLE_PROPS.EA,
+                prestress: typeof constraint.prestress === 'number' ? constraint.prestress : DEFAULT_CABLE_PROPS.prestress,
+                weightPerLength: typeof constraint.weightPerLength === 'number' ? constraint.weightPerLength : DEFAULT_CABLE_PROPS.weightPerLength
+            };
+
+        default:
+            return null;
+    }
+};
 
 export const sanitizeLoad = (load: any): Load | null => {
     // Must have id and scope at minimum

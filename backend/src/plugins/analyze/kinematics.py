@@ -101,8 +101,8 @@ def add_support_constraints(
         u_i, v_i, t_i = 3*idx, 3*idx+1, 3*idx+2
         
         # Access nested supports
-        is_fixed_x = bool(n.supports.fix_x)
-        is_fixed_y = bool(n.supports.fix_y)
+        is_fixed_x = bool(n.supports.fix_n)
+        is_fixed_y = bool(n.supports.fix_v)
         is_fixed_m = bool(n.supports.fix_m)
         
         # Rotation Matrix for Support Angle

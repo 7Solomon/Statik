@@ -69,6 +69,7 @@ export default function SimplifiedViewer() {
             systemToRender.members,
             systemToRender.loads,
             systemToRender.scheiben,
+            systemToRender.constraints,
             view,
             interaction
         );

@@ -1,9 +1,9 @@
-import type { Load, Member, Node, KinematicResult, Release, Vec2, StructuralSystem, FEMResult, Scheibe } from '~/types/model';
+import type { Load, Member, Node, KinematicResult, Release, Vec2, StructuralSystem, FEMResult, Scheibe, Constraint, DynamicAnalysisResult } from '~/types/model';
 import type { AnalysisInteractionState, EditorInteractionState, ToolType, ViewportState } from '~/types/app';
 
 // --- SHARED DOMAIN ---
 export type AppMode = 'EDITOR' | 'ANALYSIS' | 'MODELS';
-export type AnalysisViewMode = 'KINEMATIC' | 'SIMPLIFIED' | 'SOLUTION';
+export type AnalysisViewMode = 'KINEMATIC' | 'SIMPLIFIED' | 'SOLUTION' | 'DYNAMIC';;
 export type ModelViewMode = 'TRAINING' | 'DATASETS';
 
 // --- EDITOR DOMAIN ---
@@ -11,24 +11,29 @@ export interface EditorState {
     nodes: Node[];
     members: Member[];
     loads: Load[];
-    scheiben: Scheibe[]
+    scheiben: Scheibe[];
+    constraints: Constraint[];
     viewport: ViewportState;
     interaction: EditorInteractionState;
 }
 
+// EditorActions interface
 export interface EditorActions {
     addNode: (pos: Vec2, supports?: Partial<Node['supports']>) => string;
     addMember: (startNodeId: string, endNodeId: string) => void;
     addHingeAtNode: (nodeId: string, releases: Partial<Release>) => void;
     addLoad: (data: Load) => void;
     addScheibe: (data: Omit<Scheibe, 'id'>) => string;
+    addConstraint: (constraint: Constraint) => void;
     removeNode: (id: string) => void;
     removeScheibe: (id: string) => void;
-    selectObject: (id: string | null, type: 'node' | 'member' | 'load' | null) => void;
+    removeConstraint: (id: string) => void;
+    selectObject: (id: string | null, type: 'node' | 'member' | 'load' | 'scheibe' | 'constraint' | null) => void;
     updateNode: (id: string, data: Partial<Node>) => void;
     updateMember: (id: string, data: Partial<Member>) => void;
     updateLoad: (id: string, data: Partial<Load>) => void;
     updateScheibe: (id: string, data: Partial<Scheibe>) => void;
+    updateConstraint: (id: string, data: Partial<Constraint>) => void;
     setTool: (tool: ToolType) => void;
     setViewport: (view: Partial<ViewportState>) => void;
     setInteraction: (inter: Partial<EditorInteractionState>) => void;
@@ -36,6 +41,7 @@ export interface EditorActions {
     loadStructuralSystem: (system: StructuralSystem) => void;
     exportStructuralSystem: () => StructuralSystem;
 }
+
 
 // --- ANALYSIS DOMAIN ---
 export interface AnalysisSession {
@@ -46,6 +52,7 @@ export interface AnalysisSession {
     kinematicResult: KinematicResult | null;
     simplifyResult: StructuralSystem | null;
     solutionResult: FEMResult | null;
+    dynamicResult: DynamicAnalysisResult | null;
 }
 
 export interface AnalysisState {
@@ -61,6 +68,7 @@ export interface AnalysisActions {
     setKinematicResult: (result: KinematicResult | null) => void;
     setSimplifyResult: (result: StructuralSystem | null) => void;
     setSolutionResult: (result: FEMResult | null) => void;
+    setDynamicResult: (result: DynamicAnalysisResult | null) => void;
 }
 
 // --- DATASET & MODEL DOMAIN ---

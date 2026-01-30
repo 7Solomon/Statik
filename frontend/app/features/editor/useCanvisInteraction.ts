@@ -7,6 +7,7 @@ import { MemberInteractionHandler } from './interaction/MemberInteractionHandler
 import { NodeInteractionHandler } from './interaction/NodeInteractionHandler';
 import { ScheibeInteractionHandler } from './interaction/ScheibenInteractionHandler';
 import { SelectInteractionHandler } from './interaction/SelectInteractionHandler';
+import { ConstraintInteractionHandler } from './interaction/ConstraintInteractionHandler';
 
 
 export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
@@ -29,6 +30,7 @@ export const useCanvasInteraction = (canvasRef: React.RefObject<HTMLCanvasElemen
         hinge: new HingeInteractionHandler(context),
         load: new LoadInteractionHandler(context),
         scheibe: new ScheibeInteractionHandler(context),
+        constraint: new ConstraintInteractionHandler(context),
         select: new SelectInteractionHandler(context)
     };
 

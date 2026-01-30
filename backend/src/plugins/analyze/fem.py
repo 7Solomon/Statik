@@ -88,8 +88,8 @@ def calculate_complex_fem(system: StructuralSystem) -> FEMResult:
     #  Apply Supports
     for node in system.nodes:
         dofs = dof_map[node.id]
-        if node.supports.fix_x: apply_support(K_global, F_global, dofs[0])
-        if node.supports.fix_y: apply_support(K_global, F_global, dofs[1])
+        if node.supports.fix_n: apply_support(K_global, F_global, dofs[0])
+        if node.supports.fix_v: apply_support(K_global, F_global, dofs[1])
         if node.supports.fix_m: apply_support(K_global, F_global, dofs[2])
 
     #Solve

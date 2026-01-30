@@ -19,8 +19,8 @@ export interface Node {
   // Boundary Conditions (Supports)
   // True = Fixed (Reaction force exists), False = Free
   supports: {
-    fixX: SupportValue;
-    fixY: SupportValue;
+    fixN: SupportValue;
+    fixV: SupportValue;
     fixM: SupportValue; // Fixed rotation (Moment clamp)
   };
 
@@ -122,6 +122,46 @@ export interface MemberDistLoad extends BaseLoad {
 export type Load = NodeLoad | MemberPointLoad | MemberDistLoad;
 
 
+////////////////////////////////////////////////////////////
+////////     LINKS / constraints ka was besser ist    ///////
+////////////////////////////////////////////////////////////
+
+export type Constraint = SpringConstraint | DamperConstraint | CableConstraint;
+
+interface BaseConstraint {
+  id: string;
+  startNodeId: string;
+  endNodeId: string;
+  rotation?: number;
+}
+
+export interface SpringConstraint extends BaseConstraint {
+  type: 'SPRING';
+  k: number;
+  preload?: number;
+}
+
+export interface DamperConstraint extends BaseConstraint {
+  type: 'DAMPER';
+  c: number;
+  k?: number;
+}
+
+export interface CableConstraint extends BaseConstraint {
+  type: 'CABLE';
+  EA: number;
+  prestress?: number;
+  weightPerLength?: number;
+}
+
+
+
+/////////////////////////////
+/////////////////////////////
+/////////////////////////////
+
+
+
 export interface KinematicMode {
   index: number;
   node_velocities: Record<string, number[]>;
@@ -135,6 +175,7 @@ export interface StructuralSystem {
   members: Member[];
   loads: any[];
   scheiben: Scheibe[];
+  constraints: Constraint[];
 }
 
 
@@ -175,4 +216,33 @@ export interface FEMResult {
   displacements?: Record<string, [number, number, number]>;
   reactions?: Record<string, [number, number, number]>;
   memberResults?: Record<string, MemberResult>;
+}
+
+
+
+//////////////////////////////////////
+
+export interface ModalResult {
+  frequency: number;
+  period: number;
+  modeShape: Record<string, number[]>; // node_id -> [u, v, theta]
+}
+
+export interface TimeStepResult {
+  time: number;
+  displacements: Record<string, number[]>; // node_id -> [u, v, theta]
+  velocities: Record<string, number[]>;
+  accelerations: Record<string, number[]>;
+  kineticEnergy: number;
+  potentialEnergy: number;
+  dissipatedEnergy: number;
+  total_energy: number;
+}
+export interface DynamicAnalysisResult {
+  success: boolean;
+  message: string;
+  naturalFrequencies: ModalResult[];
+  timeHistory: TimeStepResult[];
+  isStable: boolean;
+  criticalDampingRatio: number;
 }

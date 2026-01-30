@@ -69,7 +69,6 @@ def build_adjacency_map(nodes: List[Node], members: List[Member]) -> Dict[str, L
         if m.start_node_id in adj: adj[m.start_node_id].append(m.id)
         if m.end_node_id in adj: adj[m.end_node_id].append(m.id)
     return adj
-
 def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
     """
     Iteratively removes statically determinate 'leaves' (cantilevers) from the system.
@@ -94,8 +93,15 @@ def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
             for conn in scheibe.connections:
                 if conn.node_id in scheibe_connections:
                     scheibe_connections[conn.node_id].append(scheibe)
+
+        # Build Constraint map: {node_id: bool} (Is this node part of a constraint?)
+        constraint_connections = {n.id: False for n in system.nodes}
+        if system.constraints:
+            for c in system.constraints:
+                constraint_connections[c.start_node_id] = True
+                constraint_connections[c.end_node_id] = True
         
-        # 2. Find candidate nodes (Degree 1, No Support, Not in Scheibe)
+        # 2. Find candidate nodes (Degree 1, No Support, Not in Scheibe, Not in Constraint)
         nodes_to_prune = []
         for n_id, connected_m_ids in adjacency.items():
             if len(connected_m_ids) == 1:
@@ -104,71 +110,61 @@ def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
                 # Check if it has any fixity
                 has_support = node.supports.fix_x or node.supports.fix_y or node.supports.fix_m
                 
-                # Check if connected to any Scheibe (Scheiben act as constraints)
+                # Check if connected to any Scheibe
                 connected_to_scheibe = len(scheibe_connections.get(n_id, [])) > 0
+
+                # Check if connected to any Constraint (Spring/Damper/Cable)
+                connected_to_constraint = constraint_connections.get(n_id, False)
                 
-                # Only prune if: no support AND not in a Scheibe
-                if not has_support and not connected_to_scheibe:
+                # Only prune if: no support, not in Scheibe, AND not in Constraint
+                if not has_support and not connected_to_scheibe and not connected_to_constraint:
                     nodes_to_prune.append(n_id)
 
         # 3. Process Pruning
         for tip_node_id in nodes_to_prune:
+            # ... (Rest of logic remains identical) ...
             # --- A. Identify Geometry ---
             member_id = adjacency[tip_node_id][0]
             member = member_map[member_id]
             
-            # Identify Root
             if member.start_node_id == tip_node_id:
                 root_node = node_map[member.end_node_id]
             else:
                 root_node = node_map[member.start_node_id]
             
             # --- B. Transfer Forces ---
-            F_tip = get_node_loads_vector(system, tip_node_id)  # [Fx, Fy, M]
+            F_tip = get_node_loads_vector(system, tip_node_id)
             
             tip_node = node_map[tip_node_id]
-            r = tip_node.coordinates - root_node.coordinates  # Vector from Root to Tip
+            r = tip_node.coordinates - root_node.coordinates
             
             F_root_x = F_tip[0]
             F_root_y = F_tip[1]
-            
-            # Moment Transfer: M_root = M_tip + (r x F)
             M_transport = r[0] * F_tip[1] - r[1] * F_tip[0]
             M_root = F_tip[2] + M_transport
             
             add_equivalent_load(system, root_node.id, np.array([F_root_x, F_root_y, M_root]))
             
             # --- C. Delete Elements ---
-            # Remove Member
             system.members = [m for m in system.members if m.id != member_id]
-            
-            # Remove Node
             system.nodes = [n for n in system.nodes if n.id != tip_node_id]
             
-            # Remove Loads on the deleted Tip Node
             system.loads = [
                 l for l in system.loads 
                 if not (l.scope == 'NODE' and l.node_id == tip_node_id)
             ]
             
-            # Remove Scheibe connections to deleted node (shouldn't happen, but be safe)
+            # Clean scheibe connections
             for scheibe in system.scheiben:
                 scheibe.connections = [
                     conn for conn in scheibe.connections 
                     if conn.node_id != tip_node_id
                 ]
             
-            # Flag to run another pass (chains of members)
-            changed = True
             
-            # Break inner loop to rebuild maps safely
+            changed = True
             break
     
-    # Optional: Remove empty Scheiben (no connections left)
-    system.scheiben = [
-        s for s in system.scheiben 
-        if len(s.connections) > 0
-    ]
+    system.scheiben = [s for s in system.scheiben if len(s.connections) > 0]
     
-    print(system)
     return system

@@ -42,13 +42,13 @@ class ImageNode:
     def _convert_support_type(self) -> Supports:
         """Map SupportType enum to Supports constraints."""
         mapping = {
-            SupportType.FREIES_ENDE: Supports(fix_x=False, fix_y=False, fix_m=False),
-            SupportType.FESTLAGER: Supports(fix_x=True, fix_y=True, fix_m=False),
-            SupportType.LOSLAGER: Supports(fix_x=False, fix_y=True, fix_m=False),
-            SupportType.FESTE_EINSPANNUNG: Supports(fix_x=True, fix_y=True, fix_m=True),
-            SupportType.GLEITLAGER: Supports(fix_x=True, fix_y=False, fix_m=False),
-            SupportType.FEDER: Supports(fix_x=False, fix_y=10000.0, fix_m=False),  # Spring stiffness
-            SupportType.TORSIONSFEDER: Supports(fix_x=False, fix_y=False, fix_m=5000.0),
+            SupportType.FREIES_ENDE: Supports(fix_n=False, fix_v=False, fix_m=False),
+            SupportType.FESTLAGER: Supports(fix_n=True, fix_v=True, fix_m=False),
+            SupportType.LOSLAGER: Supports(fix_n=False, fix_v=True, fix_m=False),
+            SupportType.FESTE_EINSPANNUNG: Supports(fix_n=True, fix_v=True, fix_m=True),
+            SupportType.GLEITLAGER: Supports(fix_n=True, fix_v=False, fix_m=False),
+            SupportType.FEDER: Supports(fix_n=False, fix_v=10000.0, fix_m=False),  # Spring stiffness
+            SupportType.TORSIONSFEDER: Supports(fix_n=False, fix_v=False, fix_m=5000.0),
         }
         return mapping.get(self.support_type, Supports())
 

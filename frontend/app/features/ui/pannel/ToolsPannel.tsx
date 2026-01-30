@@ -3,7 +3,7 @@ import { MousePointer2, Circle, Route, Square, ArrowDown, RotateCw, Waves } from
 import { useStore } from '~/store/useStore';
 import supportLibraryRaw from '~/assets/support_symbols.json';
 import hingeLibraryRaw from '~/assets/hinge_symbols.json';
-import type { ToolType, SupportType, HingeType, LoadType, ScheibeShape } from '~/types/app';
+import type { ToolType, SupportType, HingeType, LoadType, ScheibeShape, ConstraintType } from '~/types/app';
 
 // Merge symbol libraries
 const UI_SYMBOL_LIBRARY = {
@@ -15,7 +15,7 @@ const UI_SYMBOL_LIBRARY = {
 type ToolItemConfig = {
     label: string;
     tool: ToolType;
-    subType: SupportType | HingeType | LoadType | ScheibeShape | null;
+    subType: SupportType | HingeType | LoadType | ScheibeShape | ConstraintType | null;
     icon?: React.ReactNode;
     symbolKey?: string;
     description?: string;
@@ -25,6 +25,31 @@ type ToolGroupConfig = {
     title: string;
     items: ToolItemConfig[];
 };
+
+// Custom SVG icons for constraint types
+const DamperIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+        <rect x="6" y="4" width="8" height="12" strokeWidth="1.5" rx="1" />
+        <line x1="10" y1="2" x2="10" y2="4" strokeWidth="1.5" />
+        <line x1="10" y1="16" x2="10" y2="18" strokeWidth="1.5" />
+        <line x1="8" y1="10" x2="12" y2="10" strokeWidth="1.5" />
+    </svg>
+);
+
+const CableIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+        <path d="M 3,8 Q 10,12 17,8" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+        <circle cx="3" cy="8" r="1.5" fill="currentColor" />
+        <circle cx="17" cy="8" r="1.5" fill="currentColor" />
+    </svg>
+);
+
+const SpringIconCustom = () => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+        <path d="M 3,10 L 6,10 L 7,6 L 9,14 L 11,6 L 13,14 L 14,10 L 17,10"
+            strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+);
 
 // --- Configuration ---
 const TOOL_GROUPS: ToolGroupConfig[] = [
@@ -68,7 +93,6 @@ const TOOL_GROUPS: ToolGroupConfig[] = [
             { label: 'Loslager', tool: 'node', subType: 'loslager', symbolKey: 'LOSLAGER' },
             { label: 'Einspannung', tool: 'node', subType: 'feste_einspannung', symbolKey: 'FESTE_EINSPANNUNG' },
             { label: 'Gleitlager', tool: 'node', subType: 'gleitlager', symbolKey: 'GLEITLAGER' },
-            // { label: 'Feder', tool: 'node', subType: 'feder', symbolKey: 'FEDER' },
         ]
     },
     {
@@ -106,6 +130,32 @@ const TOOL_GROUPS: ToolGroupConfig[] = [
             },
         ]
     },
+    {
+        title: "Constraints",
+        items: [
+            {
+                label: 'Spring',
+                tool: 'constraint',
+                subType: 'spring',
+                icon: <SpringIconCustom />,
+                description: "Connect nodes with spring"
+            },
+            {
+                label: 'Damper',
+                tool: 'constraint',
+                subType: 'damper',
+                icon: <DamperIcon />,
+                description: "Connect nodes with damper"
+            },
+            {
+                label: 'Cable',
+                tool: 'constraint',
+                subType: 'cable',
+                icon: <CableIcon />,
+                description: "Tension-only cable element"
+            },
+        ]
+    }
 ];
 
 export const ToolsPanel = () => {

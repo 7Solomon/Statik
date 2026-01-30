@@ -31,7 +31,7 @@ export const createAnalysisSlice: StateCreator<
         actions: {
             // Initialize a new analysis session
             startAnalysis: (system: StructuralSystem) => {
-
+                console.log(system)
                 set((state) => ({
                     analysis: {
                         ...state.analysis,
@@ -43,6 +43,7 @@ export const createAnalysisSlice: StateCreator<
                             kinematicResult: null,
                             simplifyResult: null,
                             solutionResult: null,
+                            dynamicResult: null,
                         }
                     },
                     // Automatically switch app mode when analysis starts
@@ -137,7 +138,22 @@ export const createAnalysisSlice: StateCreator<
                         }
                     };
                 });
-            }
+            },
+
+            setDynamicResult: (result) => {
+                set((state) => {
+                    if (!state.analysis.analysisSession) return state;
+                    return {
+                        analysis: {
+                            ...state.analysis,
+                            analysisSession: {
+                                ...state.analysis.analysisSession,
+                                dynamicResult: result
+                            }
+                        }
+                    };
+                });
+            },
         }
     }
 });

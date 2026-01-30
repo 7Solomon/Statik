@@ -3,10 +3,10 @@ import type { ScheibeConnection } from "~/types/model";
 import * as Geo from '../../../lib/geometry';
 
 const SUPPORT_CONFIGS: Record<string, any> = {
-    'festlager': { fixX: true, fixY: true, fixM: false },
-    'loslager': { fixX: false, fixY: true, fixM: false },
-    'feste_einspannung': { fixX: true, fixY: true, fixM: true },
-    'gleitlager': { fixX: true, fixY: false, fixM: true },
+    'festlager': { fixN: true, fixV: true, fixM: false },
+    'loslager': { fixN: false, fixV: true, fixM: false },
+    'feste_einspannung': { fixN: true, fixV: true, fixM: true },
+    'gleitlager': { fixN: true, fixV: false, fixM: true },
 };
 
 export class NodeInteractionHandler extends BaseInteractionHandler {

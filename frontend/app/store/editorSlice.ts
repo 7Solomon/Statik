@@ -1,9 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { AppStore, EditorActions, EditorState } from './types';
 import type { StateCreator } from 'zustand';
-import type { Node, Member, Load, Scheibe } from '~/types/model';
+import type { Node, Member, Load, Scheibe, Constraint } from '~/types/model';
 import type { ViewportState } from '~/types/app';
-import { DEFAULT_INTERACTION, DEFAULT_MEMBER_PROPS, DEFAULT_RELEASES, DEFAULT_VIEWPORT, sanitizeLoad, sanitizeMember, sanitizeNode, sanitizeScheibe } from '~/utils/sanitize_system';
+import { DEFAULT_INTERACTION, DEFAULT_MEMBER_PROPS, DEFAULT_RELEASES, DEFAULT_VIEWPORT, sanitizeConstraint, sanitizeLoad, sanitizeMember, sanitizeNode, sanitizeScheibe } from '~/utils/sanitize_system';
 
 
 
@@ -19,6 +19,7 @@ export const createEditorSlice: StateCreator<
         members: [],
         loads: [],
         scheiben: [],
+        constraints: [],
         viewport: DEFAULT_VIEWPORT,
         interaction: DEFAULT_INTERACTION,
 
@@ -29,8 +30,8 @@ export const createEditorSlice: StateCreator<
                     position: pos,
                     rotation: 0,
                     supports: {
-                        fixX: false,
-                        fixY: false,
+                        fixN: false,
+                        fixV: false,
                         fixM: false,
                         ...supports
                     },
@@ -126,25 +127,35 @@ export const createEditorSlice: StateCreator<
                 return newScheibe.id;
             },
 
+            addConstraint: (constraint) => {
+                set((state) => ({
+                    editor: {
+                        ...state.editor,
+                        constraints: [...state.editor.constraints, constraint]
+                    }
+                }));
+            },
 
             removeNode: (id) => {
                 set((state) => {
-                    // Extract from nested state
-                    const { members, nodes, loads } = state.editor;
+                    const { members, nodes, loads, constraints } = state.editor;
 
                     const connectedMembers = members.filter(m => m.startNodeId === id || m.endNodeId === id);
                     const connectedMemberIds = connectedMembers.map(m => m.id);
 
                     return {
                         editor: {
-                            ...state.editor, // Preserve actions & viewport
+                            ...state.editor,
                             nodes: nodes.filter(n => n.id !== id),
                             members: members.filter(m => !connectedMemberIds.includes(m.id)),
                             loads: loads.filter(l => {
                                 if (l.scope === 'NODE' && l.nodeId === id) return false;
                                 if (l.scope === 'MEMBER' && connectedMemberIds.includes(l.memberId)) return false;
                                 return true;
-                            })
+                            }),
+                            constraints: constraints.filter(c =>
+                                c.startNodeId !== id && c.endNodeId !== id
+                            ) // NEW: Remove constraints connected to this node
                         }
                     };
                 });
@@ -158,6 +169,16 @@ export const createEditorSlice: StateCreator<
                     }
                 }));
             },
+
+            removeConstraint: (id) => {
+                set((state) => ({
+                    editor: {
+                        ...state.editor,
+                        constraints: state.editor.constraints.filter(c => c.id !== id)
+                    }
+                }));
+            },
+
 
             setTool: (tool) => {
                 set((state) => ({
@@ -246,6 +267,17 @@ export const createEditorSlice: StateCreator<
                     }
                 }));
             },
+            updateConstraint: (id, data) => {
+                set((state) => ({
+                    editor: {
+                        ...state.editor,
+                        constraints: state.editor.constraints.map(c =>
+                            c.id === id ? { ...c, ...data } as Constraint : c
+                        )
+                    }
+                }));
+            },
+
 
             loadStructuralSystem: (system) => {
                 // Sanitize and validate all arrays
@@ -265,6 +297,10 @@ export const createEditorSlice: StateCreator<
                     .map(sanitizeLoad)
                     .filter((l): l is Load => l !== null);
 
+                const sanitizedConstraints = (system.constraints ?? [])
+                    .map(sanitizeConstraint)
+                    .filter((c): c is Constraint => c !== null);
+
                 set((state) => ({
                     editor: {
                         ...state.editor,
@@ -272,23 +308,26 @@ export const createEditorSlice: StateCreator<
                         members: sanitizedMembers,
                         loads: sanitizedLoads,
                         scheiben: sanitizedScheiben,
+                        constraints: sanitizedConstraints,
                         interaction: {
                             ...state.editor.interaction,
                             selectedId: null,
                             selectedType: null,
                             hoveredNodeId: null,
-                            hoveredMemberId: null
+                            hoveredMemberId: null,
+                            hoveredConstraintId: null
                         }
                     }
                 }));
             },
             exportStructuralSystem: () => {
-                const { nodes, members, loads, scheiben } = get().editor;
+                const { nodes, members, loads, scheiben, constraints } = get().editor;
                 return {
                     nodes,
                     members,
                     loads,
-                    scheiben
+                    scheiben,
+                    constraints
                 };
             }
         }

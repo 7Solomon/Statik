@@ -16,6 +16,7 @@ const EditorCanvas: React.FC = () => {
     const members = useStore((state) => state.editor.members);
     const loads = useStore((state) => state.editor.loads)
     const scheiben = useStore((state) => state.editor.scheiben)
+    const constraints = useStore(state => state.editor.constraints);
     const interaction = useStore((state) => state.editor.interaction);
     const viewport = useStore((state) => state.editor.viewport);
     // const actions = useStore((state) => state.editor.actions); // Not strictly needed here becaus ehandled in logic
@@ -50,6 +51,7 @@ const EditorCanvas: React.FC = () => {
                     useStore.getState().editor.members,
                     useStore.getState().editor.loads,
                     useStore.getState().editor.scheiben,
+                    useStore.getState().editor.constraints,
                     useStore.getState().editor.viewport,
                     useStore.getState().editor.interaction
                 );
@@ -96,7 +98,7 @@ const EditorCanvas: React.FC = () => {
         if (!ctx) return;
 
         requestAnimationFrame(() => {
-            Renderer.renderEditor(ctx, canvas, nodes, members, loads, scheiben, viewport, interaction);
+            Renderer.renderEditor(ctx, canvas, nodes, members, loads, scheiben, constraints, viewport, interaction);
         });
 
     }, [nodes, members, viewport, interaction]);

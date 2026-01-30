@@ -45,8 +45,8 @@ export default function Home() {
 
   const startAnalysisWithCurrentState = () => {
     // Always get fresh state from store
-    const { nodes, members, loads, scheiben } = useStore.getState().editor;
-    startAnalysis({ nodes, members, loads, scheiben });
+    const { nodes, members, loads, scheiben, constraints } = useStore.getState().editor;
+    startAnalysis({ nodes, members, loads, scheiben, constraints });
   };
 
   const handleDoubleHingeResolved = () => {

@@ -15,8 +15,8 @@ class Vec2:
 @dataclass
 class Supports:
     # SupportValue = boolean | number (Stiffness)
-    fix_x: Union[bool, float] = False
-    fix_y: Union[bool, float] = False
+    fix_n: Union[bool, float] = False
+    fix_v: Union[bool, float] = False
     fix_m: Union[bool, float] = False
 
 @dataclass
@@ -55,8 +55,8 @@ class Node:
             "position": {"x": self.position.x, "y": self.position.y},
             "rotation": self.rotation,
             "supports": {
-                "fixX": self.supports.fix_x,
-                "fixY": self.supports.fix_y,
+                "fixN": self.supports.fix_n,
+                "fixV": self.supports.fix_v,
                 "fixM": self.supports.fix_m
             }
         }
@@ -216,14 +216,90 @@ class Scheibe:
 
 
 @dataclass
+class SpringConstraint:
+    id: str
+    start_node_id: str
+    end_node_id: str
+    k: float  # Spring stiffness (kN/m)
+    type: Literal['SPRING'] = 'SPRING'  # MOVED AFTER NON-DEFAULTS
+    preload: float = 0.0  # Initial force (kN)
+    rotation: Optional[float] = None
+    
+    def to_dict(self):
+        result = {
+            "id": self.id,
+            "type": self.type,
+            "startNodeId": self.start_node_id,
+            "endNodeId": self.end_node_id,
+            "k": float(self.k),
+            "preload": float(self.preload)
+        }
+        if self.rotation is not None:
+            result["rotation"] = float(self.rotation)
+        return result
+
+@dataclass
+class DamperConstraint:
+    id: str
+    start_node_id: str
+    end_node_id: str
+    c: float  # Damping coefficient (kN·s/m)
+    type: Literal['DAMPER'] = 'DAMPER'  # MOVED AFTER NON-DEFAULTS
+    k: Optional[float] = None  # Optional parallel stiffness
+    rotation: Optional[float] = None
+    
+    def to_dict(self):
+        result = {
+            "id": self.id,
+            "type": self.type,
+            "startNodeId": self.start_node_id,
+            "endNodeId": self.end_node_id,
+            "c": float(self.c)
+        }
+        if self.k is not None:
+            result["k"] = float(self.k)
+        if self.rotation is not None:
+            result["rotation"] = float(self.rotation)
+        return result
+
+@dataclass
+class CableConstraint:
+    id: str
+    start_node_id: str
+    end_node_id: str
+    EA: float  # Axial stiffness (kN)
+    type: Literal['CABLE'] = 'CABLE'
+    prestress: float = 0.0  # Initial tension (kN)
+    weight_per_length: float = 0.0  # Self-weight (kN/m)
+    rotation: Optional[float] = None
+    
+    def to_dict(self):
+        result = {
+            "id": self.id,
+            "type": self.type,
+            "startNodeId": self.start_node_id,
+            "endNodeId": self.end_node_id,
+            "EA": float(self.EA),
+            "prestress": float(self.prestress),
+            "weightPerLength": float(self.weight_per_length)
+        }
+        if self.rotation is not None:
+            result["rotation"] = float(self.rotation)
+        return result
+
+Constraint = Union[SpringConstraint, DamperConstraint, CableConstraint]
+
+
+@dataclass
 class StructuralSystem:
     nodes: List[Node] = field(default_factory=list)
     members: List[Member] = field(default_factory=list)
     loads: List[Load] = field(default_factory=list)
     scheiben: List[Scheibe] = field(default_factory=list)
+    constraints: List[Constraint] = field(default_factory=list) 
 
     @classmethod
-    def create(cls, nodes_data: List[dict], members_data: List[dict], loads_data: List[dict], scheiben_data: List[Dict]) -> 'StructuralSystem':
+    def create(cls, nodes_data: List[dict], members_data: List[dict], loads_data: List[dict], scheiben_data: List[Dict], constraints_data: List[Dict]) -> 'StructuralSystem':
         system = cls()
         node_map = {}
 
@@ -237,8 +313,8 @@ class StructuralSystem:
                 id=str(n_data["id"]),
                 position=Vec2(x=float(pos["x"]), y=float(pos["y"])),
                 supports=Supports(
-                    fix_x=sup.get("fixX", False),
-                    fix_y=sup.get("fixY", False),
+                    fix_n=sup.get("fixN", False),
+                    fix_v=sup.get("fixV", False),
                     fix_m=sup.get("fixM", False)
                 ),
                 rotation=float(n_data.get("rotation", 0.0))
@@ -380,6 +456,52 @@ class StructuralSystem:
             )
             
             system.scheiben.append(scheibe)
+        # 5. Parse Constraints (NEW)
+
+        for c_data in constraints_data:
+            constraint_type = c_data.get("type")
+            start_id = str(c_data["startNodeId"])
+            end_id = str(c_data["endNodeId"])
+            
+            # Validate node references
+            if start_id not in node_map or end_id not in node_map:
+                print(f"Warning: Constraint {c_data['id']} references missing node")
+                continue
+            
+            if constraint_type == "SPRING":
+                constraint = SpringConstraint(
+                    id=str(c_data["id"]),
+                    start_node_id=start_id,
+                    end_node_id=end_id,
+                    k=float(c_data.get("k", 1000)),
+                    preload=float(c_data.get("preload", 0)),
+                    rotation=c_data.get("rotation")
+                )
+            elif constraint_type == "DAMPER":
+                constraint = DamperConstraint(
+                    id=str(c_data["id"]),
+                    start_node_id=start_id,
+                    end_node_id=end_id,
+                    c=float(c_data.get("c", 100)),
+                    k=float(c_data["k"]) if c_data.get("k") is not None else None,
+                    rotation=c_data.get("rotation")
+                )
+            elif constraint_type == "CABLE":
+                constraint = CableConstraint(
+                    id=str(c_data["id"]),
+                    start_node_id=start_id,
+                    end_node_id=end_id,
+                    EA=float(c_data.get("EA", 210000)),
+                    prestress=float(c_data.get("prestress", 0)),
+                    weight_per_length=float(c_data.get("weightPerLength", 0)),
+                    rotation=c_data.get("rotation")
+                )
+            else:
+                print(f"Warning: Unknown constraint type '{constraint_type}'")
+                continue
+            
+            system.constraints.append(constraint)
+
         return system
     
     def to_dict(self):
@@ -387,8 +509,10 @@ class StructuralSystem:
             "nodes": [n.to_dict() for n in self.nodes],
             "members": [m.to_dict() for m in self.members],
             "loads": [l.to_dict() for l in self.loads],
-            "scheiben": [s.to_dict() for s in self.scheiben]
+            "scheiben": [s.to_dict() for s in self.scheiben],
+            "constraints": [c.to_dict() for c in self.constraints]
         }
+    
 @dataclass
 class RigidBody:
     id: int
@@ -516,3 +640,4 @@ class FEMResult:
             "reactions": {k: convert_vec(v) for k, v in self.reactions.items()},
             "memberResults": {k: v.to_dict() for k, v in self.memberResults.items()}
         }
+    

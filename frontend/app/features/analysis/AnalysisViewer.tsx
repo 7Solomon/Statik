@@ -1,8 +1,9 @@
 import { useStore } from "~/store/useStore";
-import { Layers, GitMerge, Zap } from "lucide-react";
+import { Layers, GitMerge, Zap, Activity } from "lucide-react";
 import SimplifiedViewer from "./SimplifiedViewer";
 import KinematicViewer from "./KinematicsViewer";
 import SolutionViewer from "./SolutionViewer";
+import DynamicAnalysisViewer from "./DynamicsViewer/Viewer";
 
 export default function AnalysisViewer() {
     const analysisSession = useStore((s) => s.analysis.analysisSession);
@@ -16,7 +17,6 @@ export default function AnalysisViewer() {
         <div className="flex flex-col w-full h-full">
 
             <div className="flex-none flex justify-center p-2 border-b border-slate-200 bg-white z-10 relative">
-                {/* Removed 'backdrop-blur' because it's now on a solid white background */}
                 <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
                     <TabButton
                         active={viewMode === 'KINEMATIC'}
@@ -38,18 +38,27 @@ export default function AnalysisViewer() {
                         icon={<Zap size={14} />}
                         label="Solution"
                     />
+
+                    {/* NEW TAB: DYNAMIC ANALYSIS */}
+                    <div className="w-px bg-slate-200 my-1"></div>
+                    <TabButton
+                        active={viewMode === 'DYNAMIC'}
+                        onClick={() => setViewMode('DYNAMIC')}
+                        icon={<Activity size={14} />}
+                        label="Dynamics"
+                    />
                 </div>
             </div>
 
-            {/* 3. Render Sub-Viewers - Takes all remaining space (flex-1) */}
+            {/* 3. Render Sub-Viewers */}
             <div className="flex-1 relative overflow-hidden bg-slate-50">
                 {viewMode === 'KINEMATIC' && <KinematicViewer />}
                 {viewMode === 'SIMPLIFIED' && <SimplifiedViewer />}
                 {viewMode === 'SOLUTION' && <SolutionViewer />}
+                {viewMode === 'DYNAMIC' && <DynamicAnalysisViewer />}
             </div>
         </div>
     );
-
 }
 
 function TabButton({ active, onClick, icon, label }: any) {

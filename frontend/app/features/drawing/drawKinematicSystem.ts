@@ -1,3 +1,4 @@
+import { ConstraintRenderer } from './ConstraintRenderer';
 import { NodeRenderer } from './NodeRenderer';
 import { RenderUtils } from './RenderUtils';
 import { ScheibenRenderer } from './ScheibenRenderer';  // ← ADD THIS IMPORT
@@ -20,8 +21,8 @@ export function drawStructuralSystem(
     system: StructuralSystem,
     view: ViewportState,
     nodePositions: Node[],
-    highlightRigidBodies: boolean = false,  // ← NEW PARAMETER
-    rigidBodyIds: Set<string> = new Set()   // ← NEW PARAMETER
+    highlightRigidBodies: boolean = false,
+    rigidBodyIds: Set<string> = new Set()
 ) {
     // 0. Draw Scheiben FIRST (as background layer)
     system.scheiben?.forEach(scheibe => {
@@ -57,6 +58,16 @@ export function drawStructuralSystem(
                 nodeStates.get(endNode.id)
             );
         }
+    });
+
+
+    // Draw Constraints
+    system.constraints?.forEach(constraint => {
+        //const isHovered = interaction.hoveredConstraintId === constraint.id;
+        //const isSelected = interaction.selectedType === 'constraint'
+        //    && interaction.selectedId === constraint.id;
+
+        ConstraintRenderer.draw(ctx, constraint, nodePositions, view, false, false);  // HERE ADD INTERACTOIN DONT KNOw HOW 
     });
 
     // 4. Draw Nodes & Supports

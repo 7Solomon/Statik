@@ -161,6 +161,23 @@ export const createEditorSlice: StateCreator<
                 });
             },
 
+            removeMember: (id) => {
+                set((state) => {
+                    const { members, loads } = state.editor;
+
+                    return {
+                        editor: {
+                            ...state.editor,
+                            members: members.filter(m => m.id !== id),
+                            loads: loads.filter(l => {
+                                if (l.scope === 'MEMBER' && l.memberId === id) return false;
+                                return true;
+                            })
+                        }
+                    };
+                });
+            },
+
             removeScheibe: (id) => {
                 set((state) => ({
                     editor: {

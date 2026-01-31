@@ -1,3 +1,4 @@
+import type { Scheibe } from '~/types/model';
 import * as Coords from '../../../lib/coordinates';
 import * as Geo from '../../../lib/geometry';
 import { BaseInteractionHandler, type MouseEventData } from './BaseInteractionHandler';
@@ -19,6 +20,68 @@ export class SelectInteractionHandler extends BaseInteractionHandler {
             }
         }
         return null;
+    }
+
+    private getConstraintAtPosition(rawPos: { x: number, y: number }) {
+        const { state, viewport } = this.context;
+        // Constraints might be thinner visually, so maybe a tighter threshold?
+        const clickThreshold = 10 / viewport.zoom;
+
+        // Assuming state.constraints exists now
+        for (const c of state.constraints) {
+            const start = state.nodes.find(n => n.id === c.startNodeId);
+            const end = state.nodes.find(n => n.id === c.endNodeId);
+
+            if (start && end) {
+                const proj = Geo.projectPointToSegment(rawPos, start.position, end.position);
+                if (proj.dist < clickThreshold) {
+                    return c;
+                }
+            }
+        }
+        return null;
+    }
+
+    private getScheibeAtPosition(rawPos: { x: number, y: number }) {
+        const { state } = this.context;
+        for (const s of state.scheiben) {
+            if (this.isPointInScheibe(rawPos, s)) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    // Helper: Math for Rotated Rectangle Hit Test
+    private isPointInScheibe(point: { x: number, y: number }, scheibe: Scheibe): boolean {
+        // 1. Calculate Center and Dimensions (Local Axis Aligned)
+        const c1 = scheibe.corner1;
+        const c2 = scheibe.corner2;
+
+        const centerX = (c1.x + c2.x) / 2;
+        const centerY = (c1.y + c2.y) / 2;
+
+        const width = Math.abs(c2.x - c1.x);
+        const height = Math.abs(c2.y - c1.y);
+
+        // 2. Translate point so Scheibe center is at (0,0)
+        const dx = point.x - centerX;
+        const dy = point.y - centerY;
+
+        // 3. Rotate point INVERSE to the Scheibe's rotation to align it with axes
+        // Assuming scheibe.rotation is in degrees
+        const rad = -scheibe.rotation * (Math.PI / 180);
+        const localX = dx * Math.cos(rad) - dy * Math.sin(rad);
+        const localY = dx * Math.sin(rad) + dy * Math.cos(rad);
+
+        // 4. AABB Check (Axis-Aligned Bounding Box)
+        const halfW = width / 2;
+        const halfH = height / 2;
+
+        return (
+            localX >= -halfW && localX <= halfW &&
+            localY >= -halfH && localY <= halfH
+        );
     }
 
     private getLoadAtPosition = (rawPos: { x: number, y: number }) => {
@@ -112,24 +175,41 @@ export class SelectInteractionHandler extends BaseInteractionHandler {
         const { actions } = this.context;
         const { raw, snappedNodeId } = data;
 
-        // Priority: Node > Load > Member
+        // 1. Nodes (Highest Priority)
         if (snappedNodeId) {
             actions.selectObject(snappedNodeId, 'node');
             return;
         }
 
+        // 2. Loads
         const clickedLoad = this.getLoadAtPosition(raw);
         if (clickedLoad) {
             actions.selectObject(clickedLoad.id, 'load');
             return;
         }
 
-        const hit = this.getMemberAtPosition(raw);
-        if (hit) {
-            actions.selectObject(hit.member.id, 'member');
-        } else {
-            actions.selectObject(null, null);
+        // 3. Members OR Constraints (Lines)
+        const hitMember = this.getMemberAtPosition(raw);
+        if (hitMember) {
+            actions.selectObject(hitMember.member.id, 'member');
+            return;
         }
+
+        const hitConstraint = this.getConstraintAtPosition(raw);
+        if (hitConstraint) {
+            actions.selectObject(hitConstraint.id, 'constraint');
+            return;
+        }
+
+        // 4. Scheiben
+        const hitScheibe = this.getScheibeAtPosition(raw);
+        if (hitScheibe) {
+            actions.selectObject(hitScheibe.id, 'scheibe');
+            return;
+        }
+
+        // 5. Deselect
+        actions.selectObject(null, null);
     }
 
     handleMouseMove(e: React.MouseEvent, data: MouseEventData): void {

@@ -28,6 +28,7 @@ export interface EditorActions {
     removeNode: (id: string) => void;
     removeScheibe: (id: string) => void;
     removeConstraint: (id: string) => void;
+    removeMember: (id: string) => void;
     selectObject: (id: string | null, type: 'node' | 'member' | 'load' | 'scheibe' | 'constraint' | null) => void;
     updateNode: (id: string, data: Partial<Node>) => void;
     updateMember: (id: string, data: Partial<Member>) => void;

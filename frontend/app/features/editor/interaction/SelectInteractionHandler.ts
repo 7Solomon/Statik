@@ -89,8 +89,10 @@ export class SelectInteractionHandler extends BaseInteractionHandler {
         const mouseScreen = Coords.worldToScreen(rawPos.x, rawPos.y, viewport);
 
         for (const load of state.loads) {
-            // 1. POINT LOADS (Node or Member)
-            if (load.type === 'POINT' || load.type === 'MOMENT') {
+
+            const isPointLike = ['POINT', 'MOMENT', 'DYNAMIC_POINT', 'DYNAMIC_FORCE', 'DYNAMIC_MOMENT'].includes(load.type);
+
+            if (isPointLike) {
                 let anchorWorld: { x: number, y: number } | null = null;
 
                 if (load.scope === 'NODE') {
@@ -113,23 +115,32 @@ export class SelectInteractionHandler extends BaseInteractionHandler {
                 if (anchorWorld) {
                     const anchorScreen = Coords.worldToScreen(anchorWorld.x, anchorWorld.y, viewport);
 
-                    if (load.type === 'MOMENT') {
+                    // MOMENT HIT TEST (Circle)
+                    if (load.type.includes('MOMENT')) {
                         const dist = Math.hypot(mouseScreen.x - anchorScreen.x, mouseScreen.y - anchorScreen.y);
-                        if (dist < 25) return load;
-                    } else {
-                        const angleRad = (load.angle ?? 90) * Math.PI / 180;
+                        if (dist < 25) return load; // Radius matches renderer
+                    }
+                    // FORCE HIT TEST (Arrow)
+                    else {
+                        const angleVal = (load as any).angle ?? (load.type.includes('DYNAMIC') ? 0 : -90);
+                        const angleRad = angleVal * Math.PI / 180;
+
                         const tip = anchorScreen;
+
                         const tail = {
                             x: tip.x - Math.cos(angleRad) * 40,
-                            y: tip.y - Math.sin(angleRad) * 40
+                            y: tip.y + Math.sin(angleRad) * 40  // PLUS sine because Screen Y is inverted
                         };
+
                         const proj = Geo.projectPointToSegment(mouseScreen, tail, tip);
-                        if (proj.dist < 10) return load;
+
+                        // Increase buffer slightly to make selection easier
+                        if (proj.dist < 12) return load;
                     }
                 }
             }
 
-            // 2. DISTRIBUTED LOADS
+            // DISTRIBUTED LOADS (Unchanged)
             else if (load.scope === 'MEMBER' && load.type === 'DISTRIBUTED') {
                 const m = state.members.find(mem => mem.id === load.memberId);
                 if (!m) continue;
@@ -157,10 +168,7 @@ export class SelectInteractionHandler extends BaseInteractionHandler {
                         const signedDist = crossProduct / len;
                         const absDist = Math.abs(signedDist);
 
-                        const MEMBER_THICKNESS_BUFFER = 12;
-                        const LOAD_HEIGHT_LIMIT = 50;
-
-                        if (absDist > MEMBER_THICKNESS_BUFFER && absDist < LOAD_HEIGHT_LIMIT) {
+                        if (absDist > 12 && absDist < 50) {
                             return load;
                         }
                     }

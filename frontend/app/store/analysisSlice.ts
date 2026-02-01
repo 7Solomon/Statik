@@ -31,7 +31,8 @@ export const createAnalysisSlice: StateCreator<
         actions: {
             // Initialize a new analysis session
             startAnalysis: (system: StructuralSystem) => {
-                console.log(system)
+                console.log("ANALYZE");
+                console.log(system);
                 set((state) => ({
                     analysis: {
                         ...state.analysis,
@@ -94,7 +95,6 @@ export const createAnalysisSlice: StateCreator<
             setKinematicResult: (result) => {
                 set((state) => {
                     if (!state.analysis.analysisSession) return state;
-                    console.log(result)
                     return {
                         analysis: {
                             ...state.analysis,
@@ -143,6 +143,7 @@ export const createAnalysisSlice: StateCreator<
             setDynamicResult: (result) => {
                 set((state) => {
                     if (!state.analysis.analysisSession) return state;
+                    console.log(result)
                     return {
                         analysis: {
                             ...state.analysis,

@@ -3,13 +3,17 @@ import { useStore } from "~/store/useStore";
 import { Share2, Wand2, RotateCw, RefreshCw } from "lucide-react";
 import AnalysisCanvas from "./AnalysisCanvas";
 import { Renderer } from "../drawing/Renderer";
-import { RenderUtils } from "../drawing/RenderUtils";
 import type { AnalysisInteractionState } from "~/types/app";
+import { useSystemValidator } from "~/utils/check_analysis_system";
+import type { StructuralSystem } from "~/types/model";
+import { SystemValidationModal } from "../modals/SystemValidationModal";
 
 export default function SimplifiedViewer() {
     const session = useStore(s => s.analysis.analysisSession);
     const simplifyResult = session?.simplifyResult;
     const system = session?.system;
+
+    const { checkSystem, validatorProps } = useSystemValidator();
 
     // Actions
     const setSimplifyResult = useStore(s => s.analysis.actions.setSimplifyResult);
@@ -19,6 +23,13 @@ export default function SimplifiedViewer() {
     // --- API CALL ---
     const handleSimplify = async () => {
         if (!system || system.nodes.length === 0) return;
+
+        const isValid = checkSystem(
+            system as StructuralSystem,
+            ['DYNAMIC_LOADS', 'CONSTRAINTS']  // FORBIDDEN
+        );
+
+        if (!isValid) return;
         setIsLoading(true);
         try {
             const payload = {
@@ -99,6 +110,8 @@ export default function SimplifiedViewer() {
                             {isLoading ? <RotateCw className="animate-spin" size={18} /> : <Wand2 size={18} />}
                             <span>{isLoading ? 'Processing...' : 'Simplify System'}</span>
                         </button>
+                        <SystemValidationModal {...validatorProps} />
+
                     </div>
                 </div>
             </AnalysisCanvas>
@@ -126,6 +139,8 @@ export default function SimplifiedViewer() {
                 >
                     <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
                 </button>
+
+                <SystemValidationModal {...validatorProps} />
             </div>
         </AnalysisCanvas>
     );

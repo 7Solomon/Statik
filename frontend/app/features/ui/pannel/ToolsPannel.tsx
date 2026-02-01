@@ -1,5 +1,5 @@
 import React from 'react';
-import { MousePointer2, Circle, Route, Square, ArrowDown, RotateCw, Waves } from 'lucide-react';
+import { MousePointer2, Circle, Route, Square, ArrowDown, RotateCw, Waves, Radio, Activity } from 'lucide-react';
 import { useStore } from '~/store/useStore';
 import supportLibraryRaw from '~/assets/support_symbols.json';
 import hingeLibraryRaw from '~/assets/hinge_symbols.json';
@@ -105,28 +105,47 @@ const TOOL_GROUPS: ToolGroupConfig[] = [
         ]
     },
     {
-        title: "Loads",
+        title: "Static Loads",
         items: [
             {
                 label: 'Point Load',
                 tool: 'load',
                 subType: 'point',
                 icon: <ArrowDown size={20} />,
-                description: "Force on a Node (10kN)"
+                description: "Static Force (kN)"
             },
             {
                 label: 'Moment',
                 tool: 'load',
                 subType: 'moment',
                 icon: <RotateCw size={20} />,
-                description: "Moment on a Node (10kNm)"
+                description: "Static Moment (kNm)"
             },
             {
                 label: 'Dist. Load',
                 tool: 'load',
                 subType: 'distributed',
                 icon: <Waves size={20} />,
-                description: "Line load on Member (5kN/m)"
+                description: "Line load (kN/m)"
+            },
+        ]
+    },
+    {
+        title: "Dynamic Loads",
+        items: [
+            {
+                label: 'Dyn. Force',
+                tool: 'load',
+                subType: 'dynamic_force',
+                icon: <Activity size={20} className="text-violet-600" />,
+                description: "Time-varying Force F(t)"
+            },
+            {
+                label: 'Dyn. Moment',
+                tool: 'load',
+                subType: 'dynamic_moment',
+                icon: <Radio size={20} className="text-violet-600" />,
+                description: "Time-varying Moment M(t)"
             },
         ]
     },
@@ -192,9 +211,6 @@ export const ToolsPanel = () => {
 
                         <div className="grid grid-cols-2 gap-2">
                             {group.items.map((item, i) => {
-                                // Logic: Is this button active?
-                                // If it has a subtype, both tool AND subtype must match.
-                                // If it has NO subtype (like Select), only tool must match.
                                 const isActive = item.subType
                                     ? activeTool === item.tool && activeSubType === item.subType
                                     : activeTool === item.tool && activeSubType === null;

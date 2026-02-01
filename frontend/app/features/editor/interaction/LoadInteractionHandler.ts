@@ -1,15 +1,21 @@
 import { BaseInteractionHandler, type MouseEventData } from './BaseInteractionHandler';
 import { v4 as uuidv4 } from 'uuid';
 import * as Geo from '../../../lib/geometry';
-import type { LoadType } from '~/types/model';
 
-const LOAD_CONFIGS: Record<string, { type: LoadType, value: number, angle?: number }> = {
+// Configuration for default values when placing a load
+const LOAD_CONFIGS: Record<string, { type: string, value: number, angle?: number }> = {
+    // STATIC
     'point': { type: 'POINT', value: 10, angle: -90 },
     'moment': { type: 'MOMENT', value: 10 },
     'distributed': { type: 'DISTRIBUTED', value: 5 },
+
+    // DYNAMIC 
+    'dynamic_force': { type: 'DYNAMIC_FORCE', value: 10, angle: 0 },
+    'dynamic_moment': { type: 'DYNAMIC_MOMENT', value: 10 }
 };
 
 export class LoadInteractionHandler extends BaseInteractionHandler {
+
     private getMemberAtPosition(rawPos: { x: number, y: number }) {
         const { state, viewport } = this.context;
         const clickThreshold = 10 / viewport.zoom;
@@ -32,10 +38,39 @@ export class LoadInteractionHandler extends BaseInteractionHandler {
         const { actions, state } = this.context;
         const { snapped, raw, snappedNodeId } = data;
         const subType = state.interaction.activeSubTypeTool;
-
         if (!subType || !LOAD_CONFIGS[subType]) return;
         const base = LOAD_CONFIGS[subType];
 
+
+        // -------------------------------------------------------------
+        // 1. DYNAMIC LOADS 
+        // -------------------------------------------------------------
+        if (base.type === 'DYNAMIC_FORCE' || base.type === 'DYNAMIC_MOMENT') {
+            if (snappedNodeId) {
+                const newId = uuidv4();
+
+                // Construct the Dynamic Load Object
+                actions.addLoad({
+                    id: newId,
+                    scope: 'NODE',
+                    type: base.type as any,
+                    nodeId: snappedNodeId,
+                    ...(base.type === 'DYNAMIC_FORCE' ? { angle: base.angle ?? 0 } : {}),
+                    signal: {
+                        type: 'HARMONIC',
+                        amplitude: base.value,
+                        frequency: 1.0,
+                        phase: 0,
+                        startTime: 0
+                    }
+                } as any);
+            }
+            return;
+        }
+
+        // -------------------------------------------------------------
+        // 2. STATIC LOADS
+        // -------------------------------------------------------------
         if (base.type === 'POINT' || base.type === 'MOMENT') {
             const newId = uuidv4();
 
@@ -43,7 +78,7 @@ export class LoadInteractionHandler extends BaseInteractionHandler {
                 actions.addLoad({
                     id: newId,
                     scope: 'NODE',
-                    type: base.type,
+                    type: base.type as any,
                     nodeId: snappedNodeId,
                     value: base.value,
                     angle: base.angle
@@ -84,6 +119,7 @@ export class LoadInteractionHandler extends BaseInteractionHandler {
                 });
             }
         }
+
     }
 
     handleMouseMove(e: React.MouseEvent, data: MouseEventData): void {

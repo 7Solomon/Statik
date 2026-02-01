@@ -220,3 +220,114 @@ def _add_rigid_body_stiffness(scheibe, system, dof_map, n_dof):
                 K_rigid[indices[i], indices[j]] += k_local[i, j]
 
     return K_rigid
+
+
+
+def create_force_function(system, dof_map):
+    """
+    Creates a callable force_func(t, dof_index) that sums up all dynamic loads
+    acting on a specific Degree of Freedom (DOF) at time t.
+    """
+    
+    # 1. Pre-process loads to speed up lookups during integration
+    # We group loads by the specific DOF index they affect.
+    # Map structure: { dof_index: [List of DynamicLoad Objects] }
+    dof_loads = {}
+
+    for load in system.loads:
+        # Skip static loads or member loads (assuming dynamics only supports Node loads for now)
+        if not hasattr(load, 'signal') or load.scope != 'NODE':
+            continue
+
+        node_id = load.node_id
+        
+        # Determine which DOF indices this node corresponds to
+        # Assuming 2D: [u, v, theta] -> indices i, i+1, i+2
+        if node_id not in dof_map:
+            continue
+            
+        node_dofs = dof_map[node_id] # This is [u, v, theta]
+        idx_u = node_dofs[0]
+        idx_v = node_dofs[1]
+        idx_theta = node_dofs[2]
+
+        target_dof = -1
+        
+        if load.type == 'DYNAMIC_MOMENT':
+            target_dof = idx_theta  # Use the extracted index
+            
+            if target_dof not in dof_loads: dof_loads[target_dof] = []
+            dof_loads[target_dof].append({
+                'type': 'MOMENT', 
+                'signal': load.signal, 
+                'factor': 1.0 
+            })
+
+        elif load.type == 'DYNAMIC_FORCE' or load.type == 'DYNAMIC_POINT':
+            angle_rad = np.radians(load.angle)
+            cos_a = np.cos(angle_rad)
+            sin_a = np.sin(angle_rad)
+
+            # X-Component -> idx_u
+            if abs(cos_a) > 1e-6:
+                if idx_u not in dof_loads: dof_loads[idx_u] = []
+                dof_loads[idx_u].append({
+                    'type': 'FORCE_X', 
+                    'signal': load.signal, 
+                    'factor': cos_a
+                })
+
+            # Y-Component -> idx_v
+            if abs(sin_a) > 1e-6:
+                if idx_v not in dof_loads: dof_loads[idx_v] = []
+                dof_loads[idx_v].append({
+                    'type': 'FORCE_Y', 
+                    'signal': load.signal, 
+                    'factor': sin_a
+                })
+                
+    # 2. Define the actual function called by the solver
+    def force_func(t, dof):
+        if dof not in dof_loads:
+            return 0.0
+        
+        total_force = 0.0
+        
+        for item in dof_loads[dof]:
+            sig = item['signal']
+            val = 0.0
+            
+            # --- Signal Evaluation Logic ---
+            # Apply Start Time Delay
+            t_eff = t - sig.start_time
+            if t_eff < 0:
+                val = 0.0
+            else:
+                if sig.type == 'HARMONIC':
+                    # F(t) = A * sin(2*pi*f*t + phase)
+                    # Note: might want cos or sin depending on convention, dont currenly now
+                    omega = 2 * np.pi * sig.frequency
+                    val = sig.amplitude * np.sin(omega * t_eff + sig.phase)
+                    
+                elif sig.type == 'STEP':
+                    val = sig.amplitude
+                    
+                elif sig.type == 'PULSE':
+                    if t_eff <= (sig.end_time - sig.start_time):
+                        val = sig.amplitude
+                    else:
+                        val = 0.0
+                        
+                elif sig.type == 'RAMP':
+                    duration = sig.end_time - sig.start_time
+                    if duration > 0 and t_eff <= duration:
+                        val = sig.amplitude * (t_eff / duration)
+                    elif t_eff > duration:
+                        val = sig.amplitude # Hold value? or drop to 0? usually hold, also dont know
+            
+            # Add to total (scaled by geometric factor like cos/sin)
+            total_force += val * item['factor']
+            
+        return total_force
+
+    return force_func

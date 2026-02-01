@@ -128,10 +128,9 @@ def analyze_dynamics():
             system=system,
             t_span=(0.0, 5.0),  # 5 seconds
             dt=0.02,            # 10ms timestep
-            external_force_func=lambda t, dof: 100000 * np.sin(2*np.pi*t) if dof == 7 else 0
         )
         
-        # 3. Check internal success flag if your analyzer returns one
+        # Check internal success flag if your analyzer returns one
         if not result.success:
             return jsonify(result.to_dict()), 200
 

@@ -1,11 +1,12 @@
 import { COLORS, SIZES, RenderUtils } from './RenderUtils';
-import type { Load, Member, Node, Vec2 } from '~/types/model';
+import type { Load, Member, Node, Vec2, DynamicForceLoad, DynamicMomentLoad, NodeLoad, MemberPointLoad, MemberDistLoad } from '~/types/model';
 import * as Coords from '../../lib/coordinates';
 import type { ViewportState } from '~/types/app';
 
 // Configuration for visuals
 const FORCE_CONFIG = {
-    color: '#ef4444',     // Red
+    color: '#ef4444',        // Red (Static)
+    dynamicColor: '#8b5cf6', // Violet/Purple (Dynamic)
     lineWidth: 2,
     arrowSize: 8,
     pointLength: 40,
@@ -17,7 +18,8 @@ const FORCE_CONFIG = {
 export class ForceRenderer {
 
     /**
-     * Main Router: Decides what to draw based on load SCOPE and TYPE
+     * Main Router: Decides what to draw based on load properties.
+     * We treat the input as a Union of Static Load | Dynamic Load.
      */
     static draw(
         ctx: CanvasRenderingContext2D,
@@ -27,55 +29,91 @@ export class ForceRenderer {
         members: Member[]
     ) {
         ctx.save();
-        ctx.strokeStyle = FORCE_CONFIG.color;
-        ctx.fillStyle = FORCE_CONFIG.color;
+
+        // ----------------------------------------------------------------
+        // 1. DETECT TYPE (Static vs Dynamic)
+        // ----------------------------------------------------------------
+
+        // In your model, Dynamic Loads have a 'signal' property. Static loads do not.
+        // We use this as a Type Guard.
+        const isDynamic = 'signal' in load;
+        const color = isDynamic ? FORCE_CONFIG.dynamicColor : FORCE_CONFIG.color;
+
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
         ctx.lineWidth = FORCE_CONFIG.lineWidth;
 
-        // ------------------------------------------------------
-        // 1. LOADS ON NODES
-        // ------------------------------------------------------
-        if (load.scope === 'NODE') {
-            const node = nodes.find(n => n.id === load.nodeId);
+        // ----------------------------------------------------------------
+        // 2. DYNAMIC LOADS
+        // ----------------------------------------------------------------
+        if (isDynamic) {
+            const dLoad = load as DynamicForceLoad | DynamicMomentLoad;
+
+            const node = nodes.find(n => n.id === dLoad.nodeId);
+
             if (node) {
                 const screenPos = Coords.worldToScreen(node.position.x, node.position.y, viewport);
 
-                if (load.type === 'MOMENT') {
-                    this.drawMoment(ctx, screenPos, load.value);
+                // FIX 3: amplitude is now valid because of the cast above
+                const val = dLoad.signal.amplitude;
+
+                if (dLoad.type === 'DYNAMIC_MOMENT') {
+                    const label = `M(t) ${val}`;
+                    this.drawMoment(ctx, screenPos, val, label);
                 } else {
-                    // Point load on node
-                    this.drawPointLoad(ctx, screenPos, load.angle ?? -90, load.value);
+                    // DYNAMIC_FORCE has 'angle'
+                    const label = `F(t) ${val}`;
+                    this.drawPointLoad(ctx, screenPos, dLoad.angle ?? 0, val, label, true);
                 }
             }
         }
+        // ----------------------------------------------------------------
+        // 3. STATIC LOADS
+        // ----------------------------------------------------------------
 
-        // ------------------------------------------------------
-        // 2. LOADS ON MEMBERS
-        // ------------------------------------------------------
-        else if (load.scope === 'MEMBER') {
-            const member = members.find(m => m.id === load.memberId);
-            if (member) {
-                const startNode = nodes.find(n => n.id === member.startNodeId);
-                const endNode = nodes.find(n => n.id === member.endNodeId);
+        else {
+            // CAST: We know it's not Dynamic, so it must be one of the Static types
+            const sLoad = load as NodeLoad | MemberPointLoad | MemberDistLoad;
 
-                if (startNode && endNode) {
+            // A. NODE LOADS
+            if (sLoad.scope === 'NODE') {
+                const node = nodes.find(n => n.id === sLoad.nodeId);
+                if (node) {
+                    const screenPos = Coords.worldToScreen(node.position.x, node.position.y, viewport);
 
-                    // A. POINT LOAD ON MEMBER
-                    if (load.type === 'POINT') {
-                        // Calculate position based on RATIO (0 to 1)
-                        const t = load.ratio;
-                        const wx = startNode.position.x + (endNode.position.x - startNode.position.x) * t;
-                        const wy = startNode.position.y + (endNode.position.y - startNode.position.y) * t;
-
-                        const screenPos = Coords.worldToScreen(wx, wy, viewport);
-                        this.drawPointLoad(ctx, screenPos, load.angle ?? -90, load.value);
+                    if (sLoad.type === 'MOMENT') {
+                        // STATIC MOMENT 
+                        this.drawMoment(ctx, screenPos, sLoad.value);
+                    } else {
+                        this.drawPointLoad(ctx, screenPos, sLoad.angle ?? -90, sLoad.value);
                     }
+                }
+            }
 
-                    // B. DISTRIBUTED LOAD
-                    else if (load.type === 'DISTRIBUTED') {
-                        const p1 = Coords.worldToScreen(startNode.position.x, startNode.position.y, viewport);
-                        const p2 = Coords.worldToScreen(endNode.position.x, endNode.position.y, viewport);
 
-                        this.drawDistributedLoad(ctx, p1, p2, load);
+            // B. MEMBER LOADS
+            else if (sLoad.scope === 'MEMBER') {
+                const member = members.find(m => m.id === sLoad.memberId);
+                if (member) {
+                    const startNode = nodes.find(n => n.id === member.startNodeId);
+                    const endNode = nodes.find(n => n.id === member.endNodeId);
+
+                    if (startNode && endNode) {
+                        // Point Load on Member
+                        if (sLoad.type === 'POINT') {
+                            const t = sLoad.ratio;
+                            const wx = startNode.position.x + (endNode.position.x - startNode.position.x) * t;
+                            const wy = startNode.position.y + (endNode.position.y - startNode.position.y) * t;
+
+                            const screenPos = Coords.worldToScreen(wx, wy, viewport);
+                            this.drawPointLoad(ctx, screenPos, sLoad.angle ?? -90, sLoad.value);
+                        }
+                        // Distributed Load
+                        else if (sLoad.type === 'DISTRIBUTED') {
+                            const p1 = Coords.worldToScreen(startNode.position.x, startNode.position.y, viewport);
+                            const p2 = Coords.worldToScreen(endNode.position.x, endNode.position.y, viewport);
+                            this.drawDistributedLoad(ctx, p1, p2, sLoad);
+                        }
                     }
                 }
             }
@@ -84,15 +122,24 @@ export class ForceRenderer {
         ctx.restore();
     }
 
+
     // ==========================================================
     // PRIMITIVES
     // ==========================================================
 
-    private static drawPointLoad(ctx: CanvasRenderingContext2D, pos: Vec2, angleDeg: number, value: number) {
+    private static drawPointLoad(
+        ctx: CanvasRenderingContext2D,
+        pos: Vec2,
+        angleDeg: number,
+        value: number,
+        customLabel?: string,
+        isDynamic: boolean = false
+    ) {
         ctx.save();
         ctx.translate(pos.x, pos.y);
 
         // Rotate canvas so +X is the direction of the force
+        // Canvas Y is Down, Physics Y is Up -> negate angle
         const angleRad = -(angleDeg) * (Math.PI / 180);
         ctx.rotate(angleRad);
 
@@ -113,17 +160,24 @@ export class ForceRenderer {
         this.drawArrowHead(ctx, headX, 0, 0);
 
         // Label
-        this.drawLabel(ctx, `${value}kN`, tailX - 10, 0, -angleRad);
+        const text = customLabel || `${value}kN`;
+        // Draw label upright (counter-rotate)
+        this.drawLabel(ctx, text, tailX - 10, 0, -angleRad);
+
+        // Optional: Small wave icon for dynamic loads
+        if (isDynamic) {
+            this.drawWave(ctx, tailX - 25, 0);
+        }
 
         ctx.restore();
     }
 
-    private static drawMoment(ctx: CanvasRenderingContext2D, pos: Vec2, value: number) {
+    private static drawMoment(ctx: CanvasRenderingContext2D, pos: Vec2, value: number, customLabel?: string) {
         ctx.save();
         ctx.translate(pos.x, pos.y);
 
         const r = 20;
-        const isClockwise = value < 0; // Convention check
+        const isClockwise = value < 0;
 
         ctx.beginPath();
         const startAngle = 0;
@@ -140,7 +194,8 @@ export class ForceRenderer {
         this.drawArrowHead(ctx, 0, 0, 0);
         ctx.restore();
 
-        this.drawLabel(ctx, `${Math.abs(value)}kNm`, 0, -r - 10, 0);
+        const text = customLabel || `${Math.abs(value)}kNm`;
+        this.drawLabel(ctx, text, 0, -r - 10, 0);
         ctx.restore();
     }
 
@@ -148,9 +203,8 @@ export class ForceRenderer {
         ctx: CanvasRenderingContext2D,
         p1: Vec2,
         p2: Vec2,
-        load: any // Typed as any here just to access specific member-dist props safely
+        load: MemberDistLoad
     ) {
-        // We know it is MemberDistLoad here
         const rStart = load.startRatio;
         const rEnd = load.endRatio;
         const valStart = load.startValue ?? load.value;
@@ -171,7 +225,6 @@ export class ForceRenderer {
         const scale = maxVal === 0 ? 0 : FORCE_CONFIG.distMaxHeight / maxVal;
 
         // Y-direction: Positive loads usually point DOWN (positive Y in canvas)
-        // Adjust sign based on your structural convention (usually loads oppose Global Y)
         const hStart = -valStart * scale;
         const hEnd = -valEnd * scale;
 
@@ -180,13 +233,14 @@ export class ForceRenderer {
         const width = xEnd - xStart;
 
         // 1. Draw "Container" Polygon
-        if (Math.abs(width) > 1) { // Only draw if length > 1px
+        if (Math.abs(width) > 1) {
             ctx.beginPath();
             ctx.moveTo(xStart, 0);
             ctx.lineTo(xStart, hStart);
             ctx.lineTo(xEnd, hEnd);
             ctx.lineTo(xEnd, 0);
-            ctx.fillStyle = `${FORCE_CONFIG.color}33`; // Transparent fill
+            const baseColor = ctx.fillStyle as string;
+            ctx.fillStyle = baseColor + '33';
             ctx.fill();
 
             // Top line
@@ -196,12 +250,10 @@ export class ForceRenderer {
             ctx.stroke();
 
             // 2. Internal Arrows
-            // Ensure strictly positive spacing loop
             const spacing = FORCE_CONFIG.distSpacing;
             const numArrows = Math.floor(Math.abs(width) / spacing);
 
             for (let i = 0; i <= numArrows; i++) {
-                // lerp ratio (0 to 1)
                 const t = numArrows === 0 ? 0.5 : i / numArrows;
                 const curX = xStart + (xEnd - xStart) * t;
                 const curH = hStart + (hEnd - hStart) * t;
@@ -244,7 +296,6 @@ export class ForceRenderer {
         ctx.lineTo(-s, -s * 0.4);
         ctx.lineTo(-s, s * 0.4);
         ctx.closePath();
-        ctx.fillStyle = FORCE_CONFIG.color;
         ctx.fill();
         ctx.restore();
     }
@@ -256,8 +307,19 @@ export class ForceRenderer {
         ctx.font = '12px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillStyle = FORCE_CONFIG.color;
         ctx.fillText(text, 0, 0);
+        ctx.restore();
+    }
+
+    private static drawWave(ctx: CanvasRenderingContext2D, x: number, y: number) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.beginPath();
+        ctx.moveTo(-5, 0);
+        ctx.quadraticCurveTo(-2.5, -4, 0, 0);
+        ctx.quadraticCurveTo(2.5, 4, 5, 0);
+        ctx.lineWidth = 1;
+        ctx.stroke();
         ctx.restore();
     }
 }

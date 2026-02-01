@@ -89,32 +89,55 @@ class Member:
                 "end": {"fx": self.releases.end.fx, "fy": self.releases.end.fy, "mz": self.releases.end.mz},
             }
         }
+    
+@dataclass
+class DynamicSignal:
+    type: Literal['HARMONIC', 'STEP', 'PULSE', 'RAMP']
+    amplitude: float
+    start_time: float = 0.0
+    frequency: float = 0.0
+    phase: float = 0.0
+    end_time: float = 0.0
+    offset: float = 0.0
+
+    def to_dict(self):
+        return {
+            "type": self.type,
+            "amplitude": self.amplitude,
+            "startTime": self.start_time,
+            "frequency": self.frequency,
+            "phase": self.phase,
+            "endTime": self.end_time,
+            "offset": self.offset
+        }
+
 @dataclass
 class Load:
     id: str
     scope: Literal['NODE', 'MEMBER']
-    type: Literal['POINT', 'MOMENT', 'DISTRIBUTED']
-    value: float
+    type: Literal['POINT', 'MOMENT', 'DISTRIBUTED', 'DYNAMIC_FORCE', 'DYNAMIC_MOMENT']
+    value: float = 0.0 # Default to 0 for dynamic loads
     
-    # -- Linkage (Optional based on scope) --
+    # -- Linkage --
     node_id: Optional[str] = None
     member_id: Optional[str] = None
     
-    # -- Geometry / Physics --
-    angle: float = 0.0           # For Point Loads
-    is_global: bool = True       # For Distributed
+    # -- Geometry --
+    angle: float = 0.0
+    is_global: bool = True
     
     # -- Member Positioning --
-    ratio: Optional[float] = None       # Point on Member (0.0 - 1.0)
+    ratio: Optional[float] = None
     
     # -- Distributed Params --
     start_ratio: Optional[float] = None
     end_ratio: Optional[float] = None
-    start_value: Optional[float] = None # Trapezoid support
+    start_value: Optional[float] = None
     end_value: Optional[float] = None
 
+    signal: Optional[DynamicSignal] = None 
+
     def to_dict(self):
-        # Construct dict based on TypeScript interfaces
         base = {
             "id": self.id,
             "scope": self.scope,
@@ -123,17 +146,19 @@ class Load:
             "isGlobal": self.is_global
         }
 
+        # Add Signal if present
+        if self.signal:
+            base["signal"] = self.signal.to_dict()
+
         if self.scope == 'NODE':
             base["nodeId"] = self.node_id
             base["angle"] = self.angle
         
         elif self.scope == 'MEMBER':
             base["memberId"] = self.member_id
-            
             if self.type == 'POINT':
                 base["ratio"] = self.ratio
                 base["angle"] = self.angle
-            
             elif self.type == 'DISTRIBUTED':
                 base["startRatio"] = self.start_ratio
                 base["endRatio"] = self.end_ratio
@@ -141,6 +166,7 @@ class Load:
                 if self.end_value is not None: base["endValue"] = self.end_value
 
         return base
+
     
 @dataclass
 class ScheibeProperties:
@@ -357,36 +383,42 @@ class StructuralSystem:
             )
             system.members.append(member)
 
-         # 3. Parse Loads
+        # 3. Parse Loads
         for l_data in loads_data:
-            # Safely get optional fields
             scope = l_data.get("scope", "NODE")
             
+            # Parse Signal if exists
+            signal = None
+            if "signal" in l_data and l_data["signal"]:
+                s_data = l_data["signal"]
+                signal = DynamicSignal(
+                    type=s_data.get("type", "HARMONIC"),
+                    amplitude=float(s_data.get("amplitude", 0)),
+                    start_time=float(s_data.get("startTime", 0)),
+                    frequency=float(s_data.get("frequency", 0)),
+                    phase=float(s_data.get("phase", 0)),
+                    end_time=float(s_data.get("endTime", 0)),
+                    offset=float(s_data.get("offset", 0))
+                )
+
             load = Load(
                 id=str(l_data["id"]),
                 scope=scope,
                 type=l_data.get("type", "POINT"),
                 value=float(l_data.get("value", 0.0)),
-                
-                # Linkage
                 node_id=l_data.get("nodeId"),
                 member_id=l_data.get("memberId"),
-                
-                # Params
                 angle=float(l_data.get("angle", 0.0)),
                 is_global=l_data.get("isGlobal", True),
-                
-                # Member Point
                 ratio=l_data.get("ratio") if l_data.get("ratio") is not None else None,
-                
-                # Member Distributed
                 start_ratio=l_data.get("startRatio"),
                 end_ratio=l_data.get("endRatio"),
                 start_value=l_data.get("startValue"),
-                end_value=l_data.get("endValue")
+                end_value=l_data.get("endValue"),
+                signal=signal
             )
             
-            # Simple validation to skip invalid loads
+            # Simple validation
             if scope == "NODE" and not load.node_id: continue
             if scope == "MEMBER" and not load.member_id: continue
             

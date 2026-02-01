@@ -141,7 +141,6 @@ const sanitizeScheibeConnection = (conn: any): ScheibeConnection | null => {
 export const sanitizeScheibe = (scheibe: any): Scheibe | null => {
     // Must have id
     if (!scheibe?.id || typeof scheibe.id !== 'string') return null;
-    console.log(scheibe)
     // Validate shape
 
     const incomingShape = scheibe.shape?.toUpperCase();
@@ -176,7 +175,6 @@ export const sanitizeScheibe = (scheibe: any): Scheibe | null => {
         ? scheibe.meshLevel as (1 | 2 | 3 | 4 | 5)
         : undefined;
 
-    console.log(scheibe)
 
     return {
         id: scheibe.id,
@@ -243,10 +241,21 @@ export const sanitizeConstraint = (constraint: any): Constraint | null => {
 };
 
 export const sanitizeLoad = (load: any): Load | null => {
-    // Must have id and scope at minimum
     if (!load?.id || typeof load.id !== 'string') return null;
-    if (!load?.scope) return null;
+    if (!load?.scope || !load?.type) return null;
+    // Check for Dynamic Load integrity
+    if (load.type === 'DYNAMIC_FORCE' || load.type === 'DYNAMIC_MOMENT') {
+        // Must have signal object
+        if (!load.signal || typeof load.signal.amplitude !== 'number') return null;
+        return load as Load;
+    }
 
-    // Basic validation - you might want to add more specific checks based on Load type
-    return load as Load;
+    // Check for Static Load integrity
+    if (['POINT', 'MOMENT', 'DISTRIBUTED'].includes(load.type)) {
+        // Must have value
+        if (typeof load.value !== 'number') return null;
+        return load as Load;
+    }
+
+    return null;
 };

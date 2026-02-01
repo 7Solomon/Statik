@@ -104,6 +104,7 @@ export const createEditorSlice: StateCreator<
             },
 
             addLoad: (load) => {
+                console.log(load)
                 set((state) => ({
                     editor: {
                         ...state.editor,
@@ -155,7 +156,7 @@ export const createEditorSlice: StateCreator<
                             }),
                             constraints: constraints.filter(c =>
                                 c.startNodeId !== id && c.endNodeId !== id
-                            ) // NEW: Remove constraints connected to this node
+                            )
                         }
                     };
                 });

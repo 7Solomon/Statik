@@ -84,7 +84,7 @@ export interface Scheibe {
 
 
 export type LoadType = 'POINT' | 'MOMENT' | 'DISTRIBUTED';
-export type LoadScope = 'NODE' | 'MEMBER';
+export type LoadScope = 'NODE' | 'MEMBER' | 'SCHEIBE';
 
 interface BaseLoad {
   id: string;
@@ -119,7 +119,66 @@ export interface MemberDistLoad extends BaseLoad {
   endValue?: number;
 }
 
-export type Load = NodeLoad | MemberPointLoad | MemberDistLoad;
+
+/// DYNAMIC LOAD
+
+// --- SIGNALS (The Time Function) ---
+export type DynamicSignalType = 'HARMONIC' | 'STEP' | 'PULSE' | 'RAMP';
+
+interface BaseSignal {
+  amplitude: number; // The magnitude (F0 or M0)
+  startTime?: number; // Delay in seconds (default 0)
+}
+
+export interface HarmonicSignal extends BaseSignal {
+  type: 'HARMONIC';
+  frequency: number; // Hz
+  phase?: number;    // Radians
+  offset?: number;   // Vertical shift
+}
+
+export interface StepSignal extends BaseSignal {
+  type: 'STEP';
+  // Constant value after startTime
+}
+
+export interface PulseSignal extends BaseSignal {
+  type: 'PULSE';
+  endTime: number; // Duration is endTime - startTime
+}
+
+export interface RampSignal extends BaseSignal {
+  type: 'RAMP';
+  endTime: number; // Reaches amplitude at endTime
+}
+
+export type DynamicSignal = HarmonicSignal | StepSignal | PulseSignal | RampSignal;
+
+// --- LOADS ---
+
+interface BaseDynamicLoad {
+  id: string;
+  name?: string;
+  nodeId: string;
+  signal: DynamicSignal;
+}
+
+export interface DynamicForceLoad extends BaseDynamicLoad {
+  scope: 'NODE';
+  type: 'DYNAMIC_FORCE';
+  angle: number; // Degrees (0 = +X, 90 = +Y)
+}
+
+export interface DynamicMomentLoad extends BaseDynamicLoad {
+  scope: 'NODE';
+  type: 'DYNAMIC_MOMENT';
+  // Moments in 2D always about Z-axis so NEEDS no angle
+}
+
+
+export type Load = NodeLoad | MemberPointLoad | MemberDistLoad | DynamicForceLoad | DynamicMomentLoad;
+
+
 
 
 ////////////////////////////////////////////////////////////

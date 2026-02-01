@@ -3,13 +3,18 @@ import { useStore } from "~/store/useStore";
 import { RotateCw, ArrowRight, ArrowUp, Zap, Info, RefreshCw, AlertTriangle } from "lucide-react";
 import AnalysisCanvas from "./AnalysisCanvas";
 import { SolutionRenderer, type DiagramType } from "../drawing/SolutionRenderer";
-import type { FEMResult } from "~/types/model";
+import type { FEMResult, StructuralSystem } from "~/types/model";
+import { SystemValidationModal } from "../modals/SystemValidationModal";
+import { useSystemValidator } from "~/utils/check_analysis_system";
 
 
 export default function SolutionViewer() {
     const session = useStore(s => s.analysis.analysisSession);
     const solutionResult = session?.solutionResult;
     const system = session?.system;
+
+    const { checkSystem, validatorProps } = useSystemValidator();
+
 
     // Actions
     const setSolutionResult = useStore(s => s.analysis.actions.setSolutionResult);
@@ -21,6 +26,13 @@ export default function SolutionViewer() {
     // --- API CALL ---
     const handleRunFEM = async () => {
         if (!system) return;
+
+        const isValid = checkSystem(
+            system as StructuralSystem,
+            ['DYNAMIC_LOADS', 'CONSTRAINTS']  // FORBIDDEN
+        );
+
+        if (!isValid) return;
         setIsLoading(true);
         try {
             const payload = {
@@ -106,6 +118,8 @@ export default function SolutionViewer() {
                             {isLoading ? <RotateCw className="animate-spin" size={18} /> : <Zap size={18} fill="currentColor" />}
                             <span>{isLoading ? 'Calculating...' : 'Calculate Forces'}</span>
                         </button>
+                        <SystemValidationModal {...validatorProps} />
+
                     </div>
                 </div>
             </AnalysisCanvas>
@@ -194,9 +208,13 @@ export default function SolutionViewer() {
                             >
                                 Close
                             </button>
+
+                            <SystemValidationModal {...validatorProps} />
+
                         </div>
                     </div>
                 </div>
+
             </AnalysisCanvas>
         );
     }
@@ -256,6 +274,9 @@ export default function SolutionViewer() {
                 <Info size={12} />
                 Analysis Converged
             </div>
+
+            <SystemValidationModal {...validatorProps} />
+
         </AnalysisCanvas>
     );
 }

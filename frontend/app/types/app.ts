@@ -26,7 +26,9 @@ export type SupportType =
 export type LoadType =
     | 'point'
     | 'moment'
-    | 'distributed';
+    | 'distributed'
+    | 'dynamic_force'
+    | 'dynamic_moment'
 
 export type ScheibeShape =
     | 'rectangle'

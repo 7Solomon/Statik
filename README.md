@@ -12,6 +12,81 @@ Statik provides a complete workflow for structural analysis, from model creation
 
 ---
 
+## Installation & Setup
+
+Follow these steps to set up the development environment locally.
+
+### Prerequisites
+
+- **Python**: Version 3.9.13 or higher
+- **Node.js**: Version 18+ (Recommended for Vite/React 19)
+- **npm** (comes with Node.js)
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/statik.git
+cd statik
+```
+### Backend Setup (Python/Flask)
+Navigate to the backend directory, create a virtual environment, and install dependencies.
+
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv .venv
+```
+
+#### Activate virtual environment
+```bash
+# Windows (PowerShell):
+.venv\Scripts\activate
+```
+
+```bash
+# Linux/macOS:
+source .venv/bin/activate
+```
+
+# Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+Note: Ensure you are using Python 3.9+. You can check your version with python --version.
+
+### Frontend Setup (React/Vite)
+Open a new terminal, navigate to the frontend directory, and install the Node modules.
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+```
+
+### Running the Application
+The project includes a unified script to run both the Backend (Flask) and Frontend (Vite) concurrently from the frontend directory.
+
+**Development Mode**
+
+Open your terminal in the frontend/ directory.
+
+Run the development command:
+
+```bash
+npm run dev
+```
+
+This command uses concurrently to execute:
+
+Backend: Flask server on http://127.0.0.1:8000
+
+Frontend: Vite development server (usually http://localhost:5173)
+
+Access the application in your browser at the Local URL provided by Vite.
+
 ## Core Features
 
 ### 📐 Editor Mode
@@ -58,10 +133,6 @@ The editor provides specialized tools for creating structural elements:
 - **RIGID**: Infinitely stiff plate regions that move as rigid bodies
 - **ELASTIC**: Deformable continuum elements (requires meshing - future feature)
 - Connect nodes to Scheiben for rigid body constraints or continuum coupling
-
-<p align="center">
-  <img src="assets/simplify_system.png" alt="Beam with distributed load" width="700"/>
-</p>
 
 ---
 

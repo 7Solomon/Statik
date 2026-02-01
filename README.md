@@ -290,17 +290,17 @@ Save and load structural systems for later use.
 
 The kinematic solver validates structural stability before performing static analysis using constraint-based methods.
 
-**Degrees of Freedom**: Each node has 3 DOFs (u, v, θ) representing horizontal displacement, vertical displacement, and rotation.
+**Degrees of Freedom**: Each node has 3 DOFs ($u, v, \theta$) representing horizontal displacement, vertical displacement, and rotation.
 
 **Constraint Assembly**:
 - **Support Constraints**: Fixed supports constrain translation and/or rotation based on support type. Rotated supports use transformation matrices to align local constraint directions with global axes.
 - **Member Constraints**: 
-  - Axial constraint prevents member length change unless axial releases exist at both ends
-  - Rotational constraints enforce compatibility between node rotations and member rigid body rotation based on hinge releases
+  - Axial constraint prevents member length change unless axial releases exist at both ends.
+  - Rotational constraints enforce compatibility between node rotations and member rigid body rotation based on hinge releases.
 - **Scheibe Constraints**:
-  - RIGID Scheiben enforce rigid body motion between all connected nodes
-  - Each Scheibe adds 3 constraints per connected node pair (compatibility in u, v, and θ)
-  - Scheibe-node connections can have releases (hinges) to allow relative rotation
+  - RIGID Scheiben enforce rigid body motion between all connected nodes.
+  - Each Scheibe adds 3 constraints per connected node pair (compatibility in $u, v$, and $\theta$).
+  - Scheibe-node connections can have releases (hinges) to allow relative rotation.
 
 **Solution Method**: Singular Value Decomposition (SVD) of the constraint matrix identifies the null space, revealing kinematic modes (mechanisms) and degrees of freedom.
 
@@ -309,46 +309,63 @@ The kinematic solver validates structural stability before performing static ana
 The simplification algorithm reduces complex topologies while maintaining static equivalence.
 
 **Cantilever Pruning**:
-- Iteratively identifies and removes statically determinate branches (degree-1 nodes without supports)
-- Transfers loads from removed nodes to parent nodes using force and moment equilibrium
-- Moment transfer accounts for position offset: \( M_{root} = M_{tip} + \mathbf{r} \times \mathbf{F} \)
-- Nodes connected to Scheiben are protected from pruning (Scheibe acts as constraint)
+- Iteratively identifies and removes statically determinate branches (degree-1 nodes without supports).
+- Transfers loads from removed nodes to parent nodes using force and moment equilibrium.
+- Moment transfer accounts for position offset: $M_{root} = M_{tip} + \mathbf{r} \times \mathbf{F}$
+- Nodes connected to Scheiben are protected from pruning (Scheibe acts as constraint).
 
 #### 3. Finite Element Analysis (Statics)
 
 The FEM solver implements 2D frame analysis with member releases, distributed loads, and rigid plate constraints.
 
 **Element Formulation**:
-- **Beam element**: 6 DOFs per element (3 per node: u, v, θ)
-- **Local stiffness matrix**: Combines axial stiffness \( EA/L \) and bending stiffness terms with \( EI/L^3 \)
-- **Transformation**: Rotation matrix converts between local (member-aligned) and global coordinate systems
+- **Beam element**: 6 DOFs per element (3 per node: $u, v, \theta$).
+- **Local stiffness matrix**: The implementation uses the standard Euler-Bernoulli formulation, combining axial stiffness ($EA/L$) and bending stiffness ($EI/L^3$):
+
+$$
+\mathbf{k}_{local} = \begin{bmatrix}
+\frac{EA}{L} & 0 & 0 & -\frac{EA}{L} & 0 & 0 \\
+0 & \frac{12EI}{L^3} & \frac{6EI}{L^2} & 0 & -\frac{12EI}{L^3} & \frac{6EI}{L^2} \\
+0 & \frac{6EI}{L^2} & \frac{4EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{2EI}{L} \\
+-\frac{EA}{L} & 0 & 0 & \frac{EA}{L} & 0 & 0 \\
+0 & -\frac{12EI}{L^3} & -\frac{6EI}{L^2} & 0 & \frac{12EI}{L^3} & -\frac{6EI}{L^2} \\
+0 & \frac{6EI}{L^2} & \frac{2EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{4EI}{L}
+\end{bmatrix}
+$$
+
+- **Transformation**: Rotation matrix converts between local (member-aligned) and global coordinate systems.
 
 **Scheibe Handling**:
-- **RIGID Scheiben**: Treated as kinematic constraints using penalty method
-  - Penalty stiffness (10¹²) couples connected nodes to enforce rigid body motion
-  - Constraint equations: \( u_i = u_{ref} - dy \cdot \theta_{ref} \), \( v_i = v_{ref} + dx \cdot \theta_{ref} \), \( \theta_i = \theta_{ref} \)
-  - Reference node chosen as first connection point
+- **RIGID Scheiben**: Treated as kinematic constraints using penalty method.
+  - Penalty stiffness ($10^{12}$) couples connected nodes to enforce rigid body motion.
+  - Constraint equations: $u_i = u_{ref} - dy \cdot \theta_{ref}$, $v_i = v_{ref} + dx \cdot \theta_{ref}$, $\theta_i = \theta_{ref}$.
+  - Reference node chosen as first connection point.
 
 **Solution**:
-1. Assemble global stiffness matrix \( \mathbf{K} \) and force vector \( \mathbf{F} \)
-2. Add Scheibe penalty constraints to \( \mathbf{K} \)
-3. Apply boundary conditions by modifying constrained DOF rows
-4. Solve \( \mathbf{K} \mathbf{u} = \mathbf{F} \) for displacement vector \( \mathbf{u} \)
+1. Assemble global stiffness matrix $\mathbf{K}$ and force vector $\mathbf{F}$.
+2. Add Scheibe penalty constraints to $\mathbf{K}$.
+3. Apply boundary conditions by modifying constrained DOF rows.
+4. Solve $\mathbf{K} \mathbf{u} = \mathbf{F}$ for displacement vector $\mathbf{u}$.
 
 #### 4. Dynamic Analysis
 
 The dynamic solver performs a time history analysis of the system under time varying loads.
 
 **Formulation**:
-- Solves the equation of motion: \( \mathbf{M}\ddot{\mathbf{u}} + \mathbf{C}\dot{\mathbf{u}} + \mathbf{K}\mathbf{u} = \mathbf{F}(t) \)
-- **Mass Matrix (M)**: Assembled from member masses (consistent or lumped) and Scheibe properties (thickness/density)
-- **Stiffness Matrix (K)**: Reused from the FEM formulation, including geometric stiffness from constraints
-- **Damping (C)**: Explicit damping elements (dashpots) or proportional damping
+- Solves the equation of motion:
+  
+$$
+\mathbf{M}\ddot{\mathbf{u}} + \mathbf{C}\dot{\mathbf{u}} + \mathbf{K}\mathbf{u} = \mathbf{F}(t)
+$$
+
+- **Mass Matrix ($\mathbf{M}$)**: Assembled from member masses (consistent or lumped) and Scheibe properties (thickness/density).
+- **Stiffness Matrix ($\mathbf{K}$)**: Reused from the FEM formulation, including geometric stiffness from constraints.
+- **Damping ($\mathbf{C}$)**: Explicit damping elements (dashpots) or proportional damping.
 
 **Capabilities**:
-- **Lagrangian Dynamics**: Fully coupled system equations
-- **Signals**: Supports harmonic oscillation, step functions, pulses, and linear ramps
-- **Energy Tracking**: Verification of conservation of energy (for conservative systems)
+- **Lagrangian Dynamics**: Fully coupled system equations.
+- **Signals**: Supports harmonic oscillation, step functions, pulses, and linear ramps.
+- **Energy Tracking**: Verification of conservation of energy (for conservative systems).
 
 ---
 
@@ -372,10 +389,10 @@ The dynamic solver performs a time history analysis of the system under time var
   ELASTIC Scheiben require full 2D continuum finite element meshing. This functionality is not yet implemented. ELASTIC Scheiben are currently ignored in analysis.
 
 - **FEM on unstable systems**:  
-  If the kinematic analysis finds DOF > 0, the global stiffness matrix becomes singular and the FEM solver cannot produce a valid solution.
+  If the kinematic analysis finds $DOF > 0$, the global stiffness matrix becomes singular and the FEM solver cannot produce a valid solution.
 
 - **Linear-elastic, small-deformation model**:  
-  The FEM implementation assumes linear material behavior and small displacements/rotations. Geometric nonlinearity (P–Δ effects) and material nonlinearity are not modeled.
+  The FEM implementation assumes linear material behavior and small displacements/rotations. Geometric nonlinearity ($P-\Delta$ effects) and material nonlinearity are not modeled.
 
 ---
 

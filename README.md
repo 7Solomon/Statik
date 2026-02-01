@@ -25,7 +25,7 @@ Follow these steps to set up the development environment locally.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/statik.git
+git clone https://github.com/7Solomon/statik.git
 cd statik
 ```
 ### Backend Setup (Python/Flask)

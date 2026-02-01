@@ -399,4 +399,5 @@ $$
 ## Application Info
 
 **Version**: v1.3
+
 **Status**: Editor, Static Analysis, and Dynamic Analysis modules fully functional with RIGID Scheiben support

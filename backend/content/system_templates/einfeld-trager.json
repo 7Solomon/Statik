@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "name": "Einfeld Tr\u00e4ger",
+    "slug": "einfeld-trager",
+    "saved_at": "2026-01-02T11:08:55.911026"
+  },
+  "system": {
+    "nodes": [
+      {
+        "id": "c6739349-3dfa-427e-951f-3ef9c0edd627",
+        "position": {
+          "x": 2,
+          "y": 1
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": true,
+          "fixV": true,
+          "fixM": false
+        }
+      },
+      {
+        "id": "ebb38ff6-3fbf-449e-99c5-a6e65b69f3b8",
+        "position": {
+          "x": 6,
+          "y": 1
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": false,
+          "fixV": true,
+          "fixM": false
+        }
+      }
+    ],
+    "members": [
+      {
+        "id": "6031b8bd-b819-4535-8aad-ac615c483165",
+        "startNodeId": "c6739349-3dfa-427e-951f-3ef9c0edd627",
+        "endNodeId": "ebb38ff6-3fbf-449e-99c5-a6e65b69f3b8",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          }
+        }
+      }
+    ],
+    "loads": [
+      {
+        "id": "a22aa9bd-90a6-4833-aaf2-4c51a31b8fb2",
+        "scope": "MEMBER",
+        "type": "DISTRIBUTED",
+        "memberId": "6031b8bd-b819-4535-8aad-ac615c483165",
+        "startRatio": 0.022727272727272707,
+        "endRatio": 1,
+        "value": 5
+      }
+    ]
+  }
+}

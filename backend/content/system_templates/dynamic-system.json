@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "name": "Dynamic System",
+    "slug": "dynamic-system",
+    "saved_at": "2026-01-30T14:02:29.888342"
+  },
+  "system": {
+    "nodes": [
+      {
+        "id": "1c52b0f5-ae0e-4462-99f6-dab271b657ef",
+        "position": {
+          "x": 4,
+          "y": 1
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": true,
+          "fixV": true,
+          "fixM": true
+        }
+      },
+      {
+        "id": "512ba194-38f5-454d-9f36-d54f5d912f8d",
+        "position": {
+          "x": 7,
+          "y": 1
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": true,
+          "fixV": true,
+          "fixM": true
+        }
+      },
+      {
+        "id": "3ef3ea48-1561-4e9d-8901-6770b07b868b",
+        "position": {
+          "x": 4,
+          "y": 4
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": false,
+          "fixV": false,
+          "fixM": false
+        }
+      },
+      {
+        "id": "905b4065-5e51-4854-9910-082f328642bc",
+        "position": {
+          "x": 7,
+          "y": 4
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": false,
+          "fixV": false,
+          "fixM": false
+        }
+      },
+      {
+        "id": "e02a8b42-f326-4af3-a713-815a4ec27816",
+        "position": {
+          "x": 3,
+          "y": 5
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": true,
+          "fixV": false,
+          "fixM": false
+        }
+      },
+      {
+        "id": "7dec6a6b-5964-41cb-9b14-9f591a216d9e",
+        "position": {
+          "x": 3,
+          "y": 3
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": true,
+          "fixV": false,
+          "fixM": false
+        }
+      }
+    ],
+    "members": [],
+    "loads": [],
+    "scheiben": [
+      {
+        "id": "ad31a003-1516-439a-8681-9142090b83db",
+        "shape": "rectangle",
+        "corner1": {
+          "x": 3,
+          "y": 5
+        },
+        "corner2": {
+          "x": 8,
+          "y": 3
+        },
+        "rotation": 0,
+        "type": "RIGID",
+        "properties": {
+          "E": 30000000000,
+          "nu": 0.2,
+          "thickness": 0.2,
+          "rho": 2400
+        },
+        "connections": [
+          {
+            "nodeId": "3ef3ea48-1561-4e9d-8901-6770b07b868b"
+          },
+          {
+            "nodeId": "905b4065-5e51-4854-9910-082f328642bc"
+          },
+          {
+            "nodeId": "e02a8b42-f326-4af3-a713-815a4ec27816"
+          },
+          {
+            "nodeId": "7dec6a6b-5964-41cb-9b14-9f591a216d9e"
+          }
+        ],
+        "meshLevel": 3
+      }
+    ],
+    "constraints": [
+      {
+        "id": "5ef14e4e-e094-4d12-8a43-5128da7feb15",
+        "startNodeId": "1c52b0f5-ae0e-4462-99f6-dab271b657ef",
+        "endNodeId": "3ef3ea48-1561-4e9d-8901-6770b07b868b",
+        "type": "SPRING",
+        "k": 1000,
+        "preload": 0
+      },
+      {
+        "id": "ed377d58-446f-459e-8dd7-47b2b67cdf7b",
+        "startNodeId": "512ba194-38f5-454d-9f36-d54f5d912f8d",
+        "endNodeId": "905b4065-5e51-4854-9910-082f328642bc",
+        "type": "DAMPER",
+        "c": 100
+      }
+    ]
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "meta": {
+    "name": "simplify",
+    "slug": "simplify",
+    "saved_at": "2026-01-28T10:39:42.449136"
+  },
+  "system": {
+    "nodes": [
+      {
+        "id": "4fd9b078-cb9f-45ad-9569-d5e2d23bf404",
+        "position": {
+          "x": 3,
+          "y": 5
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": true,
+          "fixV": true,
+          "fixM": false
+        }
+      },
+      {
+        "id": "37984e9f-4088-401f-9c61-e5791f1f4662",
+        "position": {
+          "x": 9,
+          "y": 5
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": false,
+          "fixV": false,
+          "fixM": false
+        }
+      },
+      {
+        "id": "b1acdac7-2df7-4fd3-8091-fe6662e16b3c",
+        "position": {
+          "x": 13,
+          "y": 3
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": false,
+          "fixV": true,
+          "fixM": false
+        }
+      },
+      {
+        "id": "1c3271fb-672e-4a50-8a8c-ad4c4234481b",
+        "position": {
+          "x": 9,
+          "y": 7
+        },
+        "rotation": 90,
+        "supports": {
+          "fixN": false,
+          "fixV": false,
+          "fixM": false
+        }
+      }
+    ],
+    "members": [
+      {
+        "id": "539e2e42-337e-45ba-9352-7cadca0da1b6",
+        "startNodeId": "4fd9b078-cb9f-45ad-9569-d5e2d23bf404",
+        "endNodeId": "37984e9f-4088-401f-9c61-e5791f1f4662",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          }
+        }
+      },
+      {
+        "id": "33cd4c26-d8fb-4579-bbb1-6276be8cc6a5",
+        "startNodeId": "37984e9f-4088-401f-9c61-e5791f1f4662",
+        "endNodeId": "b1acdac7-2df7-4fd3-8091-fe6662e16b3c",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          }
+        }
+      },
+      {
+        "id": "1c1c2778-2be0-465d-bd2d-b0be35af1fbb",
+        "startNodeId": "37984e9f-4088-401f-9c61-e5791f1f4662",
+        "endNodeId": "1c3271fb-672e-4a50-8a8c-ad4c4234481b",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          }
+        }
+      }
+    ],
+    "loads": [
+      {
+        "id": "0990e6de-a710-4889-a01b-230aff6f00f9",
+        "scope": "NODE",
+        "type": "POINT",
+        "nodeId": "1c3271fb-672e-4a50-8a8c-ad4c4234481b",
+        "value": 10,
+        "angle": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,224 @@
+{
+  "meta": {
+    "name": "Doppelhaus",
+    "slug": "doppelhaus",
+    "saved_at": "2025-12-30T15:50:32.582782"
+  },
+  "system": {
+    "nodes": [
+      {
+        "id": "a3586617-1088-4dca-a5ed-a38b9ead82c5",
+        "position": {
+          "x": 3,
+          "y": 1
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": true,
+          "fixV": true,
+          "fixM": false
+        }
+      },
+      {
+        "id": "05d1e01d-9f5c-43f2-9899-2dcdc9b13de9",
+        "position": {
+          "x": 7,
+          "y": 1
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": true,
+          "fixV": true,
+          "fixM": false
+        }
+      },
+      {
+        "id": "2202154c-c759-473f-a245-24a0862891fe",
+        "position": {
+          "x": 3,
+          "y": 4
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": false,
+          "fixV": false,
+          "fixM": false
+        }
+      },
+      {
+        "id": "6a83190a-ecf4-447e-9b1f-4bfa3d97aa0d",
+        "position": {
+          "x": 7,
+          "y": 4
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": false,
+          "fixV": false,
+          "fixM": false
+        }
+      },
+      {
+        "id": "a2110a64-19af-41c8-8015-b3917cba48fd",
+        "position": {
+          "x": 3,
+          "y": 7
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": false,
+          "fixV": false,
+          "fixM": false
+        }
+      },
+      {
+        "id": "66a33cb4-763d-4e2c-96a7-0a1183ac1d73",
+        "position": {
+          "x": 7,
+          "y": 7
+        },
+        "rotation": 0,
+        "supports": {
+          "fixN": false,
+          "fixV": false,
+          "fixM": false
+        }
+      }
+    ],
+    "members": [
+      {
+        "id": "a9e09035-b739-46d6-b6ce-5ea500c24840",
+        "startNodeId": "a3586617-1088-4dca-a5ed-a38b9ead82c5",
+        "endNodeId": "2202154c-c759-473f-a245-24a0862891fe",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          }
+        }
+      },
+      {
+        "id": "205b4bf7-f8e3-4a93-b047-47443a96d26f",
+        "startNodeId": "2202154c-c759-473f-a245-24a0862891fe",
+        "endNodeId": "6a83190a-ecf4-447e-9b1f-4bfa3d97aa0d",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          }
+        }
+      },
+      {
+        "id": "2d13ebc7-c480-4d72-a614-d62192875960",
+        "startNodeId": "6a83190a-ecf4-447e-9b1f-4bfa3d97aa0d",
+        "endNodeId": "05d1e01d-9f5c-43f2-9899-2dcdc9b13de9",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          }
+        }
+      },
+      {
+        "id": "cfbdfa91-f289-4695-9d7b-24bb3856e175",
+        "startNodeId": "66a33cb4-763d-4e2c-96a7-0a1183ac1d73",
+        "endNodeId": "6a83190a-ecf4-447e-9b1f-4bfa3d97aa0d",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          }
+        }
+      },
+      {
+        "id": "c2aee182-7ef2-43fe-b715-175c42a9c409",
+        "startNodeId": "66a33cb4-763d-4e2c-96a7-0a1183ac1d73",
+        "endNodeId": "a2110a64-19af-41c8-8015-b3917cba48fd",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          }
+        }
+      },
+      {
+        "id": "630097da-bab8-428a-904f-f83fa6de0bed",
+        "startNodeId": "a2110a64-19af-41c8-8015-b3917cba48fd",
+        "endNodeId": "2202154c-c759-473f-a245-24a0862891fe",
+        "properties": {
+          "E": 210000000000,
+          "A": 0.005,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          }
+        }
+      }
+    ],
+    "loads": []
+  }
+}

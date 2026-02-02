@@ -1,6 +1,5 @@
 .venv/
 *__pycache__/
-content/
 yolov8n.pt
 stanli.sty
 .vscode/
@@ -74,5 +73,5 @@ pnpm-debug.log*
 
 
 # SYSTEMS
-!backend\content\system_templates\doppelhaus.json
-!backend\content\system_templates\einfeld-trager.json
+backend/content/*
+!backend/content/system_templates

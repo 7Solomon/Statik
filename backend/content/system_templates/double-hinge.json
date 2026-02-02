@@ -1,0 +1,107 @@
+{
+  "meta": {
+    "name": "Double Hinge",
+    "slug": "double-hinge",
+    "saved_at": "2026-01-28T15:58:26.491417"
+  },
+  "system": {
+    "nodes": [
+      {
+        "id": "bb696f91-6a12-4ba1-bc21-1d3ccb43bb23",
+        "position": {
+          "x": 3,
+          "y": 4
+        },
+        "rotation": 90,
+        "supports": {
+          "fixM": true,
+          "fixN": true,
+          "fixV": true
+        }
+      },
+      {
+        "id": "c89dc4d7-640a-4d76-90a4-abb6649fb97e",
+        "position": {
+          "x": 6,
+          "y": 4
+        },
+        "rotation": 0,
+        "supports": {
+          "fixM": false,
+          "fixN": false,
+          "fixV": false
+        }
+      },
+      {
+        "id": "1576fb36-8c80-4399-be9a-4e2bf2beb6b3",
+        "position": {
+          "x": 6,
+          "y": 1
+        },
+        "rotation": 0,
+        "supports": {
+          "fixM": false,
+          "fixN": true,
+          "fixV": true
+        }
+      }
+    ],
+    "members": [
+      {
+        "endNodeId": "c89dc4d7-640a-4d76-90a4-abb6649fb97e",
+        "id": "e568f5b4-787a-47c7-8283-4ff441e7d5ec",
+        "properties": {
+          "A": 0.005,
+          "E": 210000000000,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          }
+        },
+        "startNodeId": "bb696f91-6a12-4ba1-bc21-1d3ccb43bb23"
+      },
+      {
+        "endNodeId": "1576fb36-8c80-4399-be9a-4e2bf2beb6b3",
+        "id": "6826b242-df77-4538-9a3a-7bd366520229",
+        "properties": {
+          "A": 0.005,
+          "E": 210000000000,
+          "I": 0.0001
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          }
+        },
+        "startNodeId": "c89dc4d7-640a-4d76-90a4-abb6649fb97e"
+      }
+    ],
+    "loads": [
+      {
+        "endRatio": 1,
+        "id": "49f56d73-0b3d-4a33-aa36-e6f811a39fdc",
+        "memberId": "e568f5b4-787a-47c7-8283-4ff441e7d5ec",
+        "scope": "MEMBER",
+        "startRatio": 0,
+        "type": "DISTRIBUTED",
+        "value": 5
+      }
+    ]
+  }
+}

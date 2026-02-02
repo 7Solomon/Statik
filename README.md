@@ -221,7 +221,7 @@ Perform time-dependent analysis of the structure to evaluate vibration, stabilit
 **Features:**
 - **Natural Frequencies**: Calculation of eigenvalues and eigenmodes
 - **Time History**: Solve for Displacement, Velocity, and Acceleration over time
-- **Energy**: Track Kinetic, Potential, and Dissipated energy
+- **Energy**: Track Kinetic, Potential, and Dissipated energy (not yet Implemented)
 - **Signals**: Supports Harmonic, Pulse, Step, and Ramp input signals
 
 ---

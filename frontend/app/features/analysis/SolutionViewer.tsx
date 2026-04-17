@@ -5,7 +5,37 @@ import AnalysisCanvas from "./AnalysisCanvas";
 import { SolutionRenderer, type DiagramType } from "../drawing/SolutionRenderer";
 import type { FEMResult, StructuralSystem } from "~/types/model";
 import { SystemValidationModal } from "../modals/SystemValidationModal";
+import { DoubleHingeWarningModal } from "../modals/DoubleHingeWarningModal";
 import { useSystemValidator } from "~/utils/check_analysis_system";
+
+
+// --- Moved here from Home.tsx (or import from a shared util) ---
+function detectDoubleHinges(nodes: any[], members: any[]) {
+    const nodeHinges: Record<string, any[]> = {};
+
+    for (const member of members) {
+        if (member.releases.end.mz) {
+            const nodeId = member.endNodeId;
+            if (!nodeHinges[nodeId]) nodeHinges[nodeId] = [];
+            nodeHinges[nodeId].push({ member, end: 'end' });
+        }
+        if (member.releases.start.mz) {
+            const nodeId = member.startNodeId;
+            if (!nodeHinges[nodeId]) nodeHinges[nodeId] = [];
+            nodeHinges[nodeId].push({ member, end: 'start' });
+        }
+    }
+
+    const doubleHinges = [];
+    for (const [nodeId, hingedMembers] of Object.entries(nodeHinges)) {
+        if (hingedMembers.length >= 2) {
+            const node = nodes.find(n => n.id === nodeId);
+            doubleHinges.push({ node, hingedMembers });
+        }
+    }
+
+    return doubleHinges;
+}
 
 
 export default function SolutionViewer() {
@@ -15,24 +45,26 @@ export default function SolutionViewer() {
 
     const { checkSystem, validatorProps } = useSystemValidator();
 
-
     // Actions
     const setSolutionResult = useStore(s => s.analysis.actions.setSolutionResult);
 
     // Local State
     const [diagramType, setDiagramType] = useState<DiagramType>('M');
     const [isLoading, setIsLoading] = useState(false);
+    // ✅ Double-hinge state now lives here, not in Home.tsx
+    const [doubleHingeNodes, setDoubleHingeNodes] = useState<any[]>([]);
 
-    // --- API CALL ---
-    const handleRunFEM = async () => {
+
+    // --- Core FEM fetch (extracted so both paths can call it) ---
+    const runFEM = useCallback(async () => {
         if (!system) return;
 
         const isValid = checkSystem(
             system as StructuralSystem,
-            ['DYNAMIC_LOADS', 'CONSTRAINTS']  // FORBIDDEN
+            ['DYNAMIC_LOADS', 'CONSTRAINTS']
         );
-
         if (!isValid) return;
+
         setIsLoading(true);
         try {
             const payload = {
@@ -50,7 +82,6 @@ export default function SolutionViewer() {
             });
 
             if (!res.ok) {
-                // Network or server error (4xx/5xx)
                 const errorText = await res.text();
                 setSolutionResult({
                     success: false,
@@ -60,8 +91,6 @@ export default function SolutionViewer() {
             }
 
             const data: FEMResult = await res.json();
-
-            // Always set result (even if success=false)
             setSolutionResult(data);
 
         } catch (e) {
@@ -73,25 +102,41 @@ export default function SolutionViewer() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [system, checkSystem, setSolutionResult]);
 
 
-    const handleRender = useCallback((ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, view: any) => {
-        if (!system || system.nodes.length === 0) return;
+    // --- Entry point: checks double hinges first, then delegates to runFEM ---
+    const handleRunFEM = useCallback(() => {
+        if (!system) return;
 
-        if (!solutionResult || !solutionResult.success) {
-            return;
+        // ✅ Guard lives here — only FEM needs this, not kinematics/dynamics
+        const { nodes, members } = useStore.getState().editor;
+        const doubleHinges = detectDoubleHinges(nodes, members);
+
+        if (doubleHinges.length > 0) {
+            setDoubleHingeNodes(doubleHinges);
+            return; // Modal will open; runFEM called after resolution
         }
 
-        SolutionRenderer.render(
-            ctx,
-            canvas,
-            system,
-            solutionResult,
-            diagramType,
-            view
-        );
+        runFEM();
+    }, [system, runFEM]);
+
+
+    // Called by DoubleHingeWarningModal after user resolves the issue
+    const handleDoubleHingeResolved = useCallback(() => {
+        setDoubleHingeNodes([]);
+        runFEM(); // Now safe to proceed
+    }, [runFEM]);
+
+
+    // --- Render ---
+    const handleRender = useCallback((ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, view: any) => {
+        if (!system || system.nodes.length === 0) return;
+        if (!solutionResult || !solutionResult.success) return;
+
+        SolutionRenderer.render(ctx, canvas, system, solutionResult, diagramType, view);
     }, [solutionResult, system, diagramType]);
+
 
     if (!system || system.nodes.length === 0) {
         return <div className="flex h-full items-center justify-center text-slate-400">No System Loaded</div>;
@@ -119,9 +164,17 @@ export default function SolutionViewer() {
                             <span>{isLoading ? 'Calculating...' : 'Calculate Forces'}</span>
                         </button>
                         <SystemValidationModal {...validatorProps} />
-
                     </div>
                 </div>
+
+                {/* ✅ Double-hinge modal rendered at this level too */}
+                {doubleHingeNodes.length > 0 && (
+                    <DoubleHingeWarningModal
+                        doubleHingeNodes={doubleHingeNodes}
+                        onClose={() => setDoubleHingeNodes([])}
+                        onResolved={handleDoubleHingeResolved}
+                    />
+                )}
             </AnalysisCanvas>
         );
     }
@@ -137,14 +190,12 @@ export default function SolutionViewer() {
                         </div>
                         <h3 className="text-lg font-bold text-slate-800 mb-2">Analysis Failed</h3>
 
-                        {/* Error Message Box */}
                         <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
                             <p className="text-sm text-red-700 font-mono break-words">
                                 {solutionResult.error || "Unknown error occurred"}
                             </p>
                         </div>
 
-                        {/* Helpful Tips */}
                         <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-6 text-left">
                             <p className="text-xs text-slate-600 mb-2 font-semibold">Common solutions:</p>
                             <ul className="text-xs text-slate-600 space-y-1.5">
@@ -183,7 +234,6 @@ export default function SolutionViewer() {
                             </ul>
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="flex gap-2">
                             <button
                                 onClick={handleRunFEM}
@@ -191,15 +241,9 @@ export default function SolutionViewer() {
                                 className="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm disabled:opacity-70 flex items-center justify-center gap-2 transition-all"
                             >
                                 {isLoading ? (
-                                    <>
-                                        <RotateCw className="animate-spin" size={18} />
-                                        <span>Retrying...</span>
-                                    </>
+                                    <><RotateCw className="animate-spin" size={18} /><span>Retrying...</span></>
                                 ) : (
-                                    <>
-                                        <RefreshCw size={18} />
-                                        <span>Retry</span>
-                                    </>
+                                    <><RefreshCw size={18} /><span>Retry</span></>
                                 )}
                             </button>
                             <button
@@ -208,13 +252,18 @@ export default function SolutionViewer() {
                             >
                                 Close
                             </button>
-
                             <SystemValidationModal {...validatorProps} />
-
                         </div>
                     </div>
                 </div>
 
+                {doubleHingeNodes.length > 0 && (
+                    <DoubleHingeWarningModal
+                        doubleHingeNodes={doubleHingeNodes}
+                        onClose={() => setDoubleHingeNodes([])}
+                        onResolved={handleDoubleHingeResolved}
+                    />
+                )}
             </AnalysisCanvas>
         );
     }
@@ -222,7 +271,6 @@ export default function SolutionViewer() {
     // Case 3B: Result Loaded Successfully
     return (
         <AnalysisCanvas onRender={handleRender}>
-            {/* Re-Run Button (Top Left) */}
             <div className="absolute top-4 left-4 z-20">
                 <button
                     onClick={handleRunFEM}
@@ -234,42 +282,14 @@ export default function SolutionViewer() {
                 </button>
             </div>
 
-            {/* Bottom Center Diagram Controls */}
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm p-2 rounded-xl shadow-lg border border-slate-200 flex gap-2 animate-in slide-in-from-bottom-8 duration-500 z-20">
-                <DiagramButton
-                    active={diagramType === 'N'}
-                    onClick={() => setDiagramType('N')}
-                    label="N"
-                    desc="Axial Force"
-                    icon={<ArrowRight size={18} />}
-                />
-                <DiagramButton
-                    active={diagramType === 'V'}
-                    onClick={() => setDiagramType('V')}
-                    label="V"
-                    desc="Shear Force"
-                    icon={<ArrowUp size={18} />}
-                />
-                <DiagramButton
-                    active={diagramType === 'M'}
-                    onClick={() => setDiagramType('M')}
-                    label="M"
-                    desc="Bending Moment"
-                    icon={<RotateCw size={18} />}
-                />
-
+                <DiagramButton active={diagramType === 'N'} onClick={() => setDiagramType('N')} label="N" desc="Axial Force" icon={<ArrowRight size={18} />} />
+                <DiagramButton active={diagramType === 'V'} onClick={() => setDiagramType('V')} label="V" desc="Shear Force" icon={<ArrowUp size={18} />} />
+                <DiagramButton active={diagramType === 'M'} onClick={() => setDiagramType('M')} label="M" desc="Bending Moment" icon={<RotateCw size={18} />} />
                 <div className="w-px bg-slate-200 mx-1"></div>
-
-                <DiagramButton
-                    active={diagramType === 'NONE'}
-                    onClick={() => setDiagramType('NONE')}
-                    label="Off"
-                    desc="Hide Diagrams"
-                    icon={<Zap size={18} className="opacity-50" />}
-                />
+                <DiagramButton active={diagramType === 'NONE'} onClick={() => setDiagramType('NONE')} label="Off" desc="Hide Diagrams" icon={<Zap size={18} className="opacity-50" />} />
             </div>
 
-            {/* Info Badge */}
             <div className="absolute top-20 left-4 bg-emerald-50 backdrop-blur px-3 py-1.5 rounded-md border border-emerald-200 text-xs text-emerald-700 font-mono flex items-center gap-2 z-20">
                 <Info size={12} />
                 Analysis Converged
@@ -277,27 +297,33 @@ export default function SolutionViewer() {
 
             <SystemValidationModal {...validatorProps} />
 
+            {doubleHingeNodes.length > 0 && (
+                <DoubleHingeWarningModal
+                    doubleHingeNodes={doubleHingeNodes}
+                    onClose={() => setDoubleHingeNodes([])}
+                    onResolved={handleDoubleHingeResolved}
+                />
+            )}
         </AnalysisCanvas>
     );
 }
 
-// Helper Component for the buttons
+
 function DiagramButton({ active, onClick, label, desc, icon }: any) {
     return (
         <button
             onClick={onClick}
             title={desc}
-            className={`
-                relative flex items-center justify-center w-10 h-10 rounded-lg transition-all
-                ${active
+            className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-all ${
+                active
                     ? 'bg-blue-600 text-white shadow-md scale-105'
                     : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-                }
-            `}
+            }`}
         >
             {icon}
-            <span className={`absolute -bottom-1 -right-1 text-[9px] font-bold px-1 rounded ${active ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-500'
-                }`}>
+            <span className={`absolute -bottom-1 -right-1 text-[9px] font-bold px-1 rounded ${
+                active ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-500'
+            }`}>
                 {label}
             </span>
         </button>

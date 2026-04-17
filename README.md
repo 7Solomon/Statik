@@ -12,7 +12,30 @@ Statik provides a complete workflow for structural analysis, from model creation
 
 ---
 
-## Installation & Setup
+## 🐳 Quick Start with Docker
+
+The easiest way to run Statik is with Docker - no Python or Node.js setup required.
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+### Run
+
+```bash
+git clone https://github.com/7Solomon/Statik.git
+cd Statik
+docker compose up --build
+```
+
+Access the application at **http://localhost** once both containers are running.
+
+> **Note:** The first build may take a few minutes as dependencies are downloaded.
+> Subsequent builds are significantly faster due to Docker layer caching.
+
+---
+
+## Full Installation & Setup
 
 Follow these steps to set up the development environment locally.
 

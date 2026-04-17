@@ -25,13 +25,13 @@ export default function Home() {
       const currentState = useStore.getState().editor;
 
       // Check for double hinges
-      const doubleHinges = detectDoubleHinges(currentState.nodes, currentState.members);
-
-      if (doubleHinges.length > 0) {
-        setDoubleHingeNodes(doubleHinges);
-        setModalOpen('double-hinge');
-        return;
-      }
+      //const doubleHinges = detectDoubleHinges(currentState.nodes, currentState.members);
+//
+      //if (doubleHinges.length > 0) {
+      //  setDoubleHingeNodes(doubleHinges);
+      //  setModalOpen('double-hinge');
+      //  return;
+      //}
 
       // No issues - start analysis
       startAnalysisWithCurrentState();

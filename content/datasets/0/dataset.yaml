@@ -1,0 +1,16 @@
+names:
+- FESTLAGER
+- LOSLAGER
+- FESTE_EINSPANNUNG
+- GLEITLAGER
+- FEDER
+- TORSIONSFEDER
+- VOLLGELENK
+- HALBGELENK
+- SCHUBGELENK
+- NORMALKRAFTGELENK
+- BIEGESTEIFE_ECKE
+path: C:\Users\Johan\Documents\programme\Statik\content\datasets\0
+test: test/images
+train: train/images
+val: val/images

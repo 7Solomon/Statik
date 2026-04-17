@@ -56,7 +56,7 @@ def calculate_poles(
             # Formula derivation: vA = omega x r_PA => r_PA = (vA x k) / omega
             # P = A - r_PA
             
-            # Using your implementation style:
+            # Using implementation style:
             px = nA.position.x - vA[1] / omega
             py = nA.position.y + vA[0] / omega
             

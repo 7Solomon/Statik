@@ -1,55 +1,46 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-    Play, Loader2, Cpu, Save
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Play, Loader2, Cpu, Save } from 'lucide-react';
 import { useStore } from '~/store/useStore';
 
 export default function TrainingManager() {
-    // --- Store Integration ---
-    const {
-        models,
-        datasets,
-        actions: { fetchModels, fetchDatasets }
-    } = useStore(state => state.model_management);
+    const { models, datasets } = useStore(state => state.model_management);
 
-    // --- Local UI State ---
-    // We keep status local because it requires high-frequency polling (2s) 
-    // and doesn't necessarily need to be global until training finishes.
     const [status, setStatus] = useState<any>({ is_running: false });
     const [selectedDataset, setSelectedDataset] = useState<string>("");
     const [config, setConfig] = useState({ modelName: "", epochs: 50 });
     const [loading, setLoading] = useState(false);
 
-    // --- Initialization ---
-    // Load models and datasets when this component mounts
-    useEffect(() => {
-        fetchModels();
-        fetchDatasets();
-    }, [fetchModels, fetchDatasets]);
+    // ✅ Ref tracks is_running without causing fetchStatus to change identity
+    const isRunningRef = useRef(false);
 
-    // --- Training Status Polling ---
+    // ✅ Run once on mount — no dependency array instability
+    useEffect(() => {
+        useStore.getState().model_management.actions.fetchModels();
+        useStore.getState().model_management.actions.fetchDatasets();
+    }, []);
+
+    // ✅ Stable callback — only depends on fetchModels (stable Zustand action)
     const fetchStatus = useCallback(async () => {
         try {
             const res = await fetch('/api/models/status');
             if (res.ok) {
                 const data = await res.json();
-
-                // If training just finished (was running, now isn't), refresh the global models list
-                if (!data.is_running && status.is_running) {
-                    fetchModels();
+                if (!data.is_running && isRunningRef.current) {
+                    useStore.getState().model_management.actions.fetchModels();
                 }
+                isRunningRef.current = data.is_running;
                 setStatus(data);
             }
         } catch (e) { console.error("Failed to get status", e); }
-    }, [status.is_running, fetchModels]);
+    }, []); // ✅ empty deps — fully stable
 
-    // Poll status every 2 seconds
+    // ✅ Interval created once, never recreated
     useEffect(() => {
+        fetchStatus();
         const interval = setInterval(fetchStatus, 2000);
         return () => clearInterval(interval);
     }, [fetchStatus]);
 
-    // --- Actions ---
     const startTraining = async () => {
         if (!selectedDataset) return;
         setLoading(true);
@@ -64,7 +55,7 @@ export default function TrainingManager() {
                 })
             });
             if (!res.ok) throw new Error("Failed to start");
-            fetchStatus(); // Immediately update status UI
+            fetchStatus();
         } catch (e) {
             alert("Error starting training: " + e);
         } finally {
@@ -75,7 +66,6 @@ export default function TrainingManager() {
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
 
-            {/* 1. Active Training Status Card */}
             {status.is_running ? (
                 <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-1 bg-indigo-100">
@@ -96,8 +86,6 @@ export default function TrainingManager() {
                             <span className="text-slate-400 text-sm ml-1">epochs</span>
                         </div>
                     </div>
-
-                    {/* Metrics Preview */}
                     <div className="bg-slate-50 rounded-lg p-3 font-mono text-xs text-slate-600 h-32 overflow-y-auto">
                         {status.metrics?.slice(-5).map((m: any, i: number) => (
                             <div key={i} className="flex justify-between border-b border-slate-100 last:border-0 py-1">
@@ -112,13 +100,11 @@ export default function TrainingManager() {
                     </div>
                 </div>
             ) : (
-                /* 2. Start New Training Form */
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                         <Cpu size={20} className="text-slate-400" />
                         Start New Model
                     </h3>
-
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div className="space-y-2">
                             <label className="text-xs font-semibold text-slate-500 uppercase">Target Dataset</label>
@@ -128,13 +114,11 @@ export default function TrainingManager() {
                                 className="w-full p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                             >
                                 <option value="">Select a dataset...</option>
-                                {/* Mapped from STORE datasets instead of props */}
                                 {datasets.map((ds: any) => (
                                     <option key={ds.path} value={ds.path}>{ds.name}</option>
                                 ))}
                             </select>
                         </div>
-
                         <div className="space-y-2">
                             <label className="text-xs font-semibold text-slate-500 uppercase">Model Name (Optional)</label>
                             <input
@@ -145,7 +129,6 @@ export default function TrainingManager() {
                                 className="w-full p-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                             />
                         </div>
-
                         <div className="space-y-2">
                             <label className="text-xs font-semibold text-slate-500 uppercase">Epochs</label>
                             <input
@@ -156,15 +139,15 @@ export default function TrainingManager() {
                             />
                         </div>
                     </div>
-
                     <div className="flex justify-end">
                         <button
                             onClick={startTraining}
                             disabled={!selectedDataset || loading}
-                            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all ${!selectedDataset || loading
-                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg'
-                                }`}
+                            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all ${
+                                !selectedDataset || loading
+                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg'
+                            }`}
                         >
                             {loading ? <Loader2 className="animate-spin" size={18} /> : <Play size={18} />}
                             Start Training
@@ -173,12 +156,10 @@ export default function TrainingManager() {
                 </div>
             )}
 
-            {/* 3. Trained Models List */}
             <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-slate-500 uppercase flex items-center gap-2">
                     <Save size={14} /> Available Models
                 </h3>
-
                 {models.length === 0 ? (
                     <div className="text-center p-8 bg-slate-50 rounded-lg border border-dashed border-slate-200 text-slate-400">
                         No trained models found.

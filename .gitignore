@@ -75,3 +75,16 @@ pnpm-debug.log*
 # SYSTEMS
 backend/content/*
 !backend/content/system_templates
+
+frontend/node_modules
+frontend/.react-router
+frontend/dist
+
+backend/.venv
+backend/__pycache__
+**/__pycache__
+**/*.pyc
+
+.git
+*.log
+.env*

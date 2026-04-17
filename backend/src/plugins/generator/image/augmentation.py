@@ -5,7 +5,6 @@ from PIL import Image, ImageFilter
 from dataclasses import replace
 
 from src.models.image_models import ImageSystem, ImageNode, ImageLoad
-from src.plugins.generator.geometry import GeometryProcessor
 
 
 class ImageAugmenter:
@@ -13,18 +12,14 @@ class ImageAugmenter:
     
     def __init__(self, config):
         self.config = config
-        self.geometry_processor = GeometryProcessor()
     
     def augment(self, image: Image.Image, system: ImageSystem) -> Tuple[Image.Image, ImageSystem]:
         """Apply all enabled augmentations."""
         if self.config.enable_rotation:
             image, system = self._apply_rotation(image, system)
-        
-        if self.config.enable_perspective:
-            system = self.geometry_processor.apply_perspective_transform(
-                system, self.config.perspective_strength, self.config.image_size
-            )
-        
+
+        # Perspective is applied in DatasetPipeline before render so the raster matches labels.
+
         if self.config.enable_blur:
             image = self._apply_blur(image)
         

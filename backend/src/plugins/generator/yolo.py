@@ -10,17 +10,28 @@ from PIL import Image
 
 from src.models.image_models import ImageSystem
 from src.plugins.generator.image.stanli_symbols import (
-    LoadType, StanliSupport, StanliHinge, StanliLoad, 
-    SupportType, HingeType, StanliSymbol
+    LoadType,
+    StanliSupport,
+    StanliHinge,
+    StanliLoad,
+    SupportType,
+    HingeType,
 )
 
 class YOLODatasetManager:
     """Manages YOLO format dataset creation"""
     
-    def __init__(self, datasets_dir: Path, classes: List[str], dataset_id:str):
+    def __init__(
+        self,
+        datasets_dir: Path,
+        classes: List[str],
+        dataset_id: str,
+        load_arrow_length_px: float = 40.0,
+    ):
         self.classes = classes
         self.datasets_dir = datasets_dir
         self.dataset_id = dataset_id
+        self.load_arrow_length_px = load_arrow_length_px
 
         self.output_dir = self.datasets_dir / self.dataset_id
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -44,7 +55,12 @@ class YOLODatasetManager:
             support_size = 16
             image_size = (640, 640)
 
-        return cls(datasets_dir=base.parent, classes=data["names"], dataset_id=base.name)
+        return cls(
+            datasets_dir=base.parent,
+            classes=data["names"],
+            dataset_id=base.name,
+            load_arrow_length_px=40.0,
+        )
     
     def create_dataset_structure(self):
         for split in ['train', 'val', 'test']:
@@ -115,6 +131,12 @@ class YOLODatasetManager:
         try: return LoadType[name]
         except KeyError: return None
 
+    def _get_hinge_enum(self, name: str) -> Optional[HingeType]:
+        try:
+            return HingeType[name]
+        except KeyError:
+            return None
+
     # --- CORE LABEL GENERATION LOGIC ---
     def _structure_to_yolo_labels(self, system: ImageSystem, image_size: Tuple[int, int]) -> List[List[float]]:
         labels = []
@@ -133,7 +155,7 @@ class YOLODatasetManager:
                 class_id = self.classes.index(subtype)
                 stype_enum = self._get_support_enum(subtype)
                 
-                if stype_enum:
+                if stype_enum and stype_enum != SupportType.FREIES_ENDE:
                     symbol = StanliSupport(stype_enum)
                     rotation = getattr(node, 'rotation', 0.0)
                     min_x, min_y, max_x, max_y = symbol.get_bbox((node.pixel_x, node.pixel_y), rotation=rotation)
@@ -159,12 +181,34 @@ class YOLODatasetManager:
             pos = (node.pixel_x, node.pixel_y) if node else (load.pixel_x, load.pixel_y)
             
             min_x, min_y, max_x, max_y = symbol.get_bbox(
-                pos, 
+                pos,
                 rotation=getattr(load, 'angle_deg', 0),
-                length=50.0 
+                length=self.load_arrow_length_px,
             )
 
-            self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img )
+            self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img)
+
+        # 3. HINGES (at nodes)
+        for node in getattr(system, 'nodes', []):
+            hinge_val = getattr(node, 'hinge_type', None)
+            if not hinge_val:
+                continue
+            if isinstance(hinge_val, str):
+                subtype = self._normalize_class_name(hinge_val)
+                htype_enum = self._get_hinge_enum(subtype)
+            else:
+                htype_enum = hinge_val
+                subtype = self._normalize_class_name(hinge_val)
+            if not htype_enum or subtype not in self.classes:
+                continue
+            class_id = self.classes.index(subtype)
+            symbol = StanliHinge(htype_enum)
+            rotation = getattr(node, 'rotation', 0.0)
+            min_x, min_y, max_x, max_y = symbol.get_bbox(
+                (node.pixel_x, node.pixel_y), rotation=rotation
+            )
+            self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img)
+
         return labels
 
     def _add_label(self, labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img):
@@ -190,6 +234,29 @@ class YOLODatasetManager:
                 bw / w_img, 
                 bh / h_img
             ])
+
+    def debug_overlay(self, image: Image.Image, system: ImageSystem) -> Image.Image:
+        """Draw YOLO boxes using the same geometry as training labels (QA / regression checks)."""
+        from PIL import ImageDraw
+
+        out = image.copy()
+        draw = ImageDraw.Draw(out)
+        w, h = out.size
+        labels = self._structure_to_yolo_labels(system, (w, h))
+        for row in labels:
+            cid, cx, cy, bw, bh = row
+            x1 = (cx - bw / 2) * w
+            y1 = (cy - bh / 2) * h
+            x2 = (cx + bw / 2) * w
+            y2 = (cy + bh / 2) * h
+            name = (
+                self.classes[int(cid)]
+                if 0 <= int(cid) < len(self.classes)
+                else str(int(cid))
+            )
+            draw.rectangle([x1, y1, x2, y2], outline="red", width=2)
+            draw.text((x1, max(0, y1 - 12)), name, fill="red")
+        return out
 
     def get_image_list(self, split: str = "train") -> List[Dict]:
         images_dir = self.output_dir / split / "images"

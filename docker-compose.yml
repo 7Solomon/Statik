@@ -1,17 +1,20 @@
 services:
-  app:
+  frontend:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
-    image: statik:latest
     ports:
-      - "8000:8000"
-    volumes:
-      # SWITCH
-      - ./backend/content:/app/content # TEST
-    # - app-content:/app/content  # PRODUCTION
-    environment:
-      - FLASK_ENV=production
+      - "80:80"
+    depends_on:
+      - backend
 
-volumes:
-  app-content:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000" # optional: remove if you don't need direct access
+    volumes:
+      - ./backend/content:/app/content
+      - ./uploads:/app/uploads
+      - ./assets:/app/assets

@@ -455,16 +455,22 @@ class StanliLoad(StanliSymbol):
 
     def get_bbox(self, pos: Tuple[float, float], rotation: float = 0, length: float = 40.0, distance: float = 0.0) -> Tuple[float, float, float, float]:
         if self.lt == LoadType.EINZELLAST:
-            dist_px = mm(forceDistance) if distance == 0 else distance  
-            
-            # Define arrow corners with generous width for detection
-            local_corners = [
-                (-(length + dist_px), -15.0), # Top Left
-                (-(length + dist_px), 15.0),  # Bottom Left
-                (-dist_px, 15.0),             # Bottom Right
-                (-dist_px, -15.0)             # Top Right
-            ]
-            return self._get_rotated_bbox(local_corners, pos, rotation)
+            dist_px = mm(forceDistance) if distance == 0 else distance
+            # Match draw(): tail and tip lie on horizontal line through pos before rotation.
+            Ltot = length + dist_px
+            half_w = 15.0
+            corners = []
+            for lx, ly in (
+                (-Ltot, -half_w),
+                (-Ltot, half_w),
+                (-dist_px, half_w),
+                (-dist_px, -half_w),
+            ):
+                corners.append(self._rot((pos[0] + lx, pos[1] + ly), pos, rotation))
+            xs = [p[0] for p in corners]
+            ys = [p[1] for p in corners]
+            pad = self.line_width + 2 + 10  # line + arrowhead extent
+            return (min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad)
         
         elif self.lt in (LoadType.MOMENT_UHRZEIGER, LoadType.MOMENT_GEGEN_UHRZEIGER):
             # Circular arc moment symbol

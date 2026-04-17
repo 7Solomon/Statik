@@ -15,6 +15,8 @@ class DatasetConfig:
     # Image generation
     image_size: Tuple[int, int] = (640, 640)
     background_color: Tuple[int, int, int] = (255, 255, 255)
+    # Point-load arrow length in pixels (must match renderer, labels, and normalize bounds)
+    load_arrow_length_px: float = 40.0
     
     # Structure generation
     min_nodes: int = 4

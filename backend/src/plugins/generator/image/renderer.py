@@ -20,6 +20,7 @@ class StanliRenderer:
     def __init__(self, config):
         self.image_size = config.image_size
         self.background_color = config.background_color
+        self.load_arrow_length_px = getattr(config, "load_arrow_length_px", 40.0)
 
     def create_image(self) -> Image.Image:
         return Image.new('RGB', self.image_size, self.background_color)
@@ -65,7 +66,10 @@ class StanliRenderer:
             # Draw if it's a real support (not Free)
             if support_val and support_val != SupportType.FREIES_ENDE:
                 try:
-                    self.draw_support(draw, support_val, (node.pixel_x, node.pixel_y))
+                    rot = float(getattr(node, "rotation", 0.0) or 0.0)
+                    self.draw_support(
+                        draw, support_val, (node.pixel_x, node.pixel_y), rotation=rot
+                    )
                     is_occupied = True
                 except Exception:
                     pass
@@ -98,8 +102,10 @@ class StanliRenderer:
                     load_val = self._safe_load_enum(load_val)
                 
                 angle = getattr(load, "angle_deg", 270.0)
-                
-                self.draw_load(draw, load_val, pos, angle)
+
+                self.draw_load(
+                    draw, load_val, pos, angle, length=self.load_arrow_length_px
+                )
             except Exception:
                 pass 
 
@@ -289,6 +295,7 @@ def render_structure_to_image(system: ImageSystem, image_size: Tuple[int, int] =
         def __init__(self):
             self.image_size = image_size
             self.background_color = (255, 255, 255)
+            self.load_arrow_length_px = 40.0
     
     config = SimpleConfig()
     renderer = StanliRenderer(config)

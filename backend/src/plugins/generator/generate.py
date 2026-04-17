@@ -19,7 +19,10 @@ class DatasetPipeline:
     def __init__(self, datasets_dir, config: DatasetConfig, status_callback=None):
         self.config = config
         self.datasets_dir = datasets_dir
-        self.structure_generator = RandomStructureGenerator()
+        self.structure_generator = RandomStructureGenerator(
+            width=config.image_size[0],
+            height=config.image_size[1],
+        )
         self.geometry_processor = GeometryProcessor()
         self.renderer = StanliRenderer(config)
         self.augmenter = ImageAugmenter(config)
@@ -36,7 +39,12 @@ class DatasetPipeline:
         
         # 1. Create manager
         dataset_id = f"dataset_{uuid.uuid4().hex[:8]}_{int(time.time())}"
-        manager = YOLODatasetManager(self.datasets_dir, self.config.classes, dataset_id)
+        manager = YOLODatasetManager(
+            self.datasets_dir,
+            self.config.classes,
+            dataset_id,
+            load_arrow_length_px=self.config.load_arrow_length_px,
+        )
         output_dir = manager.get_output_dir()
         
         #print(f"[PIPELINE] Output: {output_dir}")
@@ -60,7 +68,17 @@ class DatasetPipeline:
             for i in tqdm(range(split_size)):
                 try:
                     system = self.structure_generator.generate()
-                    structure = self.geometry_processor.normalize_coordinates(system, self.config.image_size)
+                    structure = self.geometry_processor.normalize_coordinates(
+                        system,
+                        self.config.image_size,
+                        load_arrow_length_px=self.config.load_arrow_length_px,
+                    )
+                    if self.config.enable_perspective:
+                        structure = self.geometry_processor.apply_perspective_transform(
+                            structure,
+                            self.config.perspective_strength,
+                            self.config.image_size,
+                        )
                     image = self.renderer.render_structure(structure)
                     image, structure = self.augmenter.augment(image, structure)
                     

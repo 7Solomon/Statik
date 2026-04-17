@@ -15,13 +15,14 @@ MAX_LOAD_EXTENT_MM = 15.0
 MAX_HINGE_EXTENT_MM = 8.0     
 PX_PER_MM = 4.0
 
-from typing import Tuple
-from src.models.image_models import ImageSystem
 from src.plugins.generator.image.stanli_symbols import StanliSupport, StanliLoad, SupportType, LoadType
 
 class GeometryProcessor:
     @staticmethod
-    def get_structure_bounds_with_symbols(structure: ImageSystem) -> Tuple[float, float, float, float]:
+    def get_structure_bounds_with_symbols(
+        structure: ImageSystem,
+        load_arrow_length_px: float = 40.0,
+    ) -> Tuple[float, float, float, float]:
         if not structure or not structure.nodes:
             return (0, 0, 0, 0)
 
@@ -64,8 +65,7 @@ class GeometryProcessor:
 
             try:
                 rotation = float(getattr(load, "angle_deg", 0.0) or 0.0)
-                length = 50.0
-                bbox = StanliLoad(lt).get_bbox(pos, rotation, length)
+                bbox = StanliLoad(lt).get_bbox(pos, rotation, load_arrow_length_px)
                 if bbox is not None:
                     all_bounds.append(bbox)
             except Exception:
@@ -87,7 +87,8 @@ class GeometryProcessor:
         structure: ImageSystem,
         target_size: Tuple[int, int],
         margin: float = 0.1,
-        in_place: bool = False
+        in_place: bool = False,
+        load_arrow_length_px: float = 40.0,
     ) -> ImageSystem:
         """
         Normalize node coordinates to fit inside target_size (width, height) with margin.
@@ -97,7 +98,9 @@ class GeometryProcessor:
             return structure
 
         # Get actual bounds
-        min_x, min_y, max_x, max_y = GeometryProcessor.get_structure_bounds_with_symbols(structure)
+        min_x, min_y, max_x, max_y = GeometryProcessor.get_structure_bounds_with_symbols(
+            structure, load_arrow_length_px=load_arrow_length_px
+        )
 
         width = max_x - min_x
         height = max_y - min_y
@@ -198,7 +201,8 @@ class GeometryProcessor:
     def validate_bounds(
         structure: ImageSystem,
         image_size: Tuple[int, int],
-        padding: float = 10.0
+        padding: float = 10.0,
+        load_arrow_length_px: float = 40.0,
     ) -> bool:
         """
         Check if all structure elements are within image bounds.
@@ -207,8 +211,10 @@ class GeometryProcessor:
             return True
         
         w, h = image_size
-        min_x, min_y, max_x, max_y = GeometryProcessor.get_structure_bounds_with_symbols(structure)
-        
+        min_x, min_y, max_x, max_y = GeometryProcessor.get_structure_bounds_with_symbols(
+            structure, load_arrow_length_px=load_arrow_length_px
+        )
+
         if min_x < padding or max_x > w - padding:
             return False
         if min_y < padding or max_y > h - padding:

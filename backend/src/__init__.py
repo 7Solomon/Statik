@@ -40,23 +40,23 @@ def create_app(content_dir=Path("content")):
     app.register_blueprint(models.bp)
 
     
-    from flask import send_from_directory
-    
-    @app.route("/", defaults={'path': ''})
-    @app.route("/<path:path>")
-    def serve_react(path):
-        if path.startswith("api/") or path.startswith("api"):
-            return "API endpoint not found", 404
-        
-        if path != "" and (frontend_dist / path).exists():
-            return send_from_directory(frontend_dist, path)
-        
-        return send_from_directory(frontend_dist, "index.html")
+    #from flask import send_from_directory
+   # 
+    #@app.route("/", defaults={'path': ''})
+    #@app.route("/<path:path>")
+    #def serve_react(path):
+    #    if path.startswith("api/") or path.startswith("api"):
+    #        return "API endpoint not found", 404
+    #    
+    #    if path != "" and (frontend_dist / path).exists():
+    #        return send_from_directory(frontend_dist, path)
+    #    
+    #    return send_from_directory(frontend_dist, "index.html")
 
-    print("--- REGISTERED ROUTES ---")
-    for rule in app.url_map.iter_rules():
-        print(f"{rule.endpoint}: {rule}")
-    print("-------------------------")
+    #print("--- REGISTERED ROUTES ---")
+    #for rule in app.url_map.iter_rules():
+    #    print(f"{rule.endpoint}: {rule}")
+    #print("-------------------------")
 
 
     return app

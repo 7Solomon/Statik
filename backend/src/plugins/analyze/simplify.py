@@ -69,6 +69,7 @@ def build_adjacency_map(nodes: List[Node], members: List[Member]) -> Dict[str, L
         if m.start_node_id in adj: adj[m.start_node_id].append(m.id)
         if m.end_node_id in adj: adj[m.end_node_id].append(m.id)
     return adj
+
 def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
     """
     Iteratively removes statically determinate 'leaves' (cantilevers) from the system.
@@ -108,7 +109,7 @@ def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
                 node = node_map[n_id]
                 
                 # Check if it has any fixity
-                has_support = node.supports.fix_x or node.supports.fix_y or node.supports.fix_m
+                has_support = node.supports.fix_n or node.supports.fix_v or node.supports.fix_m
                 
                 # Check if connected to any Scheibe
                 connected_to_scheibe = len(scheibe_connections.get(n_id, [])) > 0
@@ -136,7 +137,7 @@ def prune_cantilevers(system_in: StructuralSystem) -> StructuralSystem:
             F_tip = get_node_loads_vector(system, tip_node_id)
             
             tip_node = node_map[tip_node_id]
-            r = tip_node.coordinates - root_node.coordinates
+            r = np.array([tip_node.position.x - root_node.position.x, tip_node.position.y - root_node.position.y])
             
             F_root_x = F_tip[0]
             F_root_y = F_tip[1]

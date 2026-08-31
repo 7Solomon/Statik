@@ -44,11 +44,12 @@ def simplify():
             payload.get("loads", []),
             payload.get("scheiben", []),
             payload.get("constraints", [])
-        )
+        ) 
         simplified_system = prune_cantilevers(system)
         return jsonify(simplified_system.to_dict()), 200 
     except Exception as e:
         print(e)
+        return jsonify({"error": str(e)}), 500
 
 @bp.route("/solution", methods=["POST"])
 def solution():

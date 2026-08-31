@@ -13,7 +13,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000" # optional: remove if you don't need direct access
+      - "8080:80"
     volumes:
       - ./backend/content:/app/content
       - ./uploads:/app/uploads

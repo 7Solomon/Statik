@@ -2,18 +2,20 @@
 
 FROM python:3.12-slim AS python-deps
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Torch first, from the CPU-only index. Default PyPI wheels pull ~2.5 GB of
-# nvidia-* CUDA packages this image can never use: compose reserves no GPU and
-# every call site passes device='cpu'. Its own layer so the slowest download is
-# repeated only when these pins change, not on every requirements.txt edit.
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch==2.8.0 torchvision==0.23.0 \
-        --index-url https://download.pytorch.org/whl/cpu
-
+# The CPU-only torch pins and their extra index live in requirements.txt, so
+# this one install covers them. Installing torch in a separate layer here as
+# well would fight that: to pip, "torch==2.8.0" and "torch==2.8.0+cpu" are
+# different versions, so it would download and install torch twice.
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt
@@ -21,8 +23,14 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 FROM python:3.12-slim AS runner
 
-WORKDIR /app
+# Must also install libs in the runner stage!
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /app
 COPY --from=python-deps /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -30,7 +38,5 @@ COPY src/ ./src/
 COPY wsgi.py gunicorn.conf.py ./
 
 ENV PYTHONUNBUFFERED=1
-
 EXPOSE 8000
-
 CMD ["gunicorn", "-c", "gunicorn.conf.py", "wsgi:app"]

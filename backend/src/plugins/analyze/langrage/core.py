@@ -3,7 +3,7 @@ import numpy as np
 
 from src.models.langrage import LagrangianAnalysisResult
 from src.plugins.analyze.langrage.assebly import assemble_matrices, build_dof_map, create_force_function
-from src.models.analyze_models import StructuralSystem
+from src.models.analyze import StructuralSystem
 
 from .solver import apply_boundary_conditions, solve_eigenvalues, check_stability, integrate_time_history
 

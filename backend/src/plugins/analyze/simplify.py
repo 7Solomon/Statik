@@ -1,6 +1,6 @@
 import copy
 import uuid
-from src.models.analyze_models import StructuralSystem, Load, Node, Member
+from src.models.analyze import StructuralSystem, Load, Node, Member
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 import sys

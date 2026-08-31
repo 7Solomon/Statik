@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from src.plugins.generator.image.stanli_symbols import BeamType, HingeType, LoadType, SupportType
-from src.models.analyze_models import (
+from src.models.analyze import (
     StructuralSystem, Node, Member, Load, 
     Vec2, Supports, MemberProperties, Release, MemberReleases
 )

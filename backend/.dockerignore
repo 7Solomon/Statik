@@ -1,0 +1,19 @@
+# Virtualenv — ~2 GB, 38k files, never used in the image
+.venv
+venv/
+env/
+
+# Bytecode / test caches
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Mounted as a volume by docker-compose, not needed at build time
+content
+
+# Not copied by the Dockerfile
+*.md
+.env
+.env.*

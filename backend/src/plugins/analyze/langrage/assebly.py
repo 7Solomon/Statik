@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Dict, Tuple, List
-from src.models.analyze_models import StructuralSystem, Member, Scheibe, SpringConstraint, DamperConstraint, CableConstraint
+from src.models.analyze import StructuralSystem, Member, Scheibe, SpringConstraint, DamperConstraint, CableConstraint
 
 def build_dof_map(system: StructuralSystem) -> Tuple[Dict, int]:
     """Create mapping from node DOFs to global DOF indices."""

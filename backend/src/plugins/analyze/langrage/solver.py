@@ -3,7 +3,7 @@ from scipy.linalg import eig
 from scipy.integrate import odeint
 from typing import List, Dict, Tuple
 from src.models.langrage import ModalResult, TimeStepResult
-from src.models.analyze_models import StructuralSystem
+from src.models.analyze import StructuralSystem
 
 # In solver.py
 

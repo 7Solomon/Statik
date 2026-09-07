@@ -194,6 +194,10 @@ class ImageSystem:
     nodes: List[ImageNode] = field(default_factory=list)
     members: List[ImageMember] = field(default_factory=list)
     loads: List[ImageLoad] = field(default_factory=list)
+    #: RenderStyle for this sample. Stroke width scales symbol bounding boxes,
+    #: so the renderer and the label writer must resolve the *same* style -
+    #: carrying it on the system is what guarantees that.
+    style: Optional[object] = None
 
     def convert_to_real_system(self, real_width_meters: float = 20.0) -> StructuralSystem:
         """

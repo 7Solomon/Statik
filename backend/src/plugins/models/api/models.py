@@ -27,6 +27,41 @@ WEIGHTS_ROOT = CONTENT_ROOT / "weights"
 MODELS_ROOT.mkdir(parents=True, exist_ok=True)
 WEIGHTS_ROOT.mkdir(parents=True, exist_ok=True)
 
+#: Base checkpoint per task. The generator writes 4-corner oriented boxes, so
+#: its datasets declare `task: obb` and must be trained from an -obb checkpoint:
+#: a detect-task model reads those nine numbers as a different format entirely.
+BASE_WEIGHTS = {
+    "detect": ("yolo11n.pt",
+               "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt"),
+    "obb": ("yolo11n-obb.pt",
+            "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n-obb.pt"),
+}
+
+
+def dataset_task(dataset_path: Path) -> str:
+    """Task declared by a dataset.yaml, falling back to the label shape."""
+    yaml_path = Path(dataset_path) / "dataset.yaml"
+    try:
+        import yaml as _yaml
+        declared = (_yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}).get("task")
+        if declared in BASE_WEIGHTS:
+            return declared
+    except Exception:
+        pass
+
+    # Older datasets predate the `task` key: 9 fields per row means OBB.
+    for split in ("train", "val"):
+        labels = Path(dataset_path) / split / "labels"
+        if not labels.is_dir():
+            continue
+        for txt in sorted(labels.glob("*.txt"))[:5]:
+            for line in txt.read_text(encoding="utf-8").split("\n"):
+                parts = line.split()
+                if parts:
+                    return "obb" if len(parts) == 9 else "detect"
+    return "detect"
+
+
 class TrainingThread(threading.Thread):
     def __init__(self, dataset_path, model_name, epochs=50, imgsz=640):
         super().__init__()
@@ -34,24 +69,26 @@ class TrainingThread(threading.Thread):
         self.model_name = model_name
         self.epochs = epochs
         self.imgsz = imgsz
+        self.task = dataset_task(self.dataset_path)
         # Ultralytics saves to: project/name
         self.output_dir = MODELS_ROOT / model_name
 
     def _get_base_weights(self):
-        """Ensures yolov8n.pt exists in content/weights/ to avoid root clutter"""
-        weight_path = WEIGHTS_ROOT / "yolov8n.pt"
+        """Ensures the task's base checkpoint exists in content/weights/."""
+        name, url = BASE_WEIGHTS.get(self.task, BASE_WEIGHTS["detect"])
+        weight_path = WEIGHTS_ROOT / name
         if not weight_path.exists():
-            print(f"Downloading base weights to {weight_path}...")
-            # Download manually or let YOLO handle it, but moving it is safer
-            # Simple manual download to ensure location:
-            url = "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.pt"
+            print(f"Downloading {self.task} base weights to {weight_path}...")
             try:
                 response = requests.get(url, stream=True)
+                response.raise_for_status()
                 with open(weight_path, 'wb') as f:
                     shutil.copyfileobj(response.raw, f)
             except Exception as e:
+                # Leave no truncated file behind for the next run to "find".
+                weight_path.unlink(missing_ok=True)
                 print(f"Failed to download weights manually, falling back to auto: {e}")
-                return "yolov8n.pt" # Fallback to default behavior
+                return name
         return str(weight_path)
 
     def run(self):
@@ -60,8 +97,11 @@ class TrainingThread(threading.Thread):
             # 1. Get path to base weights (inside content/weights)
             base_weight_path = self._get_base_weights()
 
-            # 2. Load model from that specific path
-            model = YOLO(base_weight_path) 
+            # 2. Load model from that specific path. The task is passed
+            # explicitly so a mismatch fails here rather than training a
+            # detect head against oriented labels.
+            model = YOLO(base_weight_path, task=self.task)
+            print(f"[TRAIN] task={self.task} weights={base_weight_path}")
             
             # 3. Start training
             # project=MODELS_ROOT ensures output goes to ./content/models/{model_name}
@@ -101,6 +141,7 @@ def start_training():
         "is_running": True,
         "model_name": model_name,
         "dataset_path": dataset_path,
+        "task": dataset_task(Path(dataset_path)),
         "start_time": time.time(),
         "progress": {}
     }

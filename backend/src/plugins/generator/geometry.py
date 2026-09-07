@@ -1,21 +1,10 @@
-import numpy as np
-from typing import Tuple, List, Optional
-from dataclasses import replace
 import copy
+from dataclasses import replace
+from typing import List, Optional, Tuple
 
-# Import your NEW image models
-from src.models.image_models import ImageSystem, ImageNode, ImageLoad
+from src.models.image_models import ImageLoad, ImageNode, ImageSystem
+from src.plugins.generator.image.placement import compute_placements
 
-# Import your existing symbol definitions
-from src.plugins.generator.image.stanli_symbols import StanliSupport, StanliHinge, StanliLoad
-
-# Maximum symbol extents (in mm, converted to pixels in normalization)
-MAX_SUPPORT_EXTENT_MM = 25.0  
-MAX_LOAD_EXTENT_MM = 15.0     
-MAX_HINGE_EXTENT_MM = 8.0     
-PX_PER_MM = 4.0
-
-from src.plugins.generator.image.stanli_symbols import StanliSupport, StanliLoad, SupportType, LoadType
 
 class GeometryProcessor:
     @staticmethod
@@ -23,64 +12,35 @@ class GeometryProcessor:
         structure: ImageSystem,
         load_arrow_length_px: float = 40.0,
     ) -> Tuple[float, float, float, float]:
+        """Extent of everything that will be inked: members plus every symbol.
+
+        Uses the same placement list as the renderer, so a symbol can no longer
+        be missing from the bounds (hinges used to be, which is why they clipped
+        at the frame edge).
+        """
         if not structure or not structure.nodes:
-            return (0, 0, 0, 0)
+            return (0.0, 0.0, 0.0, 0.0)
 
-        all_bounds = []
+        bounds: List[Tuple[float, float, float, float]] = []
 
-        # 1) Nodes + supports
+        # Members / bare nodes. Members are straight lines between nodes, so the
+        # node positions alone cover them.
         for node in structure.nodes:
-            st = getattr(node, "support_type", None)
+            pad = 3.0
+            bounds.append((node.pixel_x - pad, node.pixel_y - pad,
+                           node.pixel_x + pad, node.pixel_y + pad))
 
-            x, y = node.pixel_x, node.pixel_y
-            pos = (x, y)
-            rotation = float(getattr(node, "rotation", 0.0) or 0.0)
+        for placement in compute_placements(structure, load_arrow_length_px):
+            box = placement.bbox()
+            if box is not None:
+                bounds.append(box)
 
-            if st != SupportType.FREIES_ENDE:
-                try:
-                    bbox = StanliSupport(st).get_bbox(pos, rotation)
-                    if bbox is not None:
-                        all_bounds.append(bbox)
-                        continue
-                except Exception:
-                    pass
-
-            # fallback node bbox
-            pad = 5.0
-            all_bounds.append((x - pad, y - pad, x + pad, y + pad))
-
-        # 2) Loads
-        for load in getattr(structure, "loads", []):
-            node_id = getattr(load, "node_id", None)
-            if not node_id:
-                continue
-
-            node = next((n for n in structure.nodes if n.id == node_id), None)
-            if not node:
-                continue
-
-            pos = (node.pixel_x, node.pixel_y)
-            #lt = coerce_load_type(getattr(load, "load_type", None))
-            lt = getattr(load, "load_type", None)
-
-            try:
-                rotation = float(getattr(load, "angle_deg", 0.0) or 0.0)
-                bbox = StanliLoad(lt).get_bbox(pos, rotation, load_arrow_length_px)
-                if bbox is not None:
-                    all_bounds.append(bbox)
-            except Exception:
-                # fallback around the node if load bbox fails
-                x, y = pos
-                pad = 10.0
-                all_bounds.append((x - pad, y - pad, x + pad, y + pad))
-
-        # combine
-        min_x = min(b[0] for b in all_bounds)
-        min_y = min(b[1] for b in all_bounds)
-        max_x = max(b[2] for b in all_bounds)
-        max_y = max(b[3] for b in all_bounds)
-        return (min_x, min_y, max_x, max_y)
-
+        return (
+            min(b[0] for b in bounds),
+            min(b[1] for b in bounds),
+            max(b[2] for b in bounds),
+            max(b[3] for b in bounds),
+        )
 
     @staticmethod
     def normalize_coordinates(
@@ -90,134 +50,68 @@ class GeometryProcessor:
         in_place: bool = False,
         load_arrow_length_px: float = 40.0,
     ) -> ImageSystem:
-        """
-        Normalize node coordinates to fit inside target_size (width, height) with margin.
-        Operates on ImageSystem.
+        """Fit the structure inside `target_size`, leaving `margin` free at each edge.
+
+        Runs twice on purpose. Symbols are drawn at a fixed pixel size while node
+        positions get scaled, so the first pass' bounds - which include symbol
+        extents measured *before* scaling - under-budget the symbols whenever the
+        structure shrinks. The second pass measures the already-scaled system and
+        corrects, which is what keeps supports from being clipped at the frame.
         """
         if not structure or not structure.nodes:
             return structure
 
-        # Get actual bounds
-        min_x, min_y, max_x, max_y = GeometryProcessor.get_structure_bounds_with_symbols(
-            structure, load_arrow_length_px=load_arrow_length_px
-        )
-
-        width = max_x - min_x
-        height = max_y - min_y
-
-        if width == 0 or height == 0:
-            if in_place: return structure
-            return copy.deepcopy(structure)
-
+        result = structure if in_place else copy.deepcopy(structure)
         tgt_w, tgt_h = target_size
-        
-        margin_x = min(tgt_w * margin, tgt_w * 0.4)
-        margin_y = min(tgt_h * margin, tgt_h * 0.4)
 
-        scale_x = (tgt_w - 2 * margin_x) / width
-        scale_y = (tgt_h - 2 * margin_y) / height
-        scale = min(scale_x, scale_y)
+        for _ in range(2):
+            min_x, min_y, max_x, max_y = GeometryProcessor.get_structure_bounds_with_symbols(
+                result, load_arrow_length_px=load_arrow_length_px
+            )
+            width = max_x - min_x
+            height = max_y - min_y
+            if width <= 0 or height <= 0:
+                return result
 
-        center_x = tgt_w / 2
-        center_y = tgt_h / 2
-        struct_cx = (min_x + max_x) / 2
-        struct_cy = (min_y + max_y) / 2
+            margin_x = min(tgt_w * margin, tgt_w * 0.4)
+            margin_y = min(tgt_h * margin, tgt_h * 0.4)
+            scale = min((tgt_w - 2 * margin_x) / width, (tgt_h - 2 * margin_y) / height)
 
-        def transform(x, y):
-            new_x = center_x + (x - struct_cx) * scale
-            new_y = center_y + (y - struct_cy) * scale
-            return new_x, new_y
+            struct_cx = (min_x + max_x) / 2
+            struct_cy = (min_y + max_y) / 2
+            center_x, center_y = tgt_w / 2, tgt_h / 2
 
-        if in_place:
-            for node in structure.nodes:
-                nx, ny = transform(node.pixel_x, node.pixel_y)
-                node.pixel_x = nx
-                node.pixel_y = ny
-            # Loads follow nodes, but if they have independent positions, update them too
-            for load in structure.loads:
-                 if not load.node_id: # Only transform loads that aren't attached to nodes
-                     lx, ly = transform(load.pixel_x, load.pixel_y)
-                     load.pixel_x = lx
-                     load.pixel_y = ly
-            return structure
+            def transform(x, y):
+                return (center_x + (x - struct_cx) * scale,
+                        center_y + (y - struct_cy) * scale)
 
-        # Create new nodes
-        new_nodes = []
-        for n in structure.nodes:
-            nx, ny = transform(n.pixel_x, n.pixel_y)
-            new_nodes.append(replace(n, pixel_x=nx, pixel_y=ny))
+            for node in result.nodes:
+                node.pixel_x, node.pixel_y = transform(node.pixel_x, node.pixel_y)
+            for load in result.loads:
+                if not load.node_id:
+                    load.pixel_x, load.pixel_y = transform(load.pixel_x, load.pixel_y)
 
-        # Create new loads (if they store position)
-        new_loads = []
-        for l in structure.loads:
-            # If load is attached to a node, its position is usually derived from the node at render time
-            # But if we store pixel_x/y on the load for convenience, we must update it
-            if hasattr(l, 'pixel_x'):
-                lx, ly = transform(l.pixel_x, l.pixel_y)
-                new_loads.append(replace(l, pixel_x=lx, pixel_y=ly))
-            else:
-                new_loads.append(l)
+            # Already inside the frame with room to spare - a second pass would
+            # only nudge it by rounding error.
+            if abs(scale - 1.0) < 0.02:
+                break
 
-        # Return new structure
-        return replace(structure, nodes=new_nodes, loads=new_loads)
+        return result
 
-
-    @staticmethod
-    def apply_perspective_transform(
-        structure: ImageSystem,
-        strength: float,
-        image_size: Tuple[int, int],
-        in_place: bool = False
-    ) -> ImageSystem:
-        """
-        Apply pseudo‑perspective squeeze to ImageSystem.
-        """
-        if strength <= 0 or not structure.nodes:
-            return structure
-
-        img_w, img_h = image_size
-        max_factor = max(0.0, 1.0 - strength * 0.1)
-
-        def transform(x, y):
-            t = y / img_h if img_h > 0 else 0
-            x_factor = 1.0 - (1.0 - max_factor) * t
-            return x * x_factor, y
-
-        if in_place:
-            for node in structure.nodes:
-                nx, ny = transform(node.pixel_x, node.pixel_y)
-                node.pixel_x = nx
-                node.pixel_y = ny
-            return structure
-
-        new_nodes = []
-        for n in structure.nodes:
-            nx, ny = transform(n.pixel_x, n.pixel_y)
-            new_nodes.append(replace(n, pixel_x=nx, pixel_y=ny))
-
-        return replace(structure, nodes=new_nodes)
-    
     @staticmethod
     def validate_bounds(
         structure: ImageSystem,
         image_size: Tuple[int, int],
-        padding: float = 10.0,
+        padding: float = 0.0,
         load_arrow_length_px: float = 40.0,
     ) -> bool:
-        """
-        Check if all structure elements are within image bounds.
-        """
+        """True when every inked pixel lands inside the frame."""
         if not structure or not structure.nodes:
             return True
-        
+
         w, h = image_size
         min_x, min_y, max_x, max_y = GeometryProcessor.get_structure_bounds_with_symbols(
             structure, load_arrow_length_px=load_arrow_length_px
         )
-
-        if min_x < padding or max_x > w - padding:
-            return False
-        if min_y < padding or max_y > h - padding:
-            return False
-        
-        return True
+        return (min_x >= padding and min_y >= padding
+                and max_x <= w - padding and max_y <= h - padding)

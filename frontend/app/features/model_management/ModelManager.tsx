@@ -1,8 +1,9 @@
 import React from 'react';
 import { useStore } from "~/store/useStore";
-import { Database, BrainCircuit, Layout } from "lucide-react";
+import { Database, BrainCircuit, Layout, Tag } from "lucide-react";
 import DataSetManager from "./datasets/DataSetManager"; // Make sure this path points to your INNER component
 import TrainingManager from "./models/TrainingManager";
+import LabelingManager from "./labeling/LabelingManager";
 
 export default function ModelManagement() {
     const viewMode = useStore((s) => s.model_management.viewMode);
@@ -22,7 +23,9 @@ export default function ModelManagement() {
                     <div>
                         <h1 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Model Management</h1>
                         <p className="text-xs text-slate-500">
-                            {viewMode === 'DATASETS' ? 'Synthetic Data Generation' : 'Model Training & Evaluation'}
+                            {viewMode === 'DATASETS' ? 'Synthetic Data Generation'
+                                : viewMode === 'LABELING' ? 'Hand Labelling of Real Figures'
+                                    : 'Model Training & Evaluation'}
                         </p>
                     </div>
                 </div>
@@ -34,6 +37,12 @@ export default function ModelManagement() {
                         onClick={() => setViewMode('DATASETS')}
                         icon={<Database size={14} />}
                         label="Datasets"
+                    />
+                    <TabButton
+                        active={viewMode === 'LABELING'}
+                        onClick={() => setViewMode('LABELING')}
+                        icon={<Tag size={14} />}
+                        label="Labeling"
                     />
                     <TabButton
                         active={viewMode === 'TRAINING'}
@@ -51,6 +60,7 @@ export default function ModelManagement() {
                 <div className="w-full h-full overflow-y-auto custom-scrollbar p-6">
                     <div className="max-w-7xl mx-auto">
                         {viewMode === 'DATASETS' && <DataSetManager />}
+                        {viewMode === 'LABELING' && <LabelingManager />}
                         {viewMode === 'TRAINING' && <TrainingManager />}
                     </div>
                 </div>

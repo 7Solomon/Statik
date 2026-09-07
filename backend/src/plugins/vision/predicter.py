@@ -2,8 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Union, Any, Dict
-#
-#from ultralytics import YOLO
+from ultralytics import YOLO
 import torch
 from .config import VisionConfig
 
@@ -21,6 +20,12 @@ class Detection:
     height: float
     cx: float
     cy: float
+    #: Rotation about the centre, radians, from an OBB model; 0.0 for a plain
+    #: detect model. A Streckenlast is only reconstructable with this: it says
+    #: which member the load lies along and how far it runs.
+    angle: float = 0.0
+    #: The four corners, when the model produces them.
+    corners: Optional[List[tuple]] = None
 
 @dataclass
 class ImagePrediction:
@@ -100,15 +105,22 @@ class YoloPredictor:
         structured: List[ImagePrediction] = []
 
         for r in results:
-            if not hasattr(r, "boxes"):
+            # An OBB model puts its predictions on `.obb`, not `.boxes`.
+            container = getattr(r, "obb", None)
+            oriented = container is not None
+            if not oriented:
+                container = getattr(r, "boxes", None)
+            if container is None:
                 continue
 
             det_list: List[Detection] = []
-            if r.boxes is not None and len(r.boxes) > 0:
-                xyxy = r.boxes.xyxy.cpu().numpy()
-                cls = r.boxes.cls.cpu().numpy()
-                confs = r.boxes.conf.cpu().numpy()
-                
+            if len(container) > 0:
+                xyxy = container.xyxy.cpu().numpy()
+                cls = container.cls.cpu().numpy()
+                confs = container.conf.cpu().numpy()
+                angles = container.xywhr[:, 4].cpu().numpy() if oriented else None
+                quads = container.xyxyxyxy.cpu().numpy() if oriented else None
+
                 for i in range(len(xyxy)):
                     x1, y1, x2, y2 = xyxy[i]
                     w = x2 - x1
@@ -132,7 +144,10 @@ class YoloPredictor:
                             width=float(w),
                             height=float(h),
                             cx=float(cx),
-                            cy=float(cy)
+                            cy=float(cy),
+                            angle=float(angles[i]) if angles is not None else 0.0,
+                            corners=([tuple(pt) for pt in quads[i].tolist()]
+                                     if quads is not None else None),
                         )
                     )
 

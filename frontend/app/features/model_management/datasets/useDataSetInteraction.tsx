@@ -4,10 +4,17 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 export interface Label {
     class_id: number;
     class_name: string;
+    /** Enclosing axis-aligned box, normalised. Kept for hit-testing and layout. */
     cx: number;
     cy: number;
     w: number;
     h: number;
+    /**
+     * The four corners of the oriented box, normalised, when the dataset is in
+     * YOLO OBB format. cx/cy/w/h is only the box AROUND this, which for a
+     * Streckenlast on a diagonal member is several times too large.
+     */
+    corners?: [number, number][];
 }
 
 export interface DatasetFile {

@@ -1,20 +1,59 @@
+# Statik - Statik-Editor fuer Tragwerke.
+#
+# Erreichbar ueber das Gateway als statik.7solomon.duckdns.org.
+# Kein einziger Host-Port: der Aufruf kommt vom Gateway durch das Netz
+# "edge", nicht von aussen an diesem Rechner vorbei. Der frueher hier
+# stehende Port 80 kollidierte mit dem Caddy von POLIS - genau solche
+# Kollisionen soll das Gateway ueberfluessig machen.
+#
+# Aufteilung der Netze:
+#   statik-net  nur diese beiden Container. Darueber findet nginx im
+#               Frontend seinen "backend:8000" (siehe frontend/nginx.conf).
+#   edge        gemeinsames Netz aller Dienste dieses Servers. NUR das
+#               Frontend haengt darin - das Backend soll ausschliesslich
+#               ueber den /api/-Umweg im nginx erreichbar sein.
+
 services:
-  frontend:
+  # Der Dienstname ist "statik-frontend" und nicht "frontend", weil im
+  # edge-Netz alle Namen nebeneinander liegen: ToSearch hat dort bereits
+  # einen Dienst "frontend", und zwei gleiche Namen wuerden dort zu zwei
+  # Antworten auf dieselbe Anfrage fuehren.
+  statik-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "80:80"
+    container_name: statik-frontend
+    restart: unless-stopped
     depends_on:
-      - backend
+      - statik-backend
+    networks:
+      - statik-net
+      - edge
 
-  backend:
+  # Ebenfalls praefixiert - siehe Begruendung beim Frontend. Der Name
+  # steht so auch in frontend/nginx.conf.
+  statik-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "8080:80"
+    container_name: statik-backend
+    restart: unless-stopped
     volumes:
       - ./backend/content:/app/content
       - ./uploads:/app/uploads
       - ./assets:/app/assets
+      # Die geernteten Realbilder aus tmp/harvest.py, schreibgeschuetzt.
+      # Sie liegen bewusst ausserhalb von backend/content: das Verzeichnis
+      # ist Wegwerfmaterial (siehe tmp/README.md), die von Hand gesetzten
+      # Labels dagegen nicht - die landen unter content/labeling.
+      - ./tmp/out:/app/content/harvest:ro
+    networks:
+      - statik-net
+
+networks:
+  statik-net:
+    driver: bridge
+  # Angelegt mit "docker network create edge" - gehoert keinem Projekt,
+  # deshalb external.
+  edge:
+    external: true

@@ -103,6 +103,31 @@ export class SolutionRenderer {
         });
     }
 
+    /**
+     * Draws one member's N/V/M curve, plotted perpendicular to the member axis.
+     *
+     * SIGN CONVENTION
+     * ---------------
+     * After translate(p1) + rotate(angle), local +x runs from the start node to
+     * the end node and local +y points to the RIGHT of that direction on screen.
+     * Since canvas y grows downward, local +y is "below" the member for a member
+     * drawn left-to-right. So `lineTo(px, -py)` puts a positive `py` ABOVE the
+     * axis and a negative `py` BELOW it.
+     *
+     * The backend reports M with sagging NEGATIVE (see fem/postprocess.py: a
+     * simply supported beam under a downward UDL returns M = -qL^2/8 at midspan,
+     * a cantilever returns +qL^2/2 at the built-in end). Feeding that straight
+     * through therefore draws the moment on the TENSION SIDE, which is the
+     * convention used in structural engineering:
+     *
+     *   sagging  -> M < 0 -> py < 0 -> drawn BELOW the axis (bottom fibre in tension)
+     *   hogging  -> M > 0 -> py > 0 -> drawn ABOVE the axis (top fibre in tension)
+     *
+     * Do not negate M here. The previous `-s.M` mirrored every moment diagram,
+     * putting the sagging bulge of a beam under gravity load on top.
+     *
+     * N and V keep the usual "positive plots upward" reading.
+     */
     private static drawMemberDiagram(
         ctx: CanvasRenderingContext2D,
         startNode: Node,
@@ -136,7 +161,7 @@ export class SolutionRenderer {
 
             // Get value based on type
             let val = 0;
-            if (type === 'M') val = -s.M; // Invert Moment for standard "Tension Side" plot
+            if (type === 'M') val = s.M; // Tension-side plot; see the note above.
             else if (type === 'V') val = s.V;
             else if (type === 'N') val = s.N;
 

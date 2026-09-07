@@ -1,0 +1,15 @@
+{
+  "images_dir": "/app/content/harvest/images",
+  "classes": [
+    "FESTLAGER",
+    "LOSLAGER",
+    "FESTE_EINSPANNUNG",
+    "GLEITLAGER",
+    "EINZELLAST",
+    "MOMENT_UHRZEIGER",
+    "MOMENT_GEGEN_UHRZEIGER",
+    "VOLLGELENK",
+    "SCHUBGELENK",
+    "NORMALKRAFTGELENK"
+  ]
+}

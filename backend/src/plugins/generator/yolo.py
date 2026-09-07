@@ -9,14 +9,10 @@ import yaml
 from PIL import Image
 
 from src.models.image_models import ImageSystem
-from src.plugins.generator.image.stanli_symbols import (
-    LoadType,
-    StanliSupport,
-    StanliHinge,
-    StanliLoad,
-    SupportType,
-    HingeType,
+from src.plugins.generator.image.placement import (
+    clip_polygon, compute_placements, polygon_area,
 )
+from src.plugins.generator.image.stanli_symbols import detectable_class_names
 
 class YOLODatasetManager:
     """Manages YOLO format dataset creation"""
@@ -28,10 +24,13 @@ class YOLODatasetManager:
         dataset_id: str,
         load_arrow_length_px: float = 40.0,
     ):
-        self.classes = classes
+        self.classes = list(classes)
         self.datasets_dir = datasets_dir
         self.dataset_id = dataset_id
         self.load_arrow_length_px = load_arrow_length_px
+        # Instances actually written, per class. A class that ends on zero is a
+        # bug, not a quirk: it costs capacity and silently skews val metrics.
+        self.class_counts: Dict[str, int] = {name: 0 for name in self.classes}
 
         self.output_dir = self.datasets_dir / self.dataset_id
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -48,18 +47,11 @@ class YOLODatasetManager:
             data = yaml.safe_load(f)
         base = Path(data.get("path", dataset_yaml.parent)).resolve()
 
-        class Cfg:
-            output_dir = str(base)
-            classes = tuple(data["names"])
-            node_radius = 4
-            support_size = 16
-            image_size = (640, 640)
-
         return cls(
             datasets_dir=base.parent,
             classes=data["names"],
             dataset_id=base.name,
-            load_arrow_length_px=40.0,
+            load_arrow_length_px=float(data.get("load_arrow_length_px", 40.0)),
         )
     
     def create_dataset_structure(self):
@@ -74,10 +66,21 @@ class YOLODatasetManager:
             'train': 'train/images',
             'val': 'val/images',
             'test': 'test/images',
-            'names': list(self.classes)
+            'names': list(self.classes),
+            'load_arrow_length_px': self.load_arrow_length_px,
+            # Labels are 4-corner oriented boxes, so this dataset only trains
+            # against a *-obb model. Recorded here so a detect-task model
+            # pointed at it fails loudly instead of misreading the coordinates.
+            'task': 'obb',
         }
         with open(self.output_dir / 'dataset.yaml', 'w', encoding="utf-8") as f:
             yaml.dump(dataset_info, f, default_flow_style=False)
+
+    def class_histogram(self) -> Dict[str, int]:
+        return dict(self.class_counts)
+
+    def empty_classes(self) -> List[str]:
+        return [name for name, n in self.class_counts.items() if n == 0]
     
     def save_sample(self, image: Image.Image, system: ImageSystem,
                 filename: str, split: str = 'train'):
@@ -87,7 +90,16 @@ class YOLODatasetManager:
         images_dir.mkdir(parents=True, exist_ok=True)
         labels_dir.mkdir(parents=True, exist_ok=True)
         
-        # Save Image
+        # Labels first: an image without a matching label file is silently
+        # trained on as a pure-background sample, which is worse than skipping it.
+        try:
+            labels = self._structure_to_yolo_labels(system, image.size)
+        except Exception as e:
+            print(f"[LABELS ERROR] {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
         image_path = images_dir / f'{filename}.jpg'
         try:
             image.save(image_path, 'JPEG', quality=95)
@@ -95,16 +107,6 @@ class YOLODatasetManager:
             print(f"[SAVE ERROR] Image {image_path}: {e}")
             return False
         
-        # Generate Labels
-        try:
-            labels = self._structure_to_yolo_labels(system, image.size)
-        except Exception as e:
-            print(f"[LABELS ERROR] {e}")
-            import traceback
-            traceback.print_exc()
-            labels = []
-        
-        # Save Labels
         label_path = labels_dir / f'{filename}.txt'
         try:
             with open(label_path, 'w', encoding="utf-8") as f:
@@ -112,128 +114,65 @@ class YOLODatasetManager:
                     f.write(' '.join(map(str, label)) + '\n')
         except Exception as e:
             print(f"[SAVE ERROR] Labels {label_path}: {e}")
+            image_path.unlink(missing_ok=True)
             return False
+
+        for label in labels:
+            name = self.classes[int(label[0])]
+            self.class_counts[name] = self.class_counts.get(name, 0) + 1
         
         return True
 
-    def _normalize_class_name(self, obj) -> str:
-        if hasattr(obj, "name"): return obj.name
-        s = str(obj)
-        if "." in s: s = s.split(".")[-1]
-        return s
-
-    # --- Helpers for Enum Conversion ---
-    def _get_support_enum(self, name: str) -> Optional[SupportType]:
-        try: return SupportType[name]
-        except KeyError: return None
-
-    def _get_load_enum(self, name: str) -> Optional[LoadType]:
-        try: return LoadType[name]
-        except KeyError: return None
-
-    def _get_hinge_enum(self, name: str) -> Optional[HingeType]:
-        try:
-            return HingeType[name]
-        except KeyError:
-            return None
-
     # --- CORE LABEL GENERATION LOGIC ---
     def _structure_to_yolo_labels(self, system: ImageSystem, image_size: Tuple[int, int]) -> List[List[float]]:
-        labels = []
+        """Labels derived from the exact placements the renderer drew.
+
+        YOLO OBB format: `class x1 y1 x2 y2 x3 y3 x4 y4`, normalised, four
+        corners in draw order. See stanli_symbols._obb_from_ops for why the
+        boxes are oriented rather than axis-aligned.
+        """
+        labels: List[List[float]] = []
         w_img, h_img = image_size
-        
-        # 1. SUPPORTS
-        for node in getattr(system, 'nodes', []):
-            support_str = getattr(node, 'support_type', None)
-            
-            if not support_str:
-                continue
 
-            subtype = self._normalize_class_name(support_str)
-            
-            if subtype in self.classes:
-                class_id = self.classes.index(subtype)
-                stype_enum = self._get_support_enum(subtype)
-                
-                if stype_enum and stype_enum != SupportType.FREIES_ENDE:
-                    symbol = StanliSupport(stype_enum)
-                    rotation = getattr(node, 'rotation', 0.0)
-                    min_x, min_y, max_x, max_y = symbol.get_bbox((node.pixel_x, node.pixel_y), rotation=rotation)
-                    self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img)
-
-        # 2. LOADS
-        for load in getattr(system, 'loads', []):
-            # 1. Map string type to Enum if necessary
-            ltype = load.load_type
-            if isinstance(ltype, str):
-                ltype = self._get_load_enum(ltype) # Use your helper from renderer
-            
-            class_name = self._normalize_class_name(ltype)
-            if class_name not in self.classes:
-                print(f"Warning: Load class '{class_name}' not in dataset classes")
+        for placement in compute_placements(system, self.load_arrow_length_px):
+            if placement.class_name not in self.classes:
                 continue
-                
-            class_id = self.classes.index(class_name)
-            
-            # 2. Get the symbol and bbox
-            symbol = StanliLoad(ltype)
-            node = next((n for n in system.nodes if n.id == load.node_id), None)
-            pos = (node.pixel_x, node.pixel_y) if node else (load.pixel_x, load.pixel_y)
-            
-            min_x, min_y, max_x, max_y = symbol.get_bbox(
-                pos,
-                rotation=getattr(load, 'angle_deg', 0),
-                length=self.load_arrow_length_px,
-            )
-
-            self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img)
-
-        # 3. HINGES (at nodes)
-        for node in getattr(system, 'nodes', []):
-            hinge_val = getattr(node, 'hinge_type', None)
-            if not hinge_val:
+            corners = placement.corners()
+            if not corners:
                 continue
-            if isinstance(hinge_val, str):
-                subtype = self._normalize_class_name(hinge_val)
-                htype_enum = self._get_hinge_enum(subtype)
-            else:
-                htype_enum = hinge_val
-                subtype = self._normalize_class_name(hinge_val)
-            if not htype_enum or subtype not in self.classes:
-                continue
-            class_id = self.classes.index(subtype)
-            symbol = StanliHinge(htype_enum)
-            rotation = getattr(node, 'rotation', 0.0)
-            min_x, min_y, max_x, max_y = symbol.get_bbox(
-                (node.pixel_x, node.pixel_y), rotation=rotation
-            )
-            self._add_label(labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img)
+            self._add_label(labels, self.classes.index(placement.class_name),
+                            corners, w_img, h_img)
 
         return labels
 
-    def _add_label(self, labels, class_id, min_x, min_y, max_x, max_y, w_img, h_img):
-        """Helper to normalize and append label if valid."""
-        # Clamp to image bounds
-        min_x = max(0, min_x)
-        min_y = max(0, min_y)
-        max_x = min(w_img, max_x)
-        max_y = min(h_img, max_y)
+    def _add_label(self, labels, class_id, corners, w_img, h_img):
+        """Normalise and append, dropping symbols that fell out of the frame.
 
-        # Calculate normalized center + width/height
-        bw = (max_x - min_x)
-        bh = (max_y - min_y)
-        cx = (min_x + max_x) / 2
-        cy = (min_y + max_y) / 2
-        
-        # Only add if it has non-zero size
-        if bw > 0.5 and bh > 0.5: # at least 0.5px big
-            labels.append([
-                class_id, 
-                cx / w_img, 
-                cy / h_img, 
-                bw / w_img, 
-                bh / h_img
-            ])
+        A rotated box cannot be clipped to the frame and stay a rotated box, so
+        instead of trimming it the symbol is kept whole or dropped, judged on
+        how much of its area still lands on the image.
+        """
+        full = polygon_area(corners)
+        if full <= 0:
+            return
+
+        frame = [(0.0, 0.0), (float(w_img), 0.0),
+                 (float(w_img), float(h_img)), (0.0, float(h_img))]
+        visible = polygon_area(clip_polygon(corners, frame))
+
+        # A symbol that is mostly outside the frame is a partial glyph the model
+        # cannot classify; teaching it that such a stub is a full Festlager is
+        # how you manufacture false positives on real images.
+        if visible / full < 0.6:
+            return
+
+        row = [class_id]
+        for x, y in corners:
+            # Ultralytics wants normalised coordinates; a corner just off the
+            # edge is clamped rather than dropping an otherwise good symbol.
+            row.append(min(1.0, max(0.0, x / w_img)))
+            row.append(min(1.0, max(0.0, y / h_img)))
+        labels.append(row)
 
     def debug_overlay(self, image: Image.Image, system: ImageSystem) -> Image.Image:
         """Draw YOLO boxes using the same geometry as training labels (QA / regression checks)."""
@@ -244,18 +183,13 @@ class YOLODatasetManager:
         w, h = out.size
         labels = self._structure_to_yolo_labels(system, (w, h))
         for row in labels:
-            cid, cx, cy, bw, bh = row
-            x1 = (cx - bw / 2) * w
-            y1 = (cy - bh / 2) * h
-            x2 = (cx + bw / 2) * w
-            y2 = (cy + bh / 2) * h
-            name = (
-                self.classes[int(cid)]
-                if 0 <= int(cid) < len(self.classes)
-                else str(int(cid))
-            )
-            draw.rectangle([x1, y1, x2, y2], outline="red", width=2)
-            draw.text((x1, max(0, y1 - 12)), name, fill="red")
+            cid = int(row[0])
+            pts = [(row[1 + 2 * i] * w, row[2 + 2 * i] * h) for i in range(4)]
+            name = self.classes[cid] if 0 <= cid < len(self.classes) else str(cid)
+            draw.polygon(pts, outline="red")
+            for i in range(4):  # polygon() ignores width, so stroke the edges
+                draw.line([pts[i], pts[(i + 1) % 4]], fill="red", width=2)
+            draw.text((pts[0][0], max(0, pts[0][1] - 12)), name, fill="red")
         return out
 
     def get_image_list(self, split: str = "train") -> List[Dict]:
@@ -272,11 +206,20 @@ class YOLODatasetManager:
             with open(label_path, "r", encoding="utf-8") as f:
                 for line in f:
                     parts = line.strip().split()
-                    if len(parts) != 5: continue
+                    if len(parts) != 9: continue
                     try:
                         class_id = int(float(parts[0]))
-                        cx, cy, w, h = map(float, parts[1:])
+                        coords = list(map(float, parts[1:]))
+                        corners = [(coords[2 * i], coords[2 * i + 1]) for i in range(4)]
+                        xs = [c[0] for c in corners]
+                        ys = [c[1] for c in corners]
                         class_name = self.classes[class_id] if 0 <= class_id < len(self.classes) else str(class_id)
-                        labels.append({"class_id": class_id, "class_name": class_name, "cx": cx, "cy": cy, "w": w, "h": h})
+                        # Both shapes: `corners` is the truth, cx/cy/w/h is the
+                        # enclosing box that existing viewers already draw.
+                        labels.append({"class_id": class_id, "class_name": class_name,
+                                       "corners": corners,
+                                       "cx": (min(xs) + max(xs)) / 2,
+                                       "cy": (min(ys) + max(ys)) / 2,
+                                       "w": max(xs) - min(xs), "h": max(ys) - min(ys)})
                     except: continue
         return labels

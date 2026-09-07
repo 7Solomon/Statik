@@ -75,6 +75,9 @@ pnpm-debug.log*
 # SYSTEMS
 backend/content/*
 !backend/content/system_templates
+# Hand-drawn labels on real images: not reproducible, unlike everything else
+# under content/. Tracked on purpose.
+!backend/content/labeling
 
 frontend/node_modules
 frontend/.react-router
@@ -90,3 +93,5 @@ backend/__pycache__
 .env*
 
 content/*
+# Throwaway real-image harvester + its output (see tmp/README.md)
+tmp/

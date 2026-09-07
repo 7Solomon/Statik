@@ -4,7 +4,7 @@ import type { AnalysisInteractionState, EditorInteractionState, ToolType, Viewpo
 // --- SHARED DOMAIN ---
 export type AppMode = 'EDITOR' | 'ANALYSIS' | 'MODELS';
 export type AnalysisViewMode = 'KINEMATIC' | 'SIMPLIFIED' | 'SOLUTION' | 'DYNAMIC';;
-export type ModelViewMode = 'TRAINING' | 'DATASETS';
+export type ModelViewMode = 'TRAINING' | 'DATASETS' | 'LABELING';
 
 // --- EDITOR DOMAIN ---
 export interface EditorState {

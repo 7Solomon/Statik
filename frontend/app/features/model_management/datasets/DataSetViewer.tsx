@@ -118,44 +118,6 @@ export default function DatasetViewer({ datasetPath, onClose }: DatasetViewerPro
 
                         {currentData?.url && (
                             <>
-
-                                {currentData.labels.map((label, i) => {
-                                    if (!imageRef.current) return null;
-
-                                    return (
-                                        <div
-                                            key={i}
-                                            // 1. "group": Allows child elements to react when this parent is hovered
-                                            className="absolute border-2 border-indigo-500 bg-indigo-500/10 group cursor-help transition-colors hover:bg-indigo-500/20 hover:border-indigo-400 z-10"
-                                            style={{
-                                                left: `${(label.cx - label.w / 2) * 100}%`,
-                                                top: `${(label.cy - label.h / 2) * 100}%`,
-                                                width: `${label.w * 100}%`,
-                                                height: `${label.h * 100}%`
-                                            }}
-                                        >
-                                            {/* 2. The Tooltip Label */}
-                                            <div className="absolute 
-                                                    /* Position: centered above the box */
-                                                    left-1/2 -translate-x-1/2 -top-8
-                                                    /* Appearance: Dark tooltip with arrow */
-                                                    bg-slate-900 text-white text-xs px-2 py-1 rounded shadow-xl
-                                                    /* Behavior: Hidden by default, visible on group-hover */
-                                                    opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                                                    pointer-events-none whitespace-nowrap z-20 flex flex-col items-center">
-
-                                                {/* The Text */}
-                                                <span className="font-semibold">{label.class_name}</span>
-                                                <span className="text-[10px] text-slate-400 font-mono">
-                                                    ID: {label.class_id}
-                                                </span>
-
-                                                {/* Little triangle arrow pointing down */}
-                                                <div className="w-2 h-2 bg-slate-900 rotate-45 absolute -bottom-1"></div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
                                 <img
                                     ref={imageRef}
                                     src={currentData.url}
@@ -163,30 +125,63 @@ export default function DatasetViewer({ datasetPath, onClose }: DatasetViewerPro
                                     className="max-h-[75vh] max-w-[90vw] object-contain block select-none"
                                     draggable={false}
                                 />
-                                {/* Bounding Boxes */}
-                                {currentData.labels.map((label, i) => {
-                                    if (!imageRef.current) return null;
-                                    // Bounding box logic relies on CSS percentages if container matches img size,
-                                    // or explicit pixel calc if necessary. 
-                                    // Using percentage based styling is easiest for responsive scaling:
 
-                                    return (
-                                        <div
-                                            key={i}
-                                            className="absolute border-2 border-indigo-500 bg-indigo-500/10 group hover:bg-indigo-500/20 transition-colors cursor-crosshair"
-                                            style={{
-                                                left: `${(label.cx - label.w / 2) * 100}%`,
-                                                top: `${(label.cy - label.h / 2) * 100}%`,
-                                                width: `${label.w * 100}%`,
-                                                height: `${label.h * 100}%`
-                                            }}
-                                        >
-                                            <span className="absolute -top-6 left-0 bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                                                {label.class_name}
+                                {/* Oriented boxes. The labels are four corners,
+                                    so they are drawn as polygons - a rectangle
+                                    from cx/cy/w/h would be the box around the
+                                    box, and would not show how it is turned.
+                                    preserveAspectRatio="none" maps the 0-100
+                                    viewBox straight onto the image. */}
+                                <svg
+                                    className="absolute inset-0 w-full h-full pointer-events-none"
+                                    viewBox="0 0 100 100"
+                                    preserveAspectRatio="none"
+                                >
+                                    {currentData.labels.map((label, i) => {
+                                        const pts = label.corners ?? [
+                                            [label.cx - label.w / 2, label.cy - label.h / 2],
+                                            [label.cx + label.w / 2, label.cy - label.h / 2],
+                                            [label.cx + label.w / 2, label.cy + label.h / 2],
+                                            [label.cx - label.w / 2, label.cy + label.h / 2],
+                                        ] as [number, number][];
+                                        return (
+                                            <polygon
+                                                key={i}
+                                                points={pts.map(p => `${p[0] * 100},${p[1] * 100}`).join(' ')}
+                                                fill="rgb(99 102 241)"
+                                                fillOpacity={0.12}
+                                                stroke="rgb(99 102 241)"
+                                                strokeWidth={0.4}
+                                                vectorEffect="non-scaling-stroke"
+                                            />
+                                        );
+                                    })}
+                                </svg>
+
+                                {/* Hover targets sit above the inert SVG. */}
+                                {currentData.labels.map((label, i) => (
+                                    <div
+                                        key={i}
+                                        className="absolute group cursor-help z-10"
+                                        style={{
+                                            left: `${(label.cx - label.w / 2) * 100}%`,
+                                            top: `${(label.cy - label.h / 2) * 100}%`,
+                                            width: `${label.w * 100}%`,
+                                            height: `${label.h * 100}%`
+                                        }}
+                                    >
+                                        <div className="absolute left-1/2 -translate-x-1/2 -top-8
+                                                        bg-slate-900 text-white text-xs px-2 py-1 rounded shadow-xl
+                                                        opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                                                        pointer-events-none whitespace-nowrap z-20 flex flex-col items-center">
+                                            <span className="font-semibold">{label.class_name}</span>
+                                            <span className="text-[10px] text-slate-400 font-mono">
+                                                ID: {label.class_id}
                                             </span>
+                                            <div className="w-2 h-2 bg-slate-900 rotate-45 absolute -bottom-1"></div>
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                ))}
                             </>
                         )}
                     </div>

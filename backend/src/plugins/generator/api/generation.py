@@ -272,21 +272,34 @@ def dataset_labels_batch():
                 with open(label_path, "r") as f:
                     for line in f:
                         parts = line.strip().split()
-                        if len(parts) != 5: continue
-                        
-                        # Parse YOLO format: class_id cx cy w h
+                        # 9 = YOLO OBB (class + 4 corners), 5 = legacy axis-aligned.
+                        if len(parts) not in (5, 9): continue
+
                         class_id = int(float(parts[0]))
-                        cx, cy, w, h = map(float, parts[1:])
-                        
+                        values = list(map(float, parts[1:]))
+                        if len(values) == 8:
+                            corners = [(values[2 * i], values[2 * i + 1]) for i in range(4)]
+                            xs = [c[0] for c in corners]
+                            ys = [c[1] for c in corners]
+                            cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+                            w, h = max(xs) - min(xs), max(ys) - min(ys)
+                        else:
+                            cx, cy, w, h = values
+                            corners = [(cx - w / 2, cy - h / 2), (cx + w / 2, cy - h / 2),
+                                       (cx + w / 2, cy + h / 2), (cx - w / 2, cy + h / 2)]
+
                         # Resolve class name
                         if 0 <= class_id < len(classes):
                             class_name = classes[class_id]
                         else:
                             class_name = f"class_{class_id}"
-                            
+
+                        # cx/cy/w/h is the enclosing axis-aligned box, kept so the
+                        # existing viewer keeps working; `corners` is the truth.
                         file_labels.append({
-                            "class_id": class_id, 
-                            "class_name": class_name, 
+                            "class_id": class_id,
+                            "class_name": class_name,
+                            "corners": corners,
                             "cx": cx, "cy": cy, "w": w, "h": h
                         })
             except Exception:

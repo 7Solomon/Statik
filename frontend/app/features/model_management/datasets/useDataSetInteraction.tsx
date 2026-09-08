@@ -41,7 +41,7 @@ export const useDatasetInteraction = ({ datasetPath, initialSplit = 'train' }: U
 
     // Helper for API calls
     const apiCall = async (endpoint: string, body: any) => {
-        const res = await fetch(`api/generation/${endpoint}`, {
+        const res = await fetch(`/api/generation/${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ dataset_path: datasetPath, ...body }),

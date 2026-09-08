@@ -257,32 +257,162 @@ Damit gibt `statik_build_system` eine echte URL zurueck
 
 ## 9. Etappen
 
-**Etappe 1 — Fundament, ohne MCP**
+**Etappe 1 — Fundament, ohne MCP — ERLEDIGT**
 
-1. `backend/src/plugins/agent/schema.py`: `expand()` / `compact()` + Tests.
-2. `StructuralSystem -> ImageSystem` (Umkehrung von
-   `convert_to_real_system`) — der einzige echte neue Rechenschritt.
-3. `backend/src/plugins/agent/api/agent.py`: Blueprint `/api/agent/*`
-   (systems anlegen/lesen/patchen, render, templates).
-4. In `src/__init__.py` registrieren.
-5. Frontend-Route `/s/:slug`.
+1. `backend/src/plugins/agent/schema.py`: `expand()` / `compact()`,
+   22 Tests in `backend/tests/test_agent_schema.py`.
+2. `backend/src/plugins/agent/render.py`: Welt -> Pixel, System -> PNG.
+3. `backend/src/plugins/agent/checks.py`: Plausibilitaetswarnungen.
+4. `backend/src/plugins/agent/api/agent.py`: Blueprint `/api/agent/*`,
+   registriert in `src/__init__.py`.
+5. Frontend-Route `/s/:slug` (`app/routes/system.tsx`).
 
-Danach laesst sich der ganze Ablauf mit `curl` durchspielen. Erst dann
-lohnt Etappe 2.
+Zwei Dinge, die beim Bauen dazukamen:
 
-**Etappe 2 — MCP-Server**
+* **Alle relativen `fetch('api/...')` im Frontend sind jetzt absolut.**
+  Zwoelf Aufrufe benutzten einen relativen Pfad, der auf der flachen
+  Route zufaellig funktionierte. Unter `/s/<slug>` waere daraus
+  `/s/api/...` geworden — Speichern, Laden und jede Analyse haetten dort
+  ins Leere gegriffen. Der Rest des Codes benutzte ohnehin schon `/api/`.
+* **`AnnotationRenderer` wird bewusst NICHT wiederverwendet.** Er ist fuer
+  Trainingsdaten gebaut und deshalb absichtlich zufaellig: er laesst 45%
+  der Knotennamen weg, ersetzt Lastwerte in einem Drittel der Faelle durch
+  "F1", und zeichnet eine Bemassung, deren Laenge aus einem
+  Zufallsmassstab erfunden ist. Fuer eine Sichtkontrolle waere das aktiv
+  irrefuehrend. `render.py` beschriftet stattdessen deterministisch —
+  Knotennamen, Lastwerte, und einen Massstabsbalken, der aus der
+  tatsaechlichen Projektion berechnet ist.
 
-- `mcp/` im Repo-Root: eigenes `pyproject.toml`, `mcp` SDK + `httpx`,
-  **stdio-Transport**. Kein Docker, keine Ports, keine Auth-Frage.
-  In der Client-Konfiguration eintragen, `STATIK_URL` als env.
-- Die Tools aus Abschnitt 7. `statik_render` gibt `ImageContent` zurueck.
-- Beispiele und Legende als MCP-Resources.
+Der Ablauf laeuft durch: System anlegen, rendern, validieren, rechnen.
+Gegengeprueft an einem Zweifeldtraeger (M = qL^2/8 und PL/4, Summe der
+Auflagerkraefte) und einem Rahmen.
 
-**Etappe 2b — Messen** (Abschnitt 6, letzter Absatz)
+**API-Oberflaeche (Stand jetzt)**
 
-Vor Etappe 3, weil das Ergebnis ueber Etappe 3 entscheidet.
+| Route | Zweck |
+|---|---|
+| `GET /api/agent/schema` | Vokabular, Konventionen, Beispiel |
+| `GET /api/agent/templates` | gespeicherte Systeme kompakt, als Few-Shot-Material |
+| `GET/POST /api/agent/systems` | auflisten / anlegen (gibt `slug` + URL + Warnungen) |
+| `GET/PATCH /api/agent/systems/<slug>` | lesen / abschnittsweise ersetzen |
+| `GET /api/agent/systems/<slug>/render` | PNG (`?width=`, `?labels=0`) |
+| `POST /api/agent/render` | PNG ohne zu speichern |
+| `GET /api/agent/systems/<slug>/validate` | DOF, `ready_for_analysis`, Warnungen |
+| `GET /api/agent/systems/<slug>/analyze/<kind>` | simplify / solution / dynamics, `?full=1` fuer Rohdaten |
 
-**Etappe 3 — nur wenn die Messung es verlangt**
+**Etappe 2 — MCP-Server — ERLEDIGT**
+
+`mcp/` im Repo-Root: `pyproject.toml`, `statik_mcp/server.py`, `README.md`.
+stdio-Transport, `STATIK_URL` und `STATIK_TOKEN` als env. Neun Tools und
+zwei Resources; `statik_render` liefert echten Bildinhalt. Keine Statik-Logik
+im Server — jedes Tool ist ein Aufruf gegen `/api/agent/*`.
+
+Zwei Dinge, die man wissen muss, bevor man daran weiterbaut:
+
+* **Das SDK ist bei 2.x, und dort heisst `FastMCP` jetzt `MCPServer`.**
+  `from mcp.server.fastmcp import FastMCP` importiert nicht mehr — das Paket
+  wirft dazu eine eigene Fehlermeldung mit Migrationslink. Alles, was man
+  aus aelteren Beispielen abschreibt, ist an dieser Stelle falsch.
+* **Fehler muessen als `ToolError` geworfen werden.** Jede andere Exception
+  bekommt ihre Meldung durch eine generische ersetzt, bevor sie das Modell
+  erreicht. Genau die Meldungen aus `schema.py`, die dem Agenten sagen,
+  *was* er stattdessen schreiben soll ("end 'Z' is not a node id. Known
+  nodes: A"), waeren damit unsichtbar gewesen.
+
+Dabei fiel noch eine Luecke auf: **`rotation` am Knoten war nirgends
+dokumentiert.** Sie dreht die Achsen des Auflagers mit — `fixN` wirkt dann
+entlang der gedrehten lokalen x-Achse — und ist damit nicht Kosmetik,
+sondern ein schiefes Auflager. Nebenbei ist sie das, was einen Kragarm
+richtig aussehen laesst: ohne sie liegt die Einspannung flach am Boden, mit
+`"rotation": 90` steht sie als senkrechte Wand da, wie im Lehrbuch. Steht
+jetzt in `/api/agent/schema` und im Docstring von `statik_build_system`.
+
+Gegengeprueft mit einem echten MCP-Client ueber stdio: Tool-Liste,
+Resources, Bildrueckgabe (`content types: ['text', 'image']`), beide
+Fehlerpfade, und ein Kragarm mit M = 15 kN * 4 m = 60 kNm.
+
+**Etappe 2b — Messen — ERLEDIGT (und das Ergebnis aendert Etappe 3)**
+
+Gebaut:
+
+* `backend/src/plugins/agent/compare.py` — vergleicht zwei Systeme. Namen,
+  Massstab und Ursprung duerfen abweichen (ein gerendertes Blatt traegt keine
+  Bemassung), Lastgroessen ebenfalls (die stehen nicht im Bild). Eine
+  Spiegelung wird *nicht* verziehen. Knoten werden ueber ein optimales
+  Matching der normierten Positionen gepaart.
+* `backend/src/plugins/agent/evalset.py` — generiertes System -> kompakte
+  Wahrheit, mit y nach oben.
+* `backend/scripts/make_eval_set.py`, `backend/scripts/score_eval.py`
+* 20 Tests in `backend/tests/test_agent_compare.py`. Selbsttest der Kette:
+  Wahrheit gegen sich selbst = 100 % in allen Metriken.
+
+**Das Messergebnis** (8 Systeme, Seed 7, von einem multimodalen Modell
+ohne Kenntnis der Wahrheit rekonstruiert):
+
+| Metrik | Wert |
+|---|---|
+| Topologie exakt | **6 von 8** |
+| Knoten-F1 | 0,78 |
+| Stab-F1 | 0,75 |
+| Lagertypen | 0,71 |
+| Gelenke | 0,67 |
+| Lasten-F1 | 0,64 |
+| mittlerer Positionsfehler | 0,016 (Anteil der Diagonale) |
+| komplett korrekt | 0 von 8 |
+
+Ein Fachwerk mit 12 Knoten und 21 Staeben kam topologisch fehlerfrei
+zurueck. Die Geometrie ist also nicht das Problem — 0,016 Positionsfehler
+heisst, dass getroffene Knoten sehr genau getroffen werden.
+
+**Warum "komplett korrekt" trotzdem 0 ist — und was daran nicht am Leser
+liegt:**
+
+1. **Festlager und Loslager unterscheiden sich um 4 Pixel.** Das steht so im
+   Code (`stanli_symbols.py`, Kommentar in `StanliSupport._ops`): "Festlager
+   sits directly on the ground; Loslager rolls, so its ground line is offset
+   by supportGap. That gap is the only discriminator between the two."
+   `supportGap = 1.0` mm bei `PX_PER_MM = 4.0` — also 20 px gegen 24 px in
+   einem 900x660-Bild. Das ist weder fuer einen Agenten noch fuer YOLO noch
+   fuer einen Menschen lesbar. **Das trifft das YOLO-Training genauso:** der
+   Datensatz verlangt dort zwei Klassen zu trennen, die sich um vier Pixel
+   unterscheiden.
+2. **Gleitlager wird als zwei Rollen gezeichnet.** In der ueblichen deutschen
+   Konvention lesen sich Rollen als Loslager — daher kommt die Haelfte der
+   Lagerverwechslungen. Entweder das Symbol anpassen oder dem Agenten das
+   Vokabular explizit mitgeben (die Legende aus Abschnitt 6).
+3. **Knoten werden nicht gezeichnet.** Ein Knoten mitten in einem geraden
+   Stabzug, ohne Lager, Gelenk oder Last, hinterlaesst keine Spur im Bild —
+   das Bild ist pixelgleich, ob er da ist oder nicht. `unobservable_nodes()`
+   misst das jetzt mit: im Probelauf war genau **ein** Knoten prinzipiell
+   unsichtbar, 7 von 8 Systemen waren vollstaendig rekonstruierbar. Die
+   Obergrenze lag also bei 7/8, nicht bei 8/8.
+
+**Was wirklich Lesefehler war:** bei zwei Systemen wurden Knoten an den
+Raendern von Streckenlasten erfunden. Streckenlasten decken im Generator oft
+nur einen Teil eines Stabes ab (`from`/`to`), und ohne gezeichnete Knoten ist
+die Annahme "Lastrand = Knoten" naheliegend und falsch. Das gehoert in den
+Docstring von `statik_build_system`.
+
+**Folgerung fuer Etappe 3:** Die Zahlen sagen *noch nicht*, dass YOLO
+gebraucht wird. Sie sagen zuerst, dass der Datensatz repariert gehoert —
+solange zwei Lagerklassen vier Pixel auseinanderliegen, misst man die
+Rendering-Schwaeche und nicht den Leser. Reihenfolge: Symbole trennbar
+machen, Bemassung optional einzeichnen, dann neu messen. Erst danach ist die
+Frage nach YOLO beantwortbar.
+
+**Etappe 3 — zuerst den Datensatz reparieren, dann neu messen**
+
+Vor allem anderen, weil es Agent *und* Detektor gleichermassen betrifft:
+
+- `supportGap` so vergroessern, dass Festlager und Loslager sichtbar
+  verschieden sind, oder das Loslager konventionell mit Rollen zeichnen und
+  das Gleitlager anders.
+- Knotenpunkte markieren oder eine echte Bemassung einzeichnen (die
+  vorhandene in `AnnotationRenderer` ist erfunden — siehe Etappe 1).
+- Danach `make_eval_set.py` + `score_eval.py` erneut laufen lassen, mit
+  mehr als acht Systemen und ueber die MCP-Tools statt von Hand.
+
+Erst wenn die Zahlen dann immer noch nicht tragen:
 
 - YOLO als *optionale Praezisionshilfe* zurueckholen: `/api/vision/predict`
   als zusaetzliches Tool, das der Agent bei unbemassten oder
@@ -304,10 +434,10 @@ Vor Etappe 3, weil das Ergebnis ueber Etappe 3 entscheidet.
 ML-Modell mehr im Spiel ist, bleibt die Angriffsflaeche aber klein —
 Schreiben in `SystemManager`, sonst nichts.
 
-**Ungenaue Koordinaten.** Wenn eine Vorlage nicht durchgehend bemasst
-ist, schaetzt der Agent — und dann liegt ein Knoten vielleicht bei
-`y = 3,98` statt `4,00`. Fuer die Rechnung meist egal, fuer die Optik
-nicht. Billige Abhilfe: `validate` gibt Geometriehinweise mit aus
+**Ungenaue Koordinaten.** `checks.py` faengt inzwischen die drei Fehler
+ab, die beim Ablesen einer Zeichnung tatsaechlich passieren: zwei Knoten
+uebereinander (ein Gelenk doppelt gesehen), ein Knoten ohne Stab, ein
+System ganz ohne Lager. Was noch fehlt, ist der Fluchtungshinweis
 ("A und C unterscheiden sich um 0,02 m in y — soll das fluchten?").
 Erst bauen, wenn es in der Praxis stoert.
 

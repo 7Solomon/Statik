@@ -40,7 +40,7 @@ export default function SimplifiedViewer() {
                 meta: { zoom: 1, pan: { x: 0, y: 0 } }
             };
 
-            const res = await fetch('api/analyze/simplify', {
+            const res = await fetch('/api/analyze/simplify', {
                 method: 'POST',
                 body: JSON.stringify(payload),
                 headers: { 'Content-Type': 'application/json' }

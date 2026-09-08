@@ -1,0 +1,122 @@
+{
+  "meta": {
+    "name": "Zweifeldtraeger Agent",
+    "slug": "zweifeldtraeger-agent",
+    "saved_at": "2026-09-07T09:37:54.698774"
+  },
+  "system": {
+    "nodes": [
+      {
+        "id": "A",
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "rotation": 0.0,
+        "supports": {
+          "fixN": true,
+          "fixV": true,
+          "fixM": false
+        }
+      },
+      {
+        "id": "B",
+        "position": {
+          "x": 5.0,
+          "y": 0.0
+        },
+        "rotation": 0.0,
+        "supports": {
+          "fixN": false,
+          "fixV": true,
+          "fixM": false
+        }
+      },
+      {
+        "id": "C",
+        "position": {
+          "x": 11.0,
+          "y": 0.0
+        },
+        "rotation": 0.0,
+        "supports": {
+          "fixN": false,
+          "fixV": true,
+          "fixM": false
+        }
+      }
+    ],
+    "members": [
+      {
+        "id": "A-B",
+        "startNodeId": "A",
+        "endNodeId": "B",
+        "properties": {
+          "E": 210000000000.0,
+          "A": 0.005,
+          "I": 0.0001,
+          "m": 1
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          }
+        }
+      },
+      {
+        "id": "B-C",
+        "startNodeId": "B",
+        "endNodeId": "C",
+        "properties": {
+          "E": 210000000000.0,
+          "A": 0.005,
+          "I": 0.0001,
+          "m": 1
+        },
+        "releases": {
+          "start": {
+            "fx": false,
+            "fy": false,
+            "mz": true
+          },
+          "end": {
+            "fx": false,
+            "fy": false,
+            "mz": false
+          }
+        }
+      }
+    ],
+    "loads": [
+      {
+        "id": "L1",
+        "scope": "MEMBER",
+        "type": "DISTRIBUTED",
+        "memberId": "A-B",
+        "value": 8.0,
+        "startRatio": 0.0,
+        "endRatio": 1.0,
+        "isGlobal": true
+      },
+      {
+        "id": "L2",
+        "type": "POINT",
+        "value": 30.0,
+        "angle": -90.0,
+        "isGlobal": true,
+        "scope": "MEMBER",
+        "memberId": "B-C",
+        "ratio": 0.5
+      }
+    ],
+    "scheiben": [],
+    "constraints": []
+  }
+}

@@ -28,7 +28,7 @@ export function SaveSystemModal({ onClose }: SaveSystemModalProps) {
             };
 
             // 3. Call your backend
-            const response = await fetch('api/systems_management/save', {
+            const response = await fetch('/api/systems_management/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),

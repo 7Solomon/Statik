@@ -120,10 +120,26 @@ export interface SharedActions {
     setMode: (mode: AppMode) => void;
 }
 
+// --- SESSION DOMAIN ---
+// Not an account system - a read of what the gateway in front of us allows.
+// See sessionSlice.ts.
+export interface SessionState {
+    status: 'unknown' | 'ready';
+    user: string | null;
+    groups: string[];
+    /** The gateway is in front and this visitor is not signed in. */
+    restricted: boolean;
+}
+
+export interface SessionActions {
+    load: () => Promise<void>;
+}
+
 // --- THE ROOT STORE ---
 export interface AppStore {
     editor: EditorState & { actions: EditorActions };
     analysis: AnalysisState & { actions: AnalysisActions };
     model_management: ModelManagementState & { actions: ModelManagementActions };
     shared: SharedState & { actions: SharedActions };
+    session: SessionState & { actions: SessionActions };
 }

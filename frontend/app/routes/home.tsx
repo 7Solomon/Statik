@@ -1,13 +1,14 @@
 import { useState } from "react";
 import EditorCanvas from "../features/editor/EditorCanvas";
 import { useStore } from "../store/useStore";
-import { Save, FolderOpen, LayoutDashboard, Calculator, Database } from 'lucide-react';
+import { Save, FolderOpen, LayoutDashboard, Calculator, Database, Lock, LogIn } from 'lucide-react';
 import { SaveSystemModal } from "~/features/modals/SaveSystemModal";
 import { LoadSystemModal } from "~/features/modals/LoadSystemModal";
 import { SidePanel } from "~/features/ui/SidePannel";
 import AnalysisViewer from "~/features/analysis/AnalysisViewer";
 import ModelManagement from "~/features/model_management/ModelManager";
 import { DoubleHingeWarningModal } from "~/features/modals/DoubleHingeWarningModal";
+import { authPortalUrl } from "~/store/sessionSlice";
 
 export default function Home() {
   const mode = useStore(state => state.shared.mode);
@@ -16,10 +17,19 @@ export default function Home() {
   const startAnalysis = useStore(state => state.analysis.actions.startAnalysis);
   const clearAnalysis = useStore(state => state.analysis.actions.clearAnalysisSession);
 
+  // Saving, and everything under Models, goes through paths the gateway only
+  // opens for a signed-in visitor (gateway/Caddyfile, @statik_intern). Greying
+  // them out here just stops the click that was going to be refused anyway.
+  const restricted = useStore(state => state.session.restricted);
+  const user = useStore(state => state.session.user);
+  const loginUrl = restricted ? authPortalUrl() : null;
+
   const [modalOpen, setModalOpen] = useState<'save' | 'load' | 'double-hinge' | null>(null);
   const [doubleHingeNodes, setDoubleHingeNodes] = useState<any[]>([]);
 
   const handleToggleMode = (targetMode: 'EDITOR' | 'ANALYSIS' | 'MODELS') => {
+    if (targetMode === 'MODELS' && restricted) return;
+
     if (targetMode === 'ANALYSIS') {
       // Get CURRENT state (don't capture in variables)
       const currentState = useStore.getState().editor;
@@ -67,7 +77,13 @@ export default function Home() {
 
         <div className="flex items-center gap-1 mr-auto">
           <HeaderButton icon={<FolderOpen size={16} />} label="Open" onClick={() => setModalOpen('load')} />
-          <HeaderButton icon={<Save size={16} />} label="Save" onClick={() => setModalOpen('save')} />
+          <HeaderButton
+            icon={restricted ? <Lock size={16} /> : <Save size={16} />}
+            label="Save"
+            onClick={() => setModalOpen('save')}
+            disabled={restricted}
+            title="Zum Speichern am Gateway anmelden"
+          />
         </div>
 
         <div className="absolute left-1/2 -translate-x-1/2 bg-slate-100 p-1 rounded-lg flex gap-1 border border-slate-200">
@@ -87,9 +103,24 @@ export default function Home() {
           <ModeButton
             active={mode === 'MODELS'}
             onClick={() => handleToggleMode('MODELS')}
-            icon={<Database size={14} />}
+            icon={restricted ? <Lock size={14} /> : <Database size={14} />}
             label="Models"
+            disabled={restricted}
+            title="Datensaetze, Training und Labeling brauchen eine Anmeldung am Gateway"
           />
+        </div>
+
+        <div className="ml-auto flex items-center gap-3 text-sm">
+          {user && <span className="text-slate-500">{user}</span>}
+          {loginUrl && (
+            <a
+              href={loginUrl}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors font-medium"
+              title="Anmelden, um Speichern und Models freizuschalten"
+            >
+              <LogIn size={16} /> Anmelden
+            </a>
+          )}
         </div>
       </header>
 
@@ -144,24 +175,35 @@ function detectDoubleHinges(nodes: any[], members: any[]) {
   return doubleHinges;
 }
 
-function HeaderButton({ icon, label, onClick }: any) {
+function HeaderButton({ icon, label, onClick, disabled, title }: any) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-slate-100 text-slate-600 hover:text-blue-600 transition-colors font-medium text-sm"
+      disabled={disabled}
+      title={disabled ? title : undefined}
+      aria-disabled={disabled}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors font-medium text-sm ${disabled
+        ? 'text-slate-300 cursor-not-allowed'
+        : 'text-slate-600 hover:bg-slate-100 hover:text-blue-600'
+        }`}
     >
       {icon} <span>{label}</span>
     </button>
   )
 }
 
-function ModeButton({ active, onClick, icon, label }: any) {
+function ModeButton({ active, onClick, icon, label, disabled, title }: any) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${active
-        ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
-        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+      disabled={disabled}
+      title={disabled ? title : undefined}
+      aria-disabled={disabled}
+      className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${disabled
+        ? 'text-slate-300 cursor-not-allowed'
+        : active
+          ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
+          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
         }`}
     >
       {icon}

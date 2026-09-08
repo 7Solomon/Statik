@@ -35,7 +35,7 @@ export default function KinematicViewer() {
                 meta: { zoom: 1, pan: { x: 0, y: 0 } }
             };
 
-            const res = await fetch('api/analyze/kinematics', {
+            const res = await fetch('/api/analyze/kinematics', {
                 method: 'POST',
                 body: JSON.stringify(payload),
                 headers: { 'Content-Type': 'application/json' }

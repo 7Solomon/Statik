@@ -2,6 +2,8 @@
 
 A structural analysis tool for civil engineering. Create, analyze, and visualize 2D structural systems with an intuitive interface.
 
+Try it out: **[statik.7solomon.duckdns.org](https://statik.7solomon.duckdns.org)**
+
 <p align="center">
   <img src="assets/home.png" alt="Statik Editor Interface" width="800"/>
 </p>

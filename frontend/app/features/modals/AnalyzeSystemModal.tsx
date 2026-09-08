@@ -30,17 +30,17 @@ export function AnalyzeSystemModal({ onClose, onAnalysisComplete }: AnalyzeSyste
 
     // --- A. KINEMATIC ANALYSIS ---
     const handleRunKinematics = async () => {
-        runAnalysis('api/analyze/kinematics', 'Solving Kinematics...', 'KINEMATIC');
+        runAnalysis('/api/analyze/kinematics', 'Solving Kinematics...', 'KINEMATIC');
     };
 
     // --- B. SYSTEM SIMPLIFICATION ---
     const handleSimplify = async () => {
-        runAnalysis('api/analyze/simplify', 'Pruning Cantilevers...', 'SIMPLIFIED');
+        runAnalysis('/api/analyze/simplify', 'Pruning Cantilevers...', 'SIMPLIFIED');
     };
 
     // --- C. FEM ANALYSIS ---
     const handleRunFEMSolution = async () => {
-        runAnalysis('api/analyze/solution', 'Calculating Internal Forces...', 'SOLUTION');
+        runAnalysis('/api/analyze/solution', 'Calculating Internal Forces...', 'SOLUTION');
     };
 
     // Generic Runner to reduce duplication

@@ -35,11 +35,15 @@ def create_app(content_dir=Path("content")):
     from src.plugins.generator.api import generation
     from src.plugins.models.api import models
     from src.plugins.labeling.api import labeling
+    from src.plugins.agent.api import agent
+    from src.plugins.auth.api import session
     app.register_blueprint(api.bp)
     app.register_blueprint(systems.bp)
     app.register_blueprint(generation.bp)
     app.register_blueprint(models.bp)
     app.register_blueprint(labeling.bp)
+    app.register_blueprint(agent.bp)
+    app.register_blueprint(session.bp)
 
     
     #from flask import send_from_directory

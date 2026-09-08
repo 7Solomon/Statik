@@ -41,7 +41,7 @@ export default function DynamicAnalysisViewer() {
                 constraints: system.constraints
             };
 
-            const res = await fetch('api/analyze/dynamics', {
+            const res = await fetch('/api/analyze/dynamics', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

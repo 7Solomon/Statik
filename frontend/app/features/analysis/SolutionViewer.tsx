@@ -75,7 +75,7 @@ export default function SolutionViewer() {
                 meta: { zoom: 1, pan: { x: 0, y: 0 } }
             };
 
-            const res = await fetch('api/analyze/solution', {
+            const res = await fetch('/api/analyze/solution', {
                 method: 'POST',
                 body: JSON.stringify(payload),
                 headers: { 'Content-Type': 'application/json' }

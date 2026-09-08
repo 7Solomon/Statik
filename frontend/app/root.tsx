@@ -7,7 +7,10 @@ import {
   ScrollRestoration,
 } from "react-router";
 
+import { useEffect } from "react";
+
 import type { Route } from "./+types/root";
+import { useStore } from "~/store/useStore";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
@@ -42,6 +45,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  // Which controls the gateway would let through. Asked once, here rather than
+  // in a route, so every entry point gets the same answer. See sessionSlice.ts.
+  const loadSession = useStore((state) => state.session.actions.load);
+  useEffect(() => { loadSession(); }, [loadSession]);
+
   return <Outlet />;
 }
 

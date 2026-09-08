@@ -19,6 +19,9 @@ export function LoadSystemModal({ onClose }: LoadSystemModalProps) {
     const [search, setSearch] = useState('');
 
     const loadSystemIntoStore = useStore(state => state.editor.actions.loadStructuralSystem);
+    // Deleting goes through a gateway-protected path; loading and listing do
+    // not. So the list stays usable without an account, minus this one button.
+    const restricted = useStore(state => state.session.restricted);
 
     useEffect(() => {
         fetchSystems();
@@ -26,7 +29,7 @@ export function LoadSystemModal({ onClose }: LoadSystemModalProps) {
 
     const fetchSystems = async () => {
         try {
-            const res = await fetch('api/systems_management/list');
+            const res = await fetch('/api/systems_management/list');
             if (!res.ok) throw new Error("Failed to fetch systems");
             const data = await res.json();
             setSystems(data);
@@ -47,7 +50,7 @@ export function LoadSystemModal({ onClose }: LoadSystemModalProps) {
 
         try {
             setLoading(true);
-            const res = await fetch(`api/systems_management/load/${slug}`);
+            const res = await fetch(`/api/systems_management/load/${slug}`);
             if (!res.ok) throw new Error("Failed to load system");
 
             const systemData = await res.json();
@@ -66,7 +69,7 @@ export function LoadSystemModal({ onClose }: LoadSystemModalProps) {
         if (!confirm("Are you sure you want to delete this system? This cannot be undone.")) return; // Enhanced message
 
         try {
-            const res = await fetch(`api/systems_management/delete/${slug}`, {
+            const res = await fetch(`/api/systems_management/delete/${slug}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -155,8 +158,15 @@ export function LoadSystemModal({ onClose }: LoadSystemModalProps) {
 
                                     <button
                                         onClick={(e) => handleDelete(sys.slug, e)}
-                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                        title="Delete system"
+                                        disabled={restricted}
+                                        aria-disabled={restricted}
+                                        className={`p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all ${restricted
+                                            ? 'text-slate-200 cursor-not-allowed'
+                                            : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                                            }`}
+                                        title={restricted
+                                            ? 'Zum Loeschen am Gateway anmelden'
+                                            : 'Delete system'}
                                     >
                                         <Trash2 size={18} />
                                     </button>
